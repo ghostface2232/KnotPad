@@ -574,6 +574,20 @@
             justify-content: space-between;
         }
         .sidebar-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .sidebar-header-actions { display: flex; gap: 8px; align-items: center; }
+        .sidebar-pin-btn {
+            width: 28px; height: 28px;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center; justify-content: center;
+            transition: all var(--transition);
+        }
+        .sidebar-pin-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .sidebar-pin-btn.pinned { background: var(--accent); border-color: var(--accent); color: white; }
         .sidebar-add {
             width: 28px; height: 28px;
             background: var(--accent);
@@ -645,17 +659,81 @@
             width: 100%;
             outline: none;
         }
+
+        .canvas-icon-picker {
+            position: absolute;
+            left: 12px;
+            top: 48px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 8px;
+            display: none;
+            gap: 6px;
+            flex-wrap: wrap;
+            width: 180px;
+            box-shadow: var(--shadow-lg);
+            z-index: 300;
+        }
+        .canvas-icon-picker.active { display: flex; }
+        .canvas-icon-picker .icon-opt {
+            width: 32px; height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center; justify-content: center;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            border: 2px solid transparent;
+            transition: all var(--transition);
+        }
+        .canvas-icon-picker .icon-opt:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .canvas-icon-picker .icon-opt.selected { border-color: var(--accent); color: var(--accent); }
+        .canvas-icon-picker .icon-opt.none {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+        .canvas-item-entry .canvas-icon {
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        .canvas-item-entry .canvas-icon:hover { transform: scale(1.1); }
+        .canvas-item-entry .canvas-icon .icon-letter {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <span class="sidebar-title">Canvases</span>
-            <button class="sidebar-add" id="addCanvasBtn" title="New Canvas">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-            </button>
+            <span class="sidebar-title">Canvas</span>
+            <div class="sidebar-header-actions">
+                <button class="sidebar-pin-btn" id="sidebarPinBtn" title="Pin Sidebar">
+                    <svg class="pin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v5M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V5a1 1 0 011-1 1 1 0 001-1V2a1 1 0 00-1-1H8a1 1 0 00-1 1v1a1 1 0 001 1 1 1 0 011 1z"/></svg>
+                </button>
+                <button class="sidebar-add" id="addCanvasBtn" title="New Canvas">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+                </button>
+            </div>
         </div>
         <div class="canvas-list" id="canvasList"></div>
+        <div class="canvas-icon-picker" id="canvasIconPicker">
+            <div class="icon-opt none" data-icon="" title="Text">Aa</div>
+            <div class="icon-opt" data-icon="canvas" title="Canvas"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6"/></svg></div>
+            <div class="icon-opt" data-icon="music" title="Music"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+            <div class="icon-opt" data-icon="image" title="Image"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+            <div class="icon-opt" data-icon="document" title="Document"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
+            <div class="icon-opt" data-icon="chat" title="Chat"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+            <div class="icon-opt" data-icon="chart" title="Chart"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></div>
+            <div class="icon-opt" data-icon="code" title="Code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
+            <div class="icon-opt" data-icon="bookmark" title="Bookmark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></div>
+            <div class="icon-opt" data-icon="star" title="Star"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <div class="icon-opt" data-icon="heart" title="Heart"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
+            <div class="icon-opt" data-icon="folder" title="Folder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></div>
+        </div>
     </div>
 
     <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
@@ -756,8 +834,22 @@
     const connectionsSvg = $('connectionsSvg'), minimapContent = $('minimapContent');
     const fileInput = $('fileInput'), toast = $('toast'), zoomDisplay = $('zoomDisplay');
     const filterDropdown = $('filterDropdown'), filterBtn = $('filterBtn');
-    const sidebar = $('sidebar'), sidebarToggle = $('sidebarToggle'), canvasList = $('canvasList');
+    const sidebar = $('sidebar'), sidebarToggle = $('sidebarToggle'), canvasList = $('canvasList'), sidebarPinBtn = $('sidebarPinBtn'), canvasIconPicker = $('canvasIconPicker');
     const selectionBox = $('selectionBox');
+
+    const CANVAS_ICONS = {
+        canvas: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6"/></svg>',
+        music: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+        image: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+        document: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
+        chat: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+        chart: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>',
+        code: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>',
+        bookmark: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>',
+        star: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+        heart: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>',
+        folder: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>'
+    };
     const linkModal = $('linkModal');
 
     const CANVASES_KEY = 'knotpad-canvases', THEME_KEY = 'knotpad-theme';
@@ -948,10 +1040,20 @@
         if (c) { c.name = name || 'Untitled'; c.updatedAt = Date.now(); saveCanvasesList(); renderCanvasList(); }
     }
 
+    let iconPickerTarget = null;
+
+    function getCanvasIconHTML(canvas) {
+        if (canvas.icon && CANVAS_ICONS[canvas.icon]) {
+            return CANVAS_ICONS[canvas.icon];
+        }
+        const firstChar = (canvas.name || 'U').charAt(0).toUpperCase();
+        return `<span class="icon-letter">${esc(firstChar)}</span>`;
+    }
+
     function renderCanvasList() {
         canvasList.innerHTML = canvases.map(c => `
             <div class="canvas-item-entry ${c.id === currentCanvasId ? 'active' : ''}" data-id="${c.id}">
-                <div class="canvas-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6"/></svg></div>
+                <div class="canvas-icon" data-canvas-id="${c.id}">${getCanvasIconHTML(c)}</div>
                 <div class="canvas-info"><div class="canvas-name">${esc(c.name)}</div><div class="canvas-meta">${c.itemCount || 0} items</div></div>
                 <div class="canvas-actions">
                     <button class="canvas-action-btn rename" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
@@ -960,11 +1062,50 @@
             </div>`).join('');
         canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
             const id = entry.dataset.id;
-            entry.addEventListener('click', async e => { if (!e.target.closest('.canvas-action-btn') && id !== currentCanvasId) { saveCurrentCanvas(); await switchCanvas(id); } });
+            entry.addEventListener('click', async e => { if (!e.target.closest('.canvas-action-btn') && !e.target.closest('.canvas-icon') && id !== currentCanvasId) { saveCurrentCanvas(); await switchCanvas(id); } });
             entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
             entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
+            entry.querySelector('.canvas-icon').addEventListener('click', e => { e.stopPropagation(); openIconPicker(id, entry); });
         });
     }
+
+    function openIconPicker(canvasId, entry) {
+        iconPickerTarget = canvasId;
+        const canvas = canvases.find(c => c.id === canvasId);
+        const rect = entry.getBoundingClientRect();
+        const sidebarRect = sidebar.getBoundingClientRect();
+        canvasIconPicker.style.top = (rect.top - sidebarRect.top) + 'px';
+        canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt => {
+            opt.classList.toggle('selected', opt.dataset.icon === (canvas?.icon || ''));
+        });
+        canvasIconPicker.classList.add('active');
+    }
+
+    function setCanvasIcon(canvasId, icon) {
+        const canvas = canvases.find(c => c.id === canvasId);
+        if (canvas) {
+            canvas.icon = icon || null;
+            canvas.updatedAt = Date.now();
+            saveCanvasesList();
+            renderCanvasList();
+        }
+    }
+
+    canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt => {
+        opt.addEventListener('click', e => {
+            e.stopPropagation();
+            if (iconPickerTarget) setCanvasIcon(iconPickerTarget, opt.dataset.icon);
+            canvasIconPicker.classList.remove('active');
+            iconPickerTarget = null;
+        });
+    });
+
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.canvas-icon-picker') && !e.target.closest('.canvas-icon')) {
+            canvasIconPicker.classList.remove('active');
+            iconPickerTarget = null;
+        }
+    });
 
     function startRename(entry, id) {
         const nameEl = entry.querySelector('.canvas-name');
@@ -1027,6 +1168,10 @@
 
     app.addEventListener('mousedown', e => {
         app.focus();
+        // Close unpinned sidebar on any canvas interaction
+        if (!sidebarPinned && sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+        }
         if (e.button === 1) {
             e.preventDefault();
             isPanning = true;
@@ -1536,6 +1681,24 @@
     fileInput.addEventListener('change', e => { if (e.target.files.length) { const x = (innerWidth / 2 - offsetX) / scale - 100, y = (innerHeight / 2 - offsetY) / scale - 70; [...e.target.files].forEach((f, i) => handleFile(f, x + i * 24, y + i * 24)); fileInput.value = ''; } });
 
     sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    
+    let sidebarPinned = localStorage.getItem('knotpad-sidebar-pinned') === 'true';
+    if (sidebarPinned) sidebarPinBtn.classList.add('pinned');
+    
+    sidebarPinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sidebarPinned = !sidebarPinned;
+        sidebarPinBtn.classList.toggle('pinned', sidebarPinned);
+        localStorage.setItem('knotpad-sidebar-pinned', sidebarPinned);
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!sidebarPinned && sidebar.classList.contains('open') && 
+            !sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+            sidebar.classList.remove('open');
+        }
+    });
+    
     $('addCanvasBtn').addEventListener('click', () => { saveCurrentCanvas(); createNewCanvas(); });
 
     function updateMinimap() {
