@@ -7,10 +7,28 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#09090b">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+    @font-face {
+        font-family: 'SFProKRDisplay';
+        src: url('./fonts/SFKR-Regular.otf') format('opentype');
+        font-weight: 400;
+        font-style: normal;
+    }
+
+    @font-face {
+        font-family: 'SFProKRDisplay';
+        src: url('./fonts/SFKR-Medium.otf') format('opentype');
+        font-weight: 500;
+        font-style: normal;
+    }
+
+    @font-face {
+        font-family: 'SFProKRDisplay';
+        src: url('./fonts/SFKR-Bold.otf') format('opentype');
+        font-weight: 700;
+        font-style: normal;
+    }
+
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
@@ -74,7 +92,10 @@
         html, body {
             height: 100%;
             overflow: hidden;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'SFProKRDisplay', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg-primary);
             background: var(--bg-primary);
             color: var(--text-primary);
             transition: background var(--transition), color var(--transition);
