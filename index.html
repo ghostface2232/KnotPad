@@ -94,16 +94,18 @@
             box-shadow: var(--shadow-md);
             cursor: move; min-width: 140px; min-height: 80px; overflow: visible;
         }
-        .canvas-item::before {
-            content: '';
+        .canvas-item .color-dot {
             position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 4px;
+            top: -5px; left: -5px;
+            width: 12px; height: 12px;
             background: var(--tag-color, transparent);
-            border-radius: var(--radius-md) var(--radius-md) 0 0;
-            z-index: 5;
+            border-radius: 50%;
+            border: 2px solid var(--bg-card);
+            z-index: 15;
             pointer-events: none;
+            display: none;
         }
+        .canvas-item.has-color .color-dot { display: block; }
         .canvas-item:hover { border-color: var(--border-active); box-shadow: var(--shadow-lg); }
         .canvas-item.selected { border-color: var(--accent); box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-glow); }
         .canvas-item.dragging { opacity: 0.9; }
@@ -546,17 +548,16 @@
         <button class="toolbar-btn" id="colorBtn" title="Set Color"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.3"/><circle cx="12" cy="12" r="5"/></svg></button>
         <button class="toolbar-btn" id="filterBtn" title="Filter by Color"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/></svg></button>
         <div class="toolbar-sep"></div>
-        <button class="toolbar-btn" id="undoBtn" title="Undo (Ctrl+Z)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6M3 13c0-4.97 4.03-9 9-9s9 4.03 9 9-4.03 9-9 9a9 9 0 01-7.5-4"/></svg></button>
-        <button class="toolbar-btn" id="redoBtn" title="Redo (Ctrl+Y)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6M21 13c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9a9 9 0 007.5-4"/></svg></button>
-        <div class="toolbar-sep"></div>
-        <button class="toolbar-btn" id="deleteSelectedBtn" title="Delete Selected (Del)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>
+        <button class="toolbar-btn" id="undoBtn" title="Undo (Ctrl+Z)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a4 4 0 110 8h-1"/></svg></button>
+        <button class="toolbar-btn" id="redoBtn" title="Redo (Ctrl+Y)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a4 4 0 100 8h1"/></svg></button>
         <div class="toolbar-sep"></div>
         <button class="toolbar-btn" id="zoomOutBtn" title="Zoom Out"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg></button>
         <div class="zoom-display" id="zoomDisplay">100%</div>
         <button class="toolbar-btn" id="zoomInBtn" title="Zoom In"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg></button>
         <button class="toolbar-btn" id="fitViewBtn" title="Fit to Screen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/></svg></button>
         <div class="toolbar-sep"></div>
-        <button class="toolbar-btn" id="exportBtn" title="Export/Import"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>
+        <button class="toolbar-btn" id="importBtn" title="Import"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M12 15l-4-4M12 15l4-4"/><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/></svg></button>
+        <button class="toolbar-btn" id="exportBtn" title="Export"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17V5M12 5l-4 4M12 5l4 4"/><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/></svg></button>
         <div class="toolbar-sep"></div>
         <button class="toolbar-btn" id="themeToggle" title="Theme">
             <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
@@ -618,21 +619,9 @@
         </div>
     </div>
 
-    <div class="modal" id="exportModal">
-        <div class="modal-box">
-            <h3>Export / Import</h3>
-            <div class="modal-actions" style="flex-direction:column;gap:12px;margin-top:0">
-                <button class="modal-btn modal-btn-submit" id="exportData" style="width:100%">Export Canvas (.json)</button>
-                <button class="modal-btn modal-btn-submit" id="importData" style="width:100%;background:var(--bg-card);color:var(--text-primary)">Import Canvas</button>
-                <input type="file" id="importInput" accept=".json" style="display:none">
-            </div>
-            <div class="modal-actions" style="margin-top:16px">
-                <button class="modal-btn modal-btn-cancel" data-close>Close</button>
-            </div>
-        </div>
-    </div>
+    <input type="file" id="importInput" accept=".json" style="display:none">
 
-    <div class="help-hint"><kbd>Ctrl+F</kbd> search · <kbd>Ctrl+Z</kbd> undo · <kbd>Del</kbd> delete</div>
+    <div class="help-hint"><kbd>Ctrl+F</kbd> search · <kbd>Ctrl+Z</kbd> undo · <kbd>Del</kbd> delete selected</div>
     <div class="minimap" id="minimap"><div class="minimap-content" id="minimapContent"></div></div>
     <div class="toast" id="toast"></div>
 
@@ -648,7 +637,7 @@
     const sidebar = $('sidebar'), sidebarToggle = $('sidebarToggle'), canvasList = $('canvasList');
     const sidebarPinBtn = $('sidebarPinBtn'), canvasIconPicker = $('canvasIconPicker');
     const selectionBox = $('selectionBox');
-    const linkModal = $('linkModal'), exportModal = $('exportModal');
+    const linkModal = $('linkModal');
     const searchBar = $('searchBar'), searchInput = $('searchInput');
     const connDirectionPicker = $('connDirectionPicker');
     const childTypePicker = $('childTypePicker');
@@ -930,12 +919,13 @@
         if (!items.length) { scale = 1; offsetX = offsetY = 0; updateTransform(); return; }
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         items.forEach(i => { minX = Math.min(minX, i.x); minY = Math.min(minY, i.y); maxX = Math.max(maxX, i.x + i.w); maxY = Math.max(maxY, i.y + i.h); });
-        const pad = 60, cw = maxX - minX + pad * 2, ch = maxY - minY + pad * 2;
-        const newScale = Math.min(Math.min(innerWidth / cw, innerHeight / ch), 2);
+        const padX = 120, padY = 140; // Extra padding for toolbar/minimap
+        const cw = maxX - minX + padX * 2, ch = maxY - minY + padY * 2;
+        const newScale = Math.min(Math.min((innerWidth - 60) / cw, (innerHeight - 160) / ch), 2) * 0.9; // 10% smaller
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
         scale = newScale;
         offsetX = innerWidth / 2 - cx * scale;
-        offsetY = innerHeight / 2 - cy * scale;
+        offsetY = (innerHeight - 80) / 2 - cy * scale; // Offset for toolbar
         updateTransform(); updateMinimap();
     }
     function throttledMinimap() { if (minimapThrottle) return; minimapThrottle = requestAnimationFrame(() => { updateMinimap(); minimapThrottle = null; }); }
@@ -1052,8 +1042,11 @@
             case 'memo': html = `<div class="item-memo"><textarea class="memo-body" placeholder="Quick memo...">${esc(cfg.content)}</textarea></div>`; break;
             case 'link': html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`; break;
         }
-        if (cfg.color) el.style.setProperty('--tag-color', COLOR_MAP[cfg.color]);
-        el.innerHTML = `<div class="item-content">${html}</div><button class="delete-btn">×</button><button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
+        if (cfg.color) {
+            el.style.setProperty('--tag-color', COLOR_MAP[cfg.color]);
+            el.classList.add('has-color');
+        }
+        el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn">×</button><button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
         canvas.appendChild(el);
         const item = { id: cfg.id || `i${++itemId}`, el, type: cfg.type, x: cfg.x, y: cfg.y, w: cfg.w, h: cfg.h, content: cfg.content, color: cfg.color || null, locked: cfg.locked || false };
         items.push(item);
@@ -1067,8 +1060,13 @@
         const targets = selectedItems.size > 0 ? selectedItems : new Set([targetItem]);
         targets.forEach(item => {
             item.color = color || null;
-            if (color) item.el.style.setProperty('--tag-color', COLOR_MAP[color]);
-            else item.el.style.setProperty('--tag-color', 'transparent');
+            if (color) {
+                item.el.style.setProperty('--tag-color', COLOR_MAP[color]);
+                item.el.classList.add('has-color');
+            } else {
+                item.el.style.setProperty('--tag-color', 'transparent');
+                item.el.classList.remove('has-color');
+            }
             item.el.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (color || '')));
             if (activeFilter !== 'all') item.el.classList.toggle('filtered-out', item.color !== activeFilter);
         });
@@ -1330,12 +1328,8 @@
         if (url) { if (!url.startsWith('http')) url = 'https://' + url; const x = (innerWidth / 2 - offsetX) / scale - 130, y = (innerHeight / 2 - offsetY) / scale - 50; addLink(url, $('linkTitle').value.trim(), x, y); saveState(); closeLinkModal(); }
     });
 
-    // Export modal
-    function openExportModal() { exportModal.classList.add('active'); }
-    function closeExportModal() { exportModal.classList.remove('active'); }
-    exportModal.addEventListener('click', e => { if (e.target === exportModal) closeExportModal(); });
-    exportModal.querySelector('[data-close]').addEventListener('click', closeExportModal);
-    $('exportData').addEventListener('click', async () => {
+    // Export directly
+    $('exportBtn').addEventListener('click', async () => {
         const data = {
             items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, locked: i.locked })),
             connections: connections.map(c => ({ from: c.from.id, fh: c.fh, to: c.to.id, th: c.th, dir: c.dir })),
@@ -1346,9 +1340,8 @@
         const a = document.createElement('a'); a.href = url; a.download = `${data.name}.json`; a.click();
         URL.revokeObjectURL(url);
         showToast('Exported');
-        closeExportModal();
     });
-    $('importData').addEventListener('click', () => $('importInput').click());
+    $('importBtn').addEventListener('click', () => $('importInput').click());
     $('importInput').addEventListener('change', async e => {
         const file = e.target.files[0]; if (!file) return;
         try {
@@ -1364,7 +1357,6 @@
             showToast('Imported');
         } catch (err) { showToast('Import failed', 'error'); }
         e.target.value = '';
-        closeExportModal();
     });
 
     // Keyboard
@@ -1372,7 +1364,7 @@
         if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); openSearch(); return; }
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); return; }
         if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
-        if (e.key === 'Escape') { cancelConnection(); closeLinkModal(); closeExportModal(); closeSearch(); deselectAll(); }
+        if (e.key === 'Escape') { cancelConnection(); closeLinkModal(); closeSearch(); deselectAll(); }
         if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input,textarea')) {
             if (selectedItems.size > 0) deleteSelectedItems();
             else if (selectedConn) deleteConnection(selectedConn);
@@ -1433,11 +1425,9 @@
     $('addFileBtn').addEventListener('click', () => fileInput.click());
     $('undoBtn').addEventListener('click', undo);
     $('redoBtn').addEventListener('click', redo);
-    $('deleteSelectedBtn').addEventListener('click', () => { if (selectedItems.size > 0) { deleteSelectedItems(); showToast('Deleted'); } else if (selectedConn) { deleteConnection(selectedConn); showToast('Connection deleted'); } else { showToast('Nothing selected', 'error'); } });
     $('zoomInBtn').addEventListener('click', () => setZoom(scale * 1.25));
     $('zoomOutBtn').addEventListener('click', () => setZoom(scale / 1.25));
     $('fitViewBtn').addEventListener('click', fitToScreen);
-    $('exportBtn').addEventListener('click', openExportModal);
     $('themeToggle').addEventListener('click', toggleTheme);
     fileInput.addEventListener('change', e => { if (e.target.files.length) { const x = (innerWidth / 2 - offsetX) / scale - 100, y = (innerHeight / 2 - offsetY) / scale - 70; [...e.target.files].forEach((f, i) => handleFile(f, x + i * 24, y + i * 24)); fileInput.value = ''; } });
 
