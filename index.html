@@ -932,6 +932,15 @@
     </div>
 
     <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" data-action="edit-link" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit Link
+        </div>
+        <div class="context-menu-item" data-action="replace-file" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Replace File
+        </div>
+        <div class="context-menu-sep" id="editSep" style="display:none"></div>
         <div class="context-menu-item" data-action="connect">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="3"/><circle cx="19" cy="12" r="3"/><path d="M8 12h8"/></svg>
             Connect to...
@@ -979,6 +988,7 @@
     <div class="help-hint"><kbd>Ctrl+S</kbd> save · <kbd>C</kbd> connect · <kbd>+</kbd> child</div>
     <div class="minimap"><div class="minimap-content" id="minimapContent"></div></div>
     <div class="toast" id="toast"></div>
+    <input type="file" id="replaceInput" style="display: none;">
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -988,7 +998,7 @@
         });
       }
     </script>
-    <script>
+ <script>
     (function() {
         const $ = id => document.getElementById(id);
         const canvas = $('canvas'), app = $('app'), dropZone = $('dropZone');
@@ -997,6 +1007,9 @@
         const fileInput = $('fileInput'), toast = $('toast'), zoomDisplay = $('zoomDisplay');
         const filterDropdown = $('filterDropdown'), filterBtn = $('filterBtn');
         const sidebar = $('sidebar'), sidebarToggle = $('sidebarToggle'), canvasList = $('canvasList');
+        
+        // 새로 추가된 요소 (파일 교체용)
+        const replaceInput = $('replaceInput');
 
         const CANVASES_KEY = 'knotpad-canvases';
         const THEME_KEY = 'knotpad-theme';
@@ -1014,12 +1027,22 @@
         let draggedItem = null, resizingItem = null;
         let connectMode = false, connectSource = null, connectHandle = null, tempLine = null;
         let activeFilter = 'all';
+        let autoSaveTimer = null; // 자동 저장 타이머
 
-        // Multi-canvas state
         let canvases = [];
         let currentCanvasId = null;
 
-        // Canvas management
+        // --- 자동 저장 로직 ---
+        function triggerAutoSave() {
+            if (!currentCanvasId) return;
+            clearTimeout(autoSaveTimer);
+            // 1초 뒤 자동 저장 (조용히)
+            autoSaveTimer = setTimeout(() => {
+                saveCurrentCanvas(true);
+            }, 1000);
+        }
+
+        // --- 초기화 및 데이터 로드 ---
         function generateId() {
             return 'c' + Date.now() + Math.random().toString(36).substr(2, 9);
         }
@@ -1030,25 +1053,14 @@
                 if (saved) {
                     canvases = JSON.parse(saved);
                 } else {
-                    // Create default canvas
-                    const defaultCanvas = {
-                        id: generateId(),
-                        name: 'Untitled',
-                        createdAt: Date.now(),
-                        updatedAt: Date.now()
-                    };
+                    const defaultCanvas = { id: generateId(), name: 'Untitled', createdAt: Date.now(), updatedAt: Date.now() };
                     canvases = [defaultCanvas];
                     saveCanvasesList();
                 }
-                
-                // Load first canvas or last active
                 const lastActiveId = localStorage.getItem('knotpad-active-canvas');
                 const targetCanvas = canvases.find(c => c.id === lastActiveId) || canvases[0];
-                if (targetCanvas) {
-                    switchCanvas(targetCanvas.id);
-                }
-                
-                renderCanvasList();
+                if (targetCanvas) switchCanvas(targetCanvas.id);
+                else switchCanvas(canvases[0].id);
             } catch (e) {
                 console.error('Failed to load canvases:', e);
             }
@@ -1058,7 +1070,7 @@
             localStorage.setItem(CANVASES_KEY, JSON.stringify(canvases));
         }
 
-        function saveCurrentCanvas() {
+        function saveCurrentCanvas(isAuto = false) {
             if (!currentCanvasId) return;
             
             const data = {
@@ -1069,19 +1081,16 @@
             
             try {
                 localStorage.setItem('knotpad-data-' + currentCanvasId, JSON.stringify(data));
-                
-                // Update canvas metadata
                 const canvas = canvases.find(c => c.id === currentCanvasId);
                 if (canvas) {
                     canvas.updatedAt = Date.now();
                     canvas.itemCount = items.length;
                     saveCanvasesList();
-                    renderCanvasList();
+                    if (!isAuto) renderCanvasList();
                 }
-                
-                showToast('Saved');
+                if (!isAuto) showToast('Saved');
             } catch (e) {
-                showToast('Save failed', 'error');
+                if (!isAuto) showToast('Save failed', 'error');
             }
         }
 
@@ -1115,22 +1124,16 @@
         }
 
         function switchCanvas(canvasId) {
-            // Clear current canvas
-            connections.forEach(c => c.el.remove());
-            connections = [];
-            items.forEach(i => i.el.remove());
-            items = [];
+            connections.forEach(c => c.el.remove()); connections = [];
+            items.forEach(i => i.el.remove()); items = [];
             selectedItem = selectedConn = null;
             itemId = highestZ = 1;
-            scale = 1;
-            offsetX = offsetY = 0;
+            scale = 1; offsetX = offsetY = 0;
             updateTransform();
             
-            // Set new current
             currentCanvasId = canvasId;
             localStorage.setItem('knotpad-active-canvas', canvasId);
             
-            // Load data
             loadCanvasData(canvasId);
             setFilter('all');
             updateMinimap();
@@ -1138,38 +1141,22 @@
         }
 
         function createNewCanvas() {
-            const newCanvas = {
-                id: generateId(),
-                name: 'Untitled',
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                itemCount: 0
-            };
+            const newCanvas = { id: generateId(), name: 'Untitled', createdAt: Date.now(), updatedAt: Date.now(), itemCount: 0 };
             canvases.unshift(newCanvas);
             saveCanvasesList();
             switchCanvas(newCanvas.id);
         }
 
         function deleteCanvas(canvasId) {
-            if (canvases.length <= 1) {
-                showToast('Cannot delete last canvas', 'error');
-                return;
-            }
-            
+            if (canvases.length <= 1) { showToast('Cannot delete last canvas', 'error'); return; }
             if (!confirm('Delete this canvas?')) return;
-            
             const idx = canvases.findIndex(c => c.id === canvasId);
             if (idx > -1) {
                 canvases.splice(idx, 1);
                 localStorage.removeItem('knotpad-data-' + canvasId);
                 saveCanvasesList();
-                
-                if (currentCanvasId === canvasId) {
-                    switchCanvas(canvases[0].id);
-                } else {
-                    renderCanvasList();
-                }
-                
+                if (currentCanvasId === canvasId) switchCanvas(canvases[0].id);
+                else renderCanvasList();
                 showToast('Canvas deleted');
             }
         }
@@ -1187,74 +1174,33 @@
         function renderCanvasList() {
             canvasList.innerHTML = canvases.map(c => `
                 <div class="canvas-item-entry ${c.id === currentCanvasId ? 'active' : ''}" data-id="${c.id}">
-                    <div class="canvas-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2"/>
-                            <path d="M9 3v18M3 9h6"/>
-                        </svg>
-                    </div>
-                    <div class="canvas-info">
-                        <div class="canvas-name">${escapeHtml(c.name)}</div>
-                        <div class="canvas-meta">${c.itemCount || 0} items</div>
-                    </div>
+                    <div class="canvas-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6"/></svg></div>
+                    <div class="canvas-info"><div class="canvas-name">${escapeHtml(c.name)}</div><div class="canvas-meta">${c.itemCount || 0} items</div></div>
                     <div class="canvas-actions">
-                        <button class="canvas-action-btn rename" title="Rename">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                        </button>
-                        <button class="canvas-action-btn delete" title="Delete">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                            </svg>
-                        </button>
+                        <button class="canvas-action-btn rename" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                        <button class="canvas-action-btn delete" title="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>
                     </div>
                 </div>
             `).join('');
 
-            // Add event listeners
             canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
                 const id = entry.dataset.id;
-                
                 entry.addEventListener('click', e => {
                     if (e.target.closest('.canvas-action-btn')) return;
-                    if (id !== currentCanvasId) {
-                        saveCurrentCanvas();
-                        switchCanvas(id);
-                    }
+                    if (id !== currentCanvasId) { saveCurrentCanvas(); switchCanvas(id); }
                 });
-
-                entry.querySelector('.rename').addEventListener('click', e => {
-                    e.stopPropagation();
-                    startRename(entry, id);
-                });
-
-                entry.querySelector('.delete').addEventListener('click', e => {
-                    e.stopPropagation();
-                    deleteCanvas(id);
-                });
+                entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
+                entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
             });
         }
 
         function startRename(entry, canvasId) {
             const nameEl = entry.querySelector('.canvas-name');
             const currentName = canvases.find(c => c.id === canvasId)?.name || '';
-            
             const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'canvas-name-input';
-            input.value = currentName;
-            
-            nameEl.replaceWith(input);
-            input.focus();
-            input.select();
-
-            const finish = () => {
-                const newName = input.value.trim() || 'Untitled';
-                renameCanvas(canvasId, newName);
-            };
-
+            input.type = 'text'; input.className = 'canvas-name-input'; input.value = currentName;
+            nameEl.replaceWith(input); input.focus(); input.select();
+            const finish = () => { renameCanvas(canvasId, input.value.trim() || 'Untitled'); };
             input.addEventListener('blur', finish);
             input.addEventListener('keydown', e => {
                 if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
@@ -1262,102 +1208,68 @@
             });
         }
 
-        function escapeHtml(t) {
-            const d = document.createElement('div');
-            d.textContent = t;
-            return d.innerHTML;
-        }
+        function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-        // Sidebar toggle
-        sidebarToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('open');
-        });
+        sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+        $('addCanvasBtn').addEventListener('click', () => { saveCurrentCanvas(); createNewCanvas(); });
 
-        $('addCanvasBtn').addEventListener('click', () => {
-            saveCurrentCanvas();
-            createNewCanvas();
-        });
-
-        // Theme
         function loadTheme() {
             const t = localStorage.getItem(THEME_KEY);
             if (t === 'light') document.documentElement.classList.add('light');
             updateThemeIcon();
         }
-
         function toggleTheme() {
             document.documentElement.classList.toggle('light');
             localStorage.setItem(THEME_KEY, document.documentElement.classList.contains('light') ? 'light' : 'dark');
             updateThemeIcon();
         }
-
         function updateThemeIcon() {
             const isLight = document.documentElement.classList.contains('light');
             $('themeToggle').querySelector('.moon').style.display = isLight ? 'none' : 'block';
             $('themeToggle').querySelector('.sun').style.display = isLight ? 'block' : 'none';
         }
 
-        // Toast
         function showToast(msg, type = 'success') {
-            toast.textContent = msg;
-            toast.className = 'toast ' + type;
+            toast.textContent = msg; toast.className = 'toast ' + type;
             requestAnimationFrame(() => toast.classList.add('show'));
             setTimeout(() => toast.classList.remove('show'), 2000);
         }
 
-        // Transform
         function updateTransform() {
             canvas.style.transform = `translate(${offsetX}px,${offsetY}px) scale(${scale})`;
             zoomDisplay.textContent = Math.round(scale * 100) + '%';
         }
-
         function setZoom(z) {
             const cx = innerWidth / 2, cy = innerHeight / 2;
             z = Math.max(0.1, Math.min(5, z));
             offsetX = cx - (cx - offsetX) * (z / scale);
             offsetY = cy - (cy - offsetY) * (z / scale);
             scale = z;
-            updateTransform();
-            updateMinimap();
+            updateTransform(); updateMinimap();
         }
-
-        // Filter
         function setFilter(color) {
             activeFilter = color;
             filterDropdown.querySelectorAll('.filter-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === color));
             filterBtn.classList.toggle('filter-active', color !== 'all');
-            
             items.forEach(item => {
-                if (color === 'all' || item.color === color) {
-                    item.el.classList.remove('filtered-out');
-                } else {
-                    item.el.classList.add('filtered-out');
-                }
+                if (color === 'all' || item.color === color) item.el.classList.remove('filtered-out');
+                else item.el.classList.add('filtered-out');
             });
             updateMinimap();
         }
 
-        // Find non-overlapping position
         function findFreePosition(x, y, w, h) {
-            const offset = 6;
-            const maxTries = 50;
+            const offset = 6, maxTries = 50;
             let tries = 0;
-            
             while (tries < maxTries) {
-                const overlaps = items.some(item => 
-                    Math.abs(x - item.x) < 10 && Math.abs(y - item.y) < 10
-                );
-                
+                const overlaps = items.some(item => Math.abs(x - item.x) < 10 && Math.abs(y - item.y) < 10);
                 if (!overlaps) break;
-                x += offset;
-                y += offset;
-                tries++;
+                x += offset; y += offset; tries++;
             }
-            
             return { x, y };
         }
 
-        // Pan & Zoom
+        // --- 입력 처리 (마우스/터치) ---
         app.addEventListener('wheel', e => {
             e.preventDefault();
             const d = e.deltaY > 0 ? 0.9 : 1.1;
@@ -1367,12 +1279,21 @@
             offsetX = mx - (mx - offsetX) * (z / scale);
             offsetY = my - (my - offsetY) * (z / scale);
             scale = z;
-            updateTransform();
-            updateMinimap();
+            updateTransform(); updateMinimap();
         }, { passive: false });
 
         app.addEventListener('mousedown', e => {
-            if (e.target === canvas || e.target.classList.contains('grid-overlay')) {
+            // 휠 클릭: 패닝 (브라우저 자동 스크롤 방지)
+            if (e.button === 1) {
+                e.preventDefault();
+                isPanning = true;
+                startX = e.clientX - offsetX;
+                startY = e.clientY - offsetY;
+                canvas.style.cursor = 'grabbing';
+                return;
+            }
+            // 좌클릭 배경: 패닝 및 선택 해제
+            if (e.button === 0 && (e.target === canvas || e.target.classList.contains('grid-overlay'))) {
                 isPanning = true;
                 startX = e.clientX - offsetX;
                 startY = e.clientY - offsetY;
@@ -1385,8 +1306,7 @@
             if (isPanning) {
                 offsetX = e.clientX - startX;
                 offsetY = e.clientY - startY;
-                updateTransform();
-                updateMinimap();
+                updateTransform(); updateMinimap();
             }
             if (draggedItem) {
                 const rect = app.getBoundingClientRect();
@@ -1395,8 +1315,7 @@
                 draggedItem.el.style.left = x + 'px';
                 draggedItem.el.style.top = y + 'px';
                 draggedItem.x = x; draggedItem.y = y;
-                updateAllConnections();
-                updateMinimap();
+                updateAllConnections(); updateMinimap();
             }
             if (resizingItem) {
                 const rect = app.getBoundingClientRect();
@@ -1407,8 +1326,7 @@
                 resizingItem.el.style.width = w + 'px';
                 resizingItem.el.style.height = h + 'px';
                 resizingItem.w = w; resizingItem.h = h;
-                updateAllConnections();
-                updateMinimap();
+                updateAllConnections(); updateMinimap();
             }
             if (tempLine) {
                 const rect = app.getBoundingClientRect();
@@ -1420,11 +1338,14 @@
 
         window.addEventListener('mouseup', () => {
             if (isPanning) { isPanning = false; canvas.style.cursor = connectMode ? 'crosshair' : 'grab'; }
-            if (draggedItem) { draggedItem.el.classList.remove('dragging'); canvas.classList.remove('dragging-item'); draggedItem = null; }
-            resizingItem = null;
+            if (draggedItem || resizingItem) {
+                if (draggedItem) { draggedItem.el.classList.remove('dragging'); canvas.classList.remove('dragging-item'); draggedItem = null; }
+                resizingItem = null;
+                triggerAutoSave(); // 변경사항 자동 저장
+            }
         });
 
-        // Touch
+        // 터치 지원
         let lastDist = 0;
         app.addEventListener('touchstart', e => {
             if (e.touches.length === 2) {
@@ -1448,19 +1369,16 @@
                 offsetY = cy - rect.top - (cy - rect.top - offsetY) * (z / scale);
                 scale = z;
                 lastDist = dist;
-                updateTransform();
-                updateMinimap();
+                updateTransform(); updateMinimap();
             } else if (e.touches.length === 1 && isPanning) {
                 offsetX = e.touches[0].clientX - startX;
                 offsetY = e.touches[0].clientY - startY;
-                updateTransform();
-                updateMinimap();
+                updateTransform(); updateMinimap();
             }
         }, { passive: false });
-
         app.addEventListener('touchend', () => isPanning = false);
 
-        // Drag & Drop
+        // 드래그 앤 드롭
         let dragCount = 0;
         window.addEventListener('dragenter', e => { e.preventDefault(); dragCount++; dropZone.classList.add('active'); });
         window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragCount === 0) dropZone.classList.remove('active'); });
@@ -1477,7 +1395,36 @@
                 return;
             }
             const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-            if (url?.startsWith('http')) addLink(url, '', x, y);
+            if (url?.startsWith('http')) {
+                addLink(url, '', x, y);
+                triggerAutoSave();
+            }
+        });
+
+        // --- 붙여넣기 기능 (Ctrl+V) ---
+        window.addEventListener('paste', e => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            e.preventDefault();
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            const x = (innerWidth / 2 - offsetX) / scale - 100;
+            const y = (innerHeight / 2 - offsetY) / scale - 100;
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type.indexOf('image') !== -1) {
+                    const blob = item.getAsFile();
+                    handleFile(blob, x + i * 20, y + i * 20);
+                } else if (item.kind === 'string') {
+                    item.getAsString(text => {
+                        text = text.trim();
+                        if (!text) return;
+                        const isUrl = /^(http|https):\/\/[^ "]+$/.test(text);
+                        if (isUrl) addLink(text, '', x + i * 20, y + i * 20);
+                        else addNote('', text, x + i * 20, y + i * 20);
+                        triggerAutoSave();
+                    });
+                }
+            }
         });
 
         function handleFile(file, x, y) {
@@ -1496,6 +1443,7 @@
                     if (h > 300) { w = 300 / h * w; h = 300; }
                     const pos = findFreePosition(x, y, w, h);
                     createItem({ type: 'image', x: pos.x, y: pos.y, w, h, content: e.target.result });
+                    triggerAutoSave();
                 };
                 img.src = e.target.result;
             };
@@ -1507,6 +1455,7 @@
             r.onload = e => {
                 const pos = findFreePosition(x, y, 400, 225);
                 createItem({ type: 'video', x: pos.x, y: pos.y, w: 400, h: 225, content: e.target.result });
+                triggerAutoSave();
             };
             r.readAsDataURL(file);
         }
@@ -1515,15 +1464,18 @@
             const display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
             const domain = new URL(url).hostname;
             const pos = findFreePosition(x ?? 200, y ?? 200, 260, 100);
-            return createItem({ type: 'link', x: pos.x, y: pos.y, w: 260, h: 100, content: { url, title: title || domain, display } });
+            const item = createItem({ type: 'link', x: pos.x, y: pos.y, w: 260, h: 100, content: { url, title: title || domain, display } });
+            triggerAutoSave();
+            return item;
         }
 
         function addNote(title = '', body = '', x, y, color = null) {
             const pos = findFreePosition(x ?? 200, y ?? 200, 220, 140);
-            return createItem({ type: 'note', x: pos.x, y: pos.y, w: 220, h: 140, content: { title, body }, color });
+            const item = createItem({ type: 'note', x: pos.x, y: pos.y, w: 220, h: 140, content: { title, body }, color });
+            triggerAutoSave();
+            return item;
         }
 
-        // Item creation
         function createItem(cfg, loading = false) {
             const el = document.createElement('div');
             el.className = 'canvas-item' + (loading ? '' : ' new');
@@ -1537,9 +1489,7 @@
                 case 'link': html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`; break;
             }
 
-            if (cfg.color) {
-                el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[cfg.color]}`);
-            }
+            if (cfg.color) el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[cfg.color]}`);
 
             el.innerHTML = `
                 <div class="item-content">${html}</div>
@@ -1556,15 +1506,12 @@
                 <button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
 
             canvas.appendChild(el);
-
             const item = { id: cfg.id || `i${++itemId}`, el, type: cfg.type, x: cfg.x, y: cfg.y, w: cfg.w, h: cfg.h, content: cfg.content, color: cfg.color || null };
             items.push(item);
             setupItemEvents(item);
             if (!loading) {
                 updateMinimap();
-                if (activeFilter !== 'all' && item.color !== activeFilter) {
-                    item.el.classList.add('filtered-out');
-                }
+                if (activeFilter !== 'all' && item.color !== activeFilter) item.el.classList.add('filtered-out');
             }
             setTimeout(() => el.classList.remove('new'), 250);
             return item;
@@ -1572,18 +1519,12 @@
 
         function setItemColor(item, color) {
             item.color = color || null;
-            if (color) {
-                item.el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[color]}`);
-            } else {
-                item.el.style.setProperty('--tag-shadow', '0 0 0 0 transparent');
-            }
-            
+            if (color) item.el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[color]}`);
+            else item.el.style.setProperty('--tag-shadow', '0 0 0 0 transparent');
             item.el.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (color || '')));
-            
-            if (activeFilter !== 'all') {
-                item.el.classList.toggle('filtered-out', item.color !== activeFilter);
-            }
+            if (activeFilter !== 'all') item.el.classList.toggle('filtered-out', item.color !== activeFilter);
             updateMinimap();
+            triggerAutoSave();
         }
 
         function setupItemEvents(item) {
@@ -1645,13 +1586,12 @@
 
             if (item.type === 'note') {
                 const ti = el.querySelector('.note-title'), tb = el.querySelector('.note-body');
-                ti.addEventListener('input', () => item.content.title = ti.value);
-                tb.addEventListener('input', () => item.content.body = tb.value);
+                ti.addEventListener('input', () => { item.content.title = ti.value; triggerAutoSave(); });
+                tb.addEventListener('input', () => { item.content.body = tb.value; triggerAutoSave(); });
             }
         }
 
         function selectItem(item) { deselectAll(); item.el.classList.add('selected'); selectedItem = item; }
-
         function deselectAll() {
             items.forEach(i => i.el.classList.remove('selected'));
             selectedItem = null;
@@ -1665,24 +1605,23 @@
             const i = items.indexOf(item);
             if (i > -1) { items.splice(i, 1); item.el.remove(); }
             updateMinimap();
+            triggerAutoSave();
         }
 
         function duplicateItem(item) {
             const pos = findFreePosition(item.x + 24, item.y + 24, item.w, item.h);
             createItem({ type: item.type, x: pos.x, y: pos.y, w: item.w, h: item.h, content: JSON.parse(JSON.stringify(item.content)), color: item.color });
+            triggerAutoSave();
         }
 
-        // Connections
         function toggleConnectMode() {
             connectMode = !connectMode;
             $('connectModeBtn').classList.toggle('connect-mode', connectMode);
             canvas.classList.toggle('connecting', connectMode);
             if (!connectMode) cancelConnection();
         }
-
         function startConnection(item, handle) {
-            connectSource = item;
-            connectHandle = handle;
+            connectSource = item; connectHandle = handle;
             item.el.classList.add('connect-source');
             const pos = getHandlePos(item, handle);
             tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1690,27 +1629,23 @@
             connectionsSvg.appendChild(tempLine);
             updateTempLine(pos.x, pos.y);
         }
-
         function updateTempLine(ex, ey) {
             if (!tempLine || !connectSource) return;
             const sp = getHandlePos(connectSource, connectHandle);
             tempLine.setAttribute('d', curvePath(sp.x, sp.y, ex, ey));
         }
-
         function completeConnection(target, handle) {
             if (!connectSource || connectSource === target) { cancelConnection(); return; }
             const exists = connections.some(c => (c.from === connectSource && c.to === target) || (c.from === target && c.to === connectSource));
-            if (!exists) addConnection(connectSource, connectHandle, target, handle);
+            if (!exists) { addConnection(connectSource, connectHandle, target, handle); triggerAutoSave(); }
             cancelConnection();
         }
-
         function cancelConnection() {
             if (connectSource) connectSource.el.classList.remove('connect-source');
             if (tempLine) { tempLine.remove(); tempLine = null; }
             connectSource = connectHandle = null;
             items.forEach(i => i.el.classList.remove('connect-target'));
         }
-
         function addConnection(from, fh, to, th) {
             const conn = { id: `c${Date.now()}`, from, fh, to, th, el: null };
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1720,18 +1655,14 @@
             connectionsSvg.appendChild(path);
             conn.el = path;
             connections.push(conn);
-            updateConnection(conn);
-            updateMinimap();
+            updateConnection(conn); updateMinimap();
             return conn;
         }
-
         function updateConnection(c) {
             const fp = getHandlePos(c.from, c.fh), tp = getHandlePos(c.to, c.th);
             c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y));
         }
-
         function updateAllConnections() { connections.forEach(updateConnection); }
-
         function getHandlePos(item, h) {
             const { x, y, w, h: ih } = item, off = 10000;
             switch (h) {
@@ -1741,21 +1672,17 @@
                 case 'right': return { x: x + w + off, y: y + ih / 2 + off };
             }
         }
-
         function curvePath(x1, y1, x2, y2) {
             const dx = x2 - x1, dy = y2 - y1;
             const dist = Math.sqrt(dx * dx + dy * dy);
             const curve = Math.min(dist * 0.3, 80);
             return `M${x1} ${y1} C${x1 + curve * Math.sign(dx || 1)} ${y1}, ${x2 - curve * Math.sign(dx || 1)} ${y2}, ${x2} ${y2}`;
         }
-
         function selectConnection(c) { deselectAll(); selectedConn = c; c.el.classList.add('selected'); }
-
         function deleteConnection(c) {
             const i = connections.indexOf(c);
-            if (i > -1) { connections.splice(i, 1); c.el.remove(); selectedConn = null; updateMinimap(); }
+            if (i > -1) { connections.splice(i, 1); c.el.remove(); selectedConn = null; updateMinimap(); triggerAutoSave(); }
         }
-
         function addChildNode(parent, dir) {
             const gap = 72, cw = 220, ch = 140;
             let x, y, fh, th;
@@ -1770,31 +1697,45 @@
             return child;
         }
 
-        // Context menus
-        function showContextMenu(x, y) { contextMenu.style.left = x + 'px'; contextMenu.style.top = y + 'px'; contextMenu.classList.add('active'); }
+        // --- 컨텍스트 메뉴 수정 (편집 기능 포함) ---
+        function showContextMenu(x, y) {
+            const isLink = selectedItem.type === 'link';
+            const isMedia = selectedItem.type === 'image' || selectedItem.type === 'video';
+            
+            contextMenu.querySelector('[data-action="edit-link"]').style.display = isLink ? 'flex' : 'none';
+            contextMenu.querySelector('[data-action="replace-file"]').style.display = isMedia ? 'flex' : 'none';
+            contextMenu.querySelector('#editSep').style.display = (isLink || isMedia) ? 'block' : 'none';
+            
+            if (selectedItem.type === 'image') replaceInput.accept = 'image/*';
+            if (selectedItem.type === 'video') replaceInput.accept = 'video/*';
+            
+            contextMenu.style.left = x + 'px'; contextMenu.style.top = y + 'px'; contextMenu.classList.add('active');
+        }
         function showConnMenu(x, y) { connContextMenu.style.left = x + 'px'; connContextMenu.style.top = y + 'px'; connContextMenu.classList.add('active'); }
         function hideMenus() { contextMenu.classList.remove('active'); connContextMenu.classList.remove('active'); filterDropdown.classList.remove('active'); }
 
         document.addEventListener('click', e => {
-            if (!e.target.closest('.color-picker') && !e.target.closest('.color-btn')) {
-                document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
-            }
-            if (!e.target.closest('#filterBtn') && !e.target.closest('#filterDropdown')) {
-                filterDropdown.classList.remove('active');
-            }
-            if (!e.target.closest('.context-menu')) {
-                contextMenu.classList.remove('active');
-                connContextMenu.classList.remove('active');
-            }
+            if (!e.target.closest('.color-picker') && !e.target.closest('.color-btn')) document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
+            if (!e.target.closest('#filterBtn') && !e.target.closest('#filterDropdown')) filterDropdown.classList.remove('active');
+            if (!e.target.closest('.context-menu')) { contextMenu.classList.remove('active'); connContextMenu.classList.remove('active'); }
         });
 
         contextMenu.querySelectorAll('.context-menu-item').forEach(el => {
             el.addEventListener('click', () => {
                 if (selectedItem) {
                     switch (el.dataset.action) {
+                        case 'edit-link':
+                            $('linkTitle').value = selectedItem.content.title;
+                            $('linkUrl').value = selectedItem.content.url;
+                            $('linkModal').dataset.mode = 'edit';
+                            openLinkModal();
+                            break;
+                        case 'replace-file':
+                            replaceInput.click();
+                            break;
                         case 'connect': startConnection(selectedItem, 'right'); break;
-                        case 'bring-front': selectedItem.el.style.zIndex = ++highestZ; break;
-                        case 'send-back': selectedItem.el.style.zIndex = 1; break;
+                        case 'bring-front': selectedItem.el.style.zIndex = ++highestZ; triggerAutoSave(); break;
+                        case 'send-back': selectedItem.el.style.zIndex = 1; triggerAutoSave(); break;
                         case 'duplicate': duplicateItem(selectedItem); break;
                         case 'delete': deleteItem(selectedItem); break;
                     }
@@ -1803,45 +1744,62 @@
             });
         });
 
+        // 파일 교체 처리
+        replaceInput.addEventListener('change', e => {
+            if (e.target.files.length && selectedItem) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = evt => {
+                    selectedItem.content = evt.target.result;
+                    if (selectedItem.type === 'image') selectedItem.el.querySelector('img').src = evt.target.result;
+                    else if (selectedItem.type === 'video') selectedItem.el.querySelector('video').src = evt.target.result;
+                    triggerAutoSave();
+                };
+                reader.readAsDataURL(file);
+            }
+            replaceInput.value = '';
+        });
+
         connContextMenu.querySelector('[data-action="delete-conn"]').addEventListener('click', () => {
             if (selectedConn) deleteConnection(selectedConn);
             hideMenus();
         });
 
-        // Filter dropdown
-        filterBtn.addEventListener('click', e => {
-            e.stopPropagation();
-            filterDropdown.classList.toggle('active');
-        });
-
+        filterBtn.addEventListener('click', e => { e.stopPropagation(); filterDropdown.classList.toggle('active'); });
         filterDropdown.querySelectorAll('.filter-opt').forEach(opt => {
-            opt.addEventListener('click', e => {
-                e.stopPropagation();
-                setFilter(opt.dataset.color);
-                filterDropdown.classList.remove('active');
-            });
+            opt.addEventListener('click', e => { e.stopPropagation(); setFilter(opt.dataset.color); filterDropdown.classList.remove('active'); });
         });
 
-        // Modals
         const linkModal = $('linkModal');
         function openLinkModal() { linkModal.classList.add('active'); setTimeout(() => $('linkUrl').focus(), 100); }
-        function closeLinkModal() { linkModal.classList.remove('active'); $('linkTitle').value = ''; $('linkUrl').value = ''; }
-
+        function closeLinkModal() { linkModal.classList.remove('active'); $('linkTitle').value = ''; $('linkUrl').value = ''; $('linkModal').dataset.mode = ''; }
         linkModal.addEventListener('click', e => { if (e.target === linkModal) closeLinkModal(); });
         linkModal.querySelector('[data-close]').addEventListener('click', closeLinkModal);
 
+        // 링크 모달 (추가 및 수정 통합)
         $('linkSubmit').addEventListener('click', () => {
             let url = $('linkUrl').value.trim();
             if (url) {
                 if (!url.startsWith('http')) url = 'https://' + url;
-                const x = (innerWidth / 2 - offsetX) / scale - 130;
-                const y = (innerHeight / 2 - offsetY) / scale - 50;
-                addLink(url, $('linkTitle').value.trim(), x, y);
+                if ($('linkModal').dataset.mode === 'edit' && selectedItem) {
+                    selectedItem.content.url = url;
+                    selectedItem.content.title = $('linkTitle').value.trim() || new URL(url).hostname;
+                    selectedItem.content.display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                    const linkEl = selectedItem.el.querySelector('.item-link');
+                    linkEl.querySelector('.link-title').textContent = selectedItem.content.title;
+                    linkEl.querySelector('.link-url').href = url;
+                    linkEl.querySelector('.link-url').textContent = selectedItem.content.display;
+                    linkEl.querySelector('.link-favicon').src = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`;
+                    triggerAutoSave();
+                } else {
+                    const x = (innerWidth / 2 - offsetX) / scale - 130;
+                    const y = (innerHeight / 2 - offsetY) / scale - 50;
+                    addLink(url, $('linkTitle').value.trim(), x, y);
+                }
                 closeLinkModal();
             }
         });
 
-        // Keyboard
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveCurrentCanvas(); return; }
             if ((e.key === 'c' || e.key === 'C') && !e.target.matches('input,textarea')) toggleConnectMode();
@@ -1852,21 +1810,14 @@
             }
         });
 
-        // Toolbar
-        $('addNoteBtn').addEventListener('click', () => {
-            const x = (innerWidth / 2 - offsetX) / scale - 110;
-            const y = (innerHeight / 2 - offsetY) / scale - 70;
-            addNote('', '', x, y);
-        });
+        $('addNoteBtn').addEventListener('click', () => { const x = (innerWidth / 2 - offsetX) / scale - 110; const y = (innerHeight / 2 - offsetY) / scale - 70; addNote('', '', x, y); });
         $('addLinkBtn').addEventListener('click', openLinkModal);
         $('addFileBtn').addEventListener('click', () => fileInput.click());
         $('connectModeBtn').addEventListener('click', toggleConnectMode);
-        $('saveBtn').addEventListener('click', saveCurrentCanvas);
+        $('saveBtn').addEventListener('click', () => saveCurrentCanvas());
         $('loadBtn').addEventListener('click', () => {
             if (currentCanvasId) {
                 if (items.length && !confirm('Reload saved data?')) return;
-                connections.forEach(c => c.el.remove()); connections = [];
-                items.forEach(i => i.el.remove()); items = [];
                 loadCanvasData(currentCanvasId);
                 showToast('Loaded');
             }
@@ -1876,8 +1827,7 @@
             connections.forEach(c => c.el.remove()); connections = [];
             items.forEach(i => i.el.remove()); items = [];
             selectedItem = selectedConn = null; itemId = highestZ = 1;
-            updateMinimap();
-            showToast('Cleared');
+            updateMinimap(); triggerAutoSave(); showToast('Cleared');
         });
         $('zoomInBtn').addEventListener('click', () => setZoom(scale * 1.25));
         $('zoomOutBtn').addEventListener('click', () => setZoom(scale / 1.25));
@@ -1893,18 +1843,14 @@
             fileInput.value = '';
         });
 
-        // Minimap
         function updateMinimap() {
             const visibleItems = items.filter(i => !i.el.classList.contains('filtered-out'));
             if (!visibleItems.length) { minimapContent.innerHTML = '<div class="minimap-viewport"></div>'; return; }
-            
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             visibleItems.forEach(i => { minX = Math.min(minX, i.x); minY = Math.min(minY, i.y); maxX = Math.max(maxX, i.x + i.w); maxY = Math.max(maxY, i.y + i.h); });
-            const pad = 80;
-            minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+            const pad = 80; minX -= pad; minY -= pad; maxX += pad; maxY += pad;
             const ww = maxX - minX, wh = maxY - minY;
             const s = Math.min(160 / ww, 100 / wh);
-
             let svg = '<svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">';
             connections.forEach(c => {
                 if (c.from.el.classList.contains('filtered-out') || c.to.el.classList.contains('filtered-out')) return;
@@ -1913,24 +1859,20 @@
                 svg += `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="var(--connection-color)" stroke-width="1"/>`;
             });
             svg += '</svg>';
-
             visibleItems.forEach(i => {
                 const ix = (i.x - minX) * s, iy = (i.y - minY) * s;
                 const iw = Math.max(3, i.w * s), ih = Math.max(2, i.h * s);
                 const bg = i.color ? COLOR_MAP[i.color] : 'var(--text-secondary)';
                 svg += `<div class="minimap-item" style="left:${ix}px;top:${iy}px;width:${iw}px;height:${ih}px;background:${bg}"></div>`;
             });
-
             const vx = (-offsetX / scale - minX) * s, vy = (-offsetY / scale - minY) * s;
             const vw = innerWidth / scale * s, vh = innerHeight / scale * s;
             svg += `<div class="minimap-viewport" style="left:${vx}px;top:${vy}px;width:${vw}px;height:${vh}px"></div>`;
-
             minimapContent.innerHTML = svg;
         }
 
         function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-        // Init
         loadTheme();
         updateTransform();
         loadCanvases();
