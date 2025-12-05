@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KnotPad</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#09090b">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #09090b;
+            --bg-secondary: #18181b;
+            --bg-card: #1f1f23;
+            --bg-hover: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(255, 255, 255, 0.16);
+            --text-primary: #fafafa;
+            --text-secondary: rgba(255, 255, 255, 0.64);
+            --text-placeholder: rgba(255, 255, 255, 0.32);
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.24);
+            --accent-secondary: #8b5cf6;
+            --accent-tertiary: #10b981;
+            --connection-color: rgba(139, 92, 246, 0.56);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.32);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.4);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.48);
+            --grid-color: rgba(255, 255, 255, 0.03);
+            --scrollbar: rgba(255, 255, 255, 0.16);
+            --danger: #ef4444;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+            --tag-red: #ef4444;
+            --tag-orange: #f97316;
+            --tag-yellow: #eab308;
+            --tag-green: #22c55e;
+            --tag-blue: #3b82f6;
+            --tag-purple: #8b5cf6;
+            --tag-pink: #ec4899;
+        }
+
+        :root.light {
+            --bg-primary: #f4f4f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-hover: rgba(0, 0, 0, 0.04);
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-active: rgba(0, 0, 0, 0.16);
+            --text-primary: #18181b;
+            --text-secondary: rgba(0, 0, 0, 0.56);
+            --text-placeholder: rgba(0, 0, 0, 0.32);
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.16);
+            --accent-secondary: #7c3aed;
+            --accent-tertiary: #059669;
+            --connection-color: rgba(124, 58, 237, 0.48);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
+            --grid-color: rgba(0, 0, 0, 0.04);
+            --scrollbar: rgba(0, 0, 0, 0.16);
+            --danger: #dc2626;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background var(--transition), color var(--transition);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #app {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        #canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-origin: 0 0;
+            cursor: grab;
+        }
+
+        #canvas:active { cursor: grabbing; }
+        #canvas.dragging-item { cursor: default; }
+        #canvas.connecting { cursor: crosshair; }
+
+        .grid-overlay {
+            position: absolute;
+            inset: -200%;
+            width: 500%;
+            height: 500%;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 48px 48px;
+            pointer-events: none;
+        }
+
+        #connectionsSvg {
+            position: absolute;
+            inset: -10000px;
+            width: 20000px;
+            height: 20000px;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        .connection-line {
+            fill: none;
+            stroke: var(--connection-color);
+            stroke-width: 2;
+            pointer-events: stroke;
+            cursor: pointer;
+            transition: stroke var(--transition), stroke-width var(--transition);
+        }
+
+        .connection-line:hover { stroke: var(--accent-secondary); stroke-width: 3; }
+        .connection-line.selected { stroke: var(--accent); stroke-width: 3; }
+        .connection-line.temp { stroke-dasharray: 6 4; opacity: 0.6; animation: dash 0.4s linear infinite; }
+
+        @keyframes dash { to { stroke-dashoffset: -10; } }
+
+        .canvas-item {
+            position: absolute;
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-subtle);
+            --tag-shadow: 0 0 0 0 transparent;
+            box-shadow: var(--shadow-md), var(--tag-shadow);
+            cursor: move;
+            transition: box-shadow var(--transition), border-color var(--transition), background var(--transition), opacity var(--transition);
+            overflow: visible;
+            min-width: 140px;
+            min-height: 100px;
+        }
+
+        .canvas-item:hover { border-color: var(--border-active); box-shadow: var(--shadow-lg), var(--tag-shadow); }
+        .canvas-item.selected { border-color: var(--accent); box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-glow), var(--tag-shadow); }
+        .canvas-item.dragging { opacity: 0.92; transform: scale(1.02); }
+        .canvas-item.connect-source { border-color: var(--accent-secondary); box-shadow: var(--shadow-lg), 0 0 24px rgba(139, 92, 246, 0.32), var(--tag-shadow); }
+        .canvas-item.connect-target { border-color: var(--accent-tertiary); }
+        .canvas-item.filtered-out { opacity: 0.15; pointer-events: none; }
+
+        .canvas-item .item-content { width: 100%; height: 100%; overflow: hidden; border-radius: calc(var(--radius-md) - 1px); }
+
+        .canvas-item .delete-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: all var(--transition);
+            font-size: 14px;
+            z-index: 10;
+        }
+
+        .canvas-item:hover .delete-btn { opacity: 1; }
+        .canvas-item .delete-btn:hover { background: var(--danger); color: white; border-color: var(--danger); transform: scale(1.1); }
+
+        .canvas-item .color-btn {
+            position: absolute;
+            top: -10px;
+            right: 18px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: all var(--transition);
+            z-index: 10;
+        }
+
+        .canvas-item:hover .color-btn { opacity: 1; }
+        .canvas-item .color-btn:hover { background: var(--bg-hover); color: var(--text-primary); transform: scale(1.1); }
+
+        .color-picker {
+            position: absolute;
+            top: 18px;
+            right: -10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 6px;
+            display: none;
+            gap: 4px;
+            flex-wrap: wrap;
+            width: 76px;
+            box-shadow: var(--shadow-md);
+            z-index: 100;
+        }
+
+        .color-picker.active { display: flex; }
+
+        .color-picker .color-opt {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all var(--transition);
+        }
+
+        .color-picker .color-opt:hover { transform: scale(1.2); }
+        .color-picker .color-opt.selected { border-color: var(--text-primary); }
+        .color-picker .color-opt.none { background: var(--bg-card); border: 2px dashed var(--border-active); }
+
+        .canvas-item .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 18px;
+            height: 18px;
+            cursor: nwse-resize;
+            opacity: 0;
+            transition: opacity var(--transition);
+            z-index: 10;
+        }
+
+        .canvas-item:hover .resize-handle { opacity: 0.6; }
+        .canvas-item .resize-handle:hover { opacity: 1; }
+
+        .resize-handle::before {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 10px;
+            height: 10px;
+            border-right: 2px solid var(--text-secondary);
+            border-bottom: 2px solid var(--text-secondary);
+            border-radius: 0 0 3px 0;
+        }
+
+        .connection-handle {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: var(--accent-secondary);
+            border: 2px solid var(--bg-card);
+            border-radius: 50%;
+            cursor: crosshair;
+            opacity: 0;
+            transition: all var(--transition);
+            z-index: 20;
+        }
+
+        .canvas-item:hover .connection-handle { opacity: 1; }
+        .connection-handle:hover { transform: scale(1.4); background: var(--accent); }
+
+        .connection-handle.top { top: -7px; left: 50%; margin-left: -7px; }
+        .connection-handle.bottom { bottom: -7px; left: 50%; margin-left: -7px; }
+        .connection-handle.left { left: -7px; top: 50%; margin-top: -7px; }
+        .connection-handle.right { right: -7px; top: 50%; margin-top: -7px; }
+
+        .add-child-btn {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: var(--accent-tertiary);
+            border: 2px solid var(--bg-card);
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: all var(--transition);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .canvas-item:hover .add-child-btn { opacity: 1; }
+        .add-child-btn:hover { transform: scale(1.2); filter: brightness(1.1); }
+
+        .add-child-btn.top { top: -32px; left: 50%; margin-left: -12px; }
+        .add-child-btn.bottom { bottom: -32px; left: 50%; margin-left: -12px; }
+        .add-child-btn.left { left: -32px; top: 50%; margin-top: -12px; }
+        .add-child-btn.right { right: -32px; top: 50%; margin-top: -12px; }
+
+        .item-image { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+        .item-video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+
+        .item-note { padding: 16px; height: 100%; display: flex; flex-direction: column; gap: 8px; }
+
+        .note-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            border: none;
+            background: transparent;
+            outline: none;
+            width: 100%;
+            line-height: 1.4;
+        }
+
+        .note-title::placeholder { color: var(--text-secondary); }
+
+        .note-body {
+            flex: 1;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
+            outline: none;
+            resize: none;
+            width: 100%;
+        }
+
+        .note-body::placeholder { color: var(--text-placeholder); }
+        .note-body::-webkit-scrollbar { width: 4px; }
+        .note-body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+
+        .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
+        .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); }
+        .link-title { font-size: 14px; font-weight: 500; color: var(--text-primary); line-height: 1.4; }
+        .link-url { font-size: 12px; color: var(--text-secondary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color var(--transition); }
+        .link-url:hover { color: var(--accent); }
+
+        .drop-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 9, 11, 0.92);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(8px);
+        }
+
+        :root.light .drop-overlay { background: rgba(244, 244, 245, 0.92); }
+        .drop-overlay.active { display: flex; }
+
+        .drop-content {
+            text-align: center;
+            padding: 48px 64px;
+            border: 2px dashed var(--accent);
+            border-radius: var(--radius-lg);
+            background: var(--accent-glow);
+        }
+
+        .drop-content svg { width: 48px; height: 48px; margin-bottom: 16px; color: var(--accent); }
+        .drop-content h3 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+        .drop-content p { font-size: 13px; color: var(--text-secondary); }
+
+        .toolbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-subtle);
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+        }
+
+        .toolbar-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+            position: relative;
+        }
+
+        .toolbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .toolbar-btn.active { background: var(--accent); color: white; }
+        .toolbar-btn.connect-mode { background: var(--accent-secondary); color: white; }
+        .toolbar-btn.filter-active { box-shadow: inset 0 0 0 2px var(--accent); }
+
+        .toolbar-sep { width: 1px; background: var(--border-subtle); margin: 6px 4px; }
+
+        .zoom-display {
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            min-width: 52px;
+            justify-content: center;
+        }
+
+        .filter-dropdown {
+            position: fixed;
+            bottom: 76px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 8px;
+            display: none;
+            gap: 6px;
+            box-shadow: var(--shadow-md);
+            z-index: 101;
+        }
+
+        .filter-dropdown.active { display: flex; }
+
+        .filter-dropdown .filter-opt {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all var(--transition);
+        }
+
+        .filter-dropdown .filter-opt:hover { transform: scale(1.15); }
+        .filter-dropdown .filter-opt.selected { border-color: var(--text-primary); }
+        .filter-dropdown .filter-opt.all { 
+            background: transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .filter-dropdown .filter-opt.all::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: conic-gradient(var(--tag-red), var(--tag-orange), var(--tag-yellow), var(--tag-green), var(--tag-blue), var(--tag-purple), var(--tag-pink), var(--tag-red));
+        }
+
+        .context-menu {
+            position: fixed;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 4px;
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            min-width: 160px;
+            display: none;
+        }
+
+        .context-menu.active { display: block; }
+
+        .context-menu-item {
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background var(--transition);
+        }
+
+        .context-menu-item:hover { background: var(--bg-hover); }
+        .context-menu-item.danger { color: var(--danger); }
+        .context-menu-sep { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 9, 11, 0.88);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+
+        :root.light .modal { background: rgba(0, 0, 0, 0.48); }
+        .modal.active { display: flex; }
+
+        .modal-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-box h3 { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 12px;
+            transition: border-color var(--transition);
+        }
+
+        .modal-input:focus { outline: none; border-color: var(--accent); }
+        .modal-input::placeholder { color: var(--text-placeholder); }
+
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
+        .modal-btn {
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            border: none;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .modal-btn-cancel { background: transparent; color: var(--text-secondary); }
+        .modal-btn-cancel:hover { color: var(--text-primary); }
+        .modal-btn-submit { background: var(--accent); color: white; }
+        .modal-btn-submit:hover { filter: brightness(1.1); }
+
+        .help-hint {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            padding: 10px 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            color: var(--text-secondary);
+            z-index: 50;
+        }
+
+        .help-hint kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 11px;
+            margin: 0 1px;
+        }
+
+        .minimap {
+            position: fixed;
+            bottom: 80px;
+            right: 16px;
+            width: 160px;
+            height: 100px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            z-index: 50;
+        }
+
+        .minimap-content { width: 100%; height: 100%; position: relative; }
+        .minimap-viewport { position: absolute; border: 1.5px solid var(--accent); background: var(--accent-glow); pointer-events: none; border-radius: 2px; }
+        .minimap-item { position: absolute; border-radius: 1px; opacity: 0.8; }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            box-shadow: var(--shadow-md);
+            z-index: 10000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.success { border-color: var(--accent-tertiary); }
+        .toast.error { border-color: var(--danger); }
+
+        @keyframes appear { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+        .canvas-item.new { animation: appear 0.24s ease-out; }
+
+        #fileInput { display: none; }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 240px;
+            height: 100%;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-subtle);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(-240px);
+            transition: transform var(--transition);
+        }
+
+        .sidebar.open { transform: translateX(0); }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 201;
+            transition: all var(--transition);
+        }
+
+        .sidebar-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .sidebar.open ~ .sidebar-toggle { left: 256px; }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .sidebar-add {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+        }
+
+        .sidebar-add:hover { filter: brightness(1.1); }
+
+        .canvas-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .canvas-list::-webkit-scrollbar { width: 4px; }
+        .canvas-list::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+
+        .canvas-item-entry {
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all var(--transition);
+            margin-bottom: 4px;
+            position: relative;
+        }
+
+        .canvas-item-entry:hover { background: var(--bg-hover); }
+        .canvas-item-entry.active { background: var(--accent-glow); border: 1px solid var(--accent); }
+
+        .canvas-item-entry .canvas-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .canvas-item-entry.active .canvas-icon { background: var(--accent); color: white; }
+
+        .canvas-item-entry .canvas-info { flex: 1; min-width: 0; }
+
+        .canvas-item-entry .canvas-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .canvas-item-entry .canvas-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .canvas-item-entry .canvas-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity var(--transition);
+        }
+
+        .canvas-item-entry:hover .canvas-actions { opacity: 1; }
+
+        .canvas-item-entry .canvas-action-btn {
+            width: 24px;
+            height: 24px;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+        }
+
+        .canvas-item-entry .canvas-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .canvas-item-entry .canvas-action-btn.delete:hover { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        .canvas-name-input {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            background: var(--bg-card);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            padding: 2px 6px;
+            width: 100%;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">Canvases</span>
+            <button class="sidebar-add" id="addCanvasBtn" title="New Canvas">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M12 5v14M5 12h14" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="canvas-list" id="canvasList"></div>
+    </div>
+
+    <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12h18M3 6h18M3 18h18" stroke-linecap="round"/>
+        </svg>
+    </button>
+
+    <div id="app">
+        <div id="canvas">
+            <div class="grid-overlay"></div>
+            <svg id="connectionsSvg"></svg>
+        </div>
+    </div>
+
+    <div class="drop-overlay" id="dropZone">
+        <div class="drop-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 16V4m0 0L8 8m4-4l4 4M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <h3>Drop to add</h3>
+            <p>Images, videos, or links</p>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" multiple accept="image/*,video/*">
+
+    <div class="toolbar">
+        <button class="toolbar-btn" id="addNoteBtn" title="Add Note">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14 2v6h6M12 18v-6M9 15h6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button class="toolbar-btn" id="addLinkBtn" title="Add Link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button class="toolbar-btn" id="addFileBtn" title="Add File">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <div class="toolbar-sep"></div>
+        <button class="toolbar-btn" id="connectModeBtn" title="Connect (C)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="5" cy="12" r="3"/><circle cx="19" cy="12" r="3"/><path d="M8 12h8" stroke-linecap="round"/>
+            </svg>
+        </button>
+        <div class="toolbar-sep"></div>
+        <button class="toolbar-btn" id="filterBtn" title="Filter by Color">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="4" fill="currentColor"/>
+            </svg>
+        </button>
+        <div class="toolbar-sep"></div>
+        <button class="toolbar-btn" id="saveBtn" title="Save (Ctrl+S)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button class="toolbar-btn" id="loadBtn" title="Load">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4M17 9l-5 5-5-5M12 14V2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button class="toolbar-btn" id="clearBtn" title="Clear">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <div class="toolbar-sep"></div>
+        <button class="toolbar-btn" id="zoomOutBtn" title="Zoom Out">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <div class="zoom-display" id="zoomDisplay">100%</div>
+        <button class="toolbar-btn" id="zoomInBtn" title="Zoom In">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button class="toolbar-btn" id="resetViewBtn" title="Reset">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8M3 3v5h5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <div class="toolbar-sep"></div>
+        <button class="toolbar-btn" id="themeToggle" title="Theme">
+            <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+                <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
+
+    <div class="filter-dropdown" id="filterDropdown">
+        <div class="filter-opt all" data-color="all" title="Show All"></div>
+        <div class="filter-opt" data-color="red" style="background:var(--tag-red)" title="Red"></div>
+        <div class="filter-opt" data-color="orange" style="background:var(--tag-orange)" title="Orange"></div>
+        <div class="filter-opt" data-color="yellow" style="background:var(--tag-yellow)" title="Yellow"></div>
+        <div class="filter-opt" data-color="green" style="background:var(--tag-green)" title="Green"></div>
+        <div class="filter-opt" data-color="blue" style="background:var(--tag-blue)" title="Blue"></div>
+        <div class="filter-opt" data-color="purple" style="background:var(--tag-purple)" title="Purple"></div>
+        <div class="filter-opt" data-color="pink" style="background:var(--tag-pink)" title="Pink"></div>
+    </div>
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" data-action="connect">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="3"/><circle cx="19" cy="12" r="3"/><path d="M8 12h8"/></svg>
+            Connect to...
+        </div>
+        <div class="context-menu-sep"></div>
+        <div class="context-menu-item" data-action="bring-front">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
+            Bring to Front
+        </div>
+        <div class="context-menu-item" data-action="send-back">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 16v2a2 2 0 002 2h8a2 2 0 002-2v-8a2 2 0 00-2-2h-2"/></svg>
+            Send to Back
+        </div>
+        <div class="context-menu-sep"></div>
+        <div class="context-menu-item" data-action="duplicate">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Duplicate
+        </div>
+        <div class="context-menu-sep"></div>
+        <div class="context-menu-item danger" data-action="delete">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+            Delete
+        </div>
+    </div>
+
+    <div class="context-menu" id="connContextMenu">
+        <div class="context-menu-item danger" data-action="delete-conn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+            Delete Connection
+        </div>
+    </div>
+
+    <div class="modal" id="linkModal">
+        <div class="modal-box">
+            <h3>Add Link</h3>
+            <input type="text" class="modal-input" id="linkTitle" placeholder="Title (optional)">
+            <input type="url" class="modal-input" id="linkUrl" placeholder="https://example.com">
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" data-close>Cancel</button>
+                <button class="modal-btn modal-btn-submit" id="linkSubmit">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="help-hint"><kbd>Ctrl+S</kbd> save · <kbd>C</kbd> connect · <kbd>+</kbd> child</div>
+    <div class="minimap"><div class="minimap-content" id="minimapContent"></div></div>
+    <div class="toast" id="toast"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then((reg) => console.log('Service Worker Registered!', reg.scope))
+            .catch((err) => console.log('Service Worker Failed:', err));
+        });
+      }
+    </script>
+    <script>
+    (function() {
+        const $ = id => document.getElementById(id);
+        const canvas = $('canvas'), app = $('app'), dropZone = $('dropZone');
+        const contextMenu = $('contextMenu'), connContextMenu = $('connContextMenu');
+        const connectionsSvg = $('connectionsSvg'), minimapContent = $('minimapContent');
+        const fileInput = $('fileInput'), toast = $('toast'), zoomDisplay = $('zoomDisplay');
+        const filterDropdown = $('filterDropdown'), filterBtn = $('filterBtn');
+        const sidebar = $('sidebar'), sidebarToggle = $('sidebarToggle'), canvasList = $('canvasList');
+
+        const CANVASES_KEY = 'knotpad-canvases';
+        const THEME_KEY = 'knotpad-theme';
+        const COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
+        const COLOR_MAP = {
+            red: '#ef4444', orange: '#f97316', yellow: '#eab308',
+            green: '#22c55e', blue: '#3b82f6', purple: '#8b5cf6', pink: '#ec4899'
+        };
+        
+        let scale = 1, offsetX = 0, offsetY = 0;
+        let isPanning = false, startX = 0, startY = 0;
+        let items = [], connections = [];
+        let selectedItem = null, selectedConn = null;
+        let highestZ = 1, itemId = 0;
+        let draggedItem = null, resizingItem = null;
+        let connectMode = false, connectSource = null, connectHandle = null, tempLine = null;
+        let activeFilter = 'all';
+
+        // Multi-canvas state
+        let canvases = [];
+        let currentCanvasId = null;
+
+        // Canvas management
+        function generateId() {
+            return 'c' + Date.now() + Math.random().toString(36).substr(2, 9);
+        }
+
+        function loadCanvases() {
+            try {
+                const saved = localStorage.getItem(CANVASES_KEY);
+                if (saved) {
+                    canvases = JSON.parse(saved);
+                } else {
+                    // Create default canvas
+                    const defaultCanvas = {
+                        id: generateId(),
+                        name: 'Untitled',
+                        createdAt: Date.now(),
+                        updatedAt: Date.now()
+                    };
+                    canvases = [defaultCanvas];
+                    saveCanvasesList();
+                }
+                
+                // Load first canvas or last active
+                const lastActiveId = localStorage.getItem('knotpad-active-canvas');
+                const targetCanvas = canvases.find(c => c.id === lastActiveId) || canvases[0];
+                if (targetCanvas) {
+                    switchCanvas(targetCanvas.id);
+                }
+                
+                renderCanvasList();
+            } catch (e) {
+                console.error('Failed to load canvases:', e);
+            }
+        }
+
+        function saveCanvasesList() {
+            localStorage.setItem(CANVASES_KEY, JSON.stringify(canvases));
+        }
+
+        function saveCurrentCanvas() {
+            if (!currentCanvasId) return;
+            
+            const data = {
+                items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, z: i.el.style.zIndex })),
+                connections: connections.map(c => ({ id: c.id, from: c.from.id, fh: c.fh, to: c.to.id, th: c.th })),
+                view: { scale, offsetX, offsetY }, itemId, highestZ
+            };
+            
+            try {
+                localStorage.setItem('knotpad-data-' + currentCanvasId, JSON.stringify(data));
+                
+                // Update canvas metadata
+                const canvas = canvases.find(c => c.id === currentCanvasId);
+                if (canvas) {
+                    canvas.updatedAt = Date.now();
+                    canvas.itemCount = items.length;
+                    saveCanvasesList();
+                    renderCanvasList();
+                }
+                
+                showToast('Saved');
+            } catch (e) {
+                showToast('Save failed', 'error');
+            }
+        }
+
+        function loadCanvasData(canvasId) {
+            try {
+                const saved = localStorage.getItem('knotpad-data-' + canvasId);
+                if (!saved) return;
+                
+                const data = JSON.parse(saved);
+                itemId = data.itemId || 0;
+                highestZ = data.highestZ || 1;
+                if (data.view) {
+                    scale = data.view.scale;
+                    offsetX = data.view.offsetX;
+                    offsetY = data.view.offsetY;
+                    updateTransform();
+                }
+                const map = {};
+                data.items.forEach(d => {
+                    const i = createItem(d, true);
+                    i.el.style.zIndex = d.z || 1;
+                    map[d.id] = i;
+                });
+                data.connections.forEach(d => {
+                    if (map[d.from] && map[d.to]) addConnection(map[d.from], d.fh, map[d.to], d.th);
+                });
+                updateMinimap();
+            } catch (e) {
+                console.error('Load failed:', e);
+            }
+        }
+
+        function switchCanvas(canvasId) {
+            // Clear current canvas
+            connections.forEach(c => c.el.remove());
+            connections = [];
+            items.forEach(i => i.el.remove());
+            items = [];
+            selectedItem = selectedConn = null;
+            itemId = highestZ = 1;
+            scale = 1;
+            offsetX = offsetY = 0;
+            updateTransform();
+            
+            // Set new current
+            currentCanvasId = canvasId;
+            localStorage.setItem('knotpad-active-canvas', canvasId);
+            
+            // Load data
+            loadCanvasData(canvasId);
+            setFilter('all');
+            updateMinimap();
+            renderCanvasList();
+        }
+
+        function createNewCanvas() {
+            const newCanvas = {
+                id: generateId(),
+                name: 'Untitled',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                itemCount: 0
+            };
+            canvases.unshift(newCanvas);
+            saveCanvasesList();
+            switchCanvas(newCanvas.id);
+        }
+
+        function deleteCanvas(canvasId) {
+            if (canvases.length <= 1) {
+                showToast('Cannot delete last canvas', 'error');
+                return;
+            }
+            
+            if (!confirm('Delete this canvas?')) return;
+            
+            const idx = canvases.findIndex(c => c.id === canvasId);
+            if (idx > -1) {
+                canvases.splice(idx, 1);
+                localStorage.removeItem('knotpad-data-' + canvasId);
+                saveCanvasesList();
+                
+                if (currentCanvasId === canvasId) {
+                    switchCanvas(canvases[0].id);
+                } else {
+                    renderCanvasList();
+                }
+                
+                showToast('Canvas deleted');
+            }
+        }
+
+        function renameCanvas(canvasId, newName) {
+            const canvas = canvases.find(c => c.id === canvasId);
+            if (canvas) {
+                canvas.name = newName || 'Untitled';
+                canvas.updatedAt = Date.now();
+                saveCanvasesList();
+                renderCanvasList();
+            }
+        }
+
+        function renderCanvasList() {
+            canvasList.innerHTML = canvases.map(c => `
+                <div class="canvas-item-entry ${c.id === currentCanvasId ? 'active' : ''}" data-id="${c.id}">
+                    <div class="canvas-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M9 3v18M3 9h6"/>
+                        </svg>
+                    </div>
+                    <div class="canvas-info">
+                        <div class="canvas-name">${escapeHtml(c.name)}</div>
+                        <div class="canvas-meta">${c.itemCount || 0} items</div>
+                    </div>
+                    <div class="canvas-actions">
+                        <button class="canvas-action-btn rename" title="Rename">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
+                        <button class="canvas-action-btn delete" title="Delete">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add event listeners
+            canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
+                const id = entry.dataset.id;
+                
+                entry.addEventListener('click', e => {
+                    if (e.target.closest('.canvas-action-btn')) return;
+                    if (id !== currentCanvasId) {
+                        saveCurrentCanvas();
+                        switchCanvas(id);
+                    }
+                });
+
+                entry.querySelector('.rename').addEventListener('click', e => {
+                    e.stopPropagation();
+                    startRename(entry, id);
+                });
+
+                entry.querySelector('.delete').addEventListener('click', e => {
+                    e.stopPropagation();
+                    deleteCanvas(id);
+                });
+            });
+        }
+
+        function startRename(entry, canvasId) {
+            const nameEl = entry.querySelector('.canvas-name');
+            const currentName = canvases.find(c => c.id === canvasId)?.name || '';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'canvas-name-input';
+            input.value = currentName;
+            
+            nameEl.replaceWith(input);
+            input.focus();
+            input.select();
+
+            const finish = () => {
+                const newName = input.value.trim() || 'Untitled';
+                renameCanvas(canvasId, newName);
+            };
+
+            input.addEventListener('blur', finish);
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                if (e.key === 'Escape') { input.value = currentName; input.blur(); }
+            });
+        }
+
+        function escapeHtml(t) {
+            const d = document.createElement('div');
+            d.textContent = t;
+            return d.innerHTML;
+        }
+
+        // Sidebar toggle
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+
+        $('addCanvasBtn').addEventListener('click', () => {
+            saveCurrentCanvas();
+            createNewCanvas();
+        });
+
+        // Theme
+        function loadTheme() {
+            const t = localStorage.getItem(THEME_KEY);
+            if (t === 'light') document.documentElement.classList.add('light');
+            updateThemeIcon();
+        }
+
+        function toggleTheme() {
+            document.documentElement.classList.toggle('light');
+            localStorage.setItem(THEME_KEY, document.documentElement.classList.contains('light') ? 'light' : 'dark');
+            updateThemeIcon();
+        }
+
+        function updateThemeIcon() {
+            const isLight = document.documentElement.classList.contains('light');
+            $('themeToggle').querySelector('.moon').style.display = isLight ? 'none' : 'block';
+            $('themeToggle').querySelector('.sun').style.display = isLight ? 'block' : 'none';
+        }
+
+        // Toast
+        function showToast(msg, type = 'success') {
+            toast.textContent = msg;
+            toast.className = 'toast ' + type;
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        // Transform
+        function updateTransform() {
+            canvas.style.transform = `translate(${offsetX}px,${offsetY}px) scale(${scale})`;
+            zoomDisplay.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function setZoom(z) {
+            const cx = innerWidth / 2, cy = innerHeight / 2;
+            z = Math.max(0.1, Math.min(5, z));
+            offsetX = cx - (cx - offsetX) * (z / scale);
+            offsetY = cy - (cy - offsetY) * (z / scale);
+            scale = z;
+            updateTransform();
+            updateMinimap();
+        }
+
+        // Filter
+        function setFilter(color) {
+            activeFilter = color;
+            filterDropdown.querySelectorAll('.filter-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === color));
+            filterBtn.classList.toggle('filter-active', color !== 'all');
+            
+            items.forEach(item => {
+                if (color === 'all' || item.color === color) {
+                    item.el.classList.remove('filtered-out');
+                } else {
+                    item.el.classList.add('filtered-out');
+                }
+            });
+            updateMinimap();
+        }
+
+        // Find non-overlapping position
+        function findFreePosition(x, y, w, h) {
+            const offset = 6;
+            const maxTries = 50;
+            let tries = 0;
+            
+            while (tries < maxTries) {
+                const overlaps = items.some(item => 
+                    Math.abs(x - item.x) < 10 && Math.abs(y - item.y) < 10
+                );
+                
+                if (!overlaps) break;
+                x += offset;
+                y += offset;
+                tries++;
+            }
+            
+            return { x, y };
+        }
+
+        // Pan & Zoom
+        app.addEventListener('wheel', e => {
+            e.preventDefault();
+            const d = e.deltaY > 0 ? 0.9 : 1.1;
+            const z = Math.max(0.1, Math.min(5, scale * d));
+            const rect = app.getBoundingClientRect();
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            offsetX = mx - (mx - offsetX) * (z / scale);
+            offsetY = my - (my - offsetY) * (z / scale);
+            scale = z;
+            updateTransform();
+            updateMinimap();
+        }, { passive: false });
+
+        app.addEventListener('mousedown', e => {
+            if (e.target === canvas || e.target.classList.contains('grid-overlay')) {
+                isPanning = true;
+                startX = e.clientX - offsetX;
+                startY = e.clientY - offsetY;
+                canvas.style.cursor = 'grabbing';
+                deselectAll();
+            }
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (isPanning) {
+                offsetX = e.clientX - startX;
+                offsetY = e.clientY - startY;
+                updateTransform();
+                updateMinimap();
+            }
+            if (draggedItem) {
+                const rect = app.getBoundingClientRect();
+                const x = (e.clientX - rect.left - offsetX) / scale - draggedItem.ox;
+                const y = (e.clientY - rect.top - offsetY) / scale - draggedItem.oy;
+                draggedItem.el.style.left = x + 'px';
+                draggedItem.el.style.top = y + 'px';
+                draggedItem.x = x; draggedItem.y = y;
+                updateAllConnections();
+                updateMinimap();
+            }
+            if (resizingItem) {
+                const rect = app.getBoundingClientRect();
+                const x = (e.clientX - rect.left - offsetX) / scale;
+                const y = (e.clientY - rect.top - offsetY) / scale;
+                const w = Math.max(140, x - resizingItem.x);
+                const h = Math.max(100, y - resizingItem.y);
+                resizingItem.el.style.width = w + 'px';
+                resizingItem.el.style.height = h + 'px';
+                resizingItem.w = w; resizingItem.h = h;
+                updateAllConnections();
+                updateMinimap();
+            }
+            if (tempLine) {
+                const rect = app.getBoundingClientRect();
+                const x = (e.clientX - rect.left - offsetX) / scale + 10000;
+                const y = (e.clientY - rect.top - offsetY) / scale + 10000;
+                updateTempLine(x, y);
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isPanning) { isPanning = false; canvas.style.cursor = connectMode ? 'crosshair' : 'grab'; }
+            if (draggedItem) { draggedItem.el.classList.remove('dragging'); canvas.classList.remove('dragging-item'); draggedItem = null; }
+            resizingItem = null;
+        });
+
+        // Touch
+        let lastDist = 0;
+        app.addEventListener('touchstart', e => {
+            if (e.touches.length === 2) {
+                lastDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+            } else if (e.touches.length === 1 && (e.target === canvas || e.target.classList.contains('grid-overlay'))) {
+                isPanning = true;
+                startX = e.touches[0].clientX - offsetX;
+                startY = e.touches[0].clientY - offsetY;
+            }
+        });
+
+        app.addEventListener('touchmove', e => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+                const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                const z = Math.max(0.1, Math.min(5, scale * dist / lastDist));
+                const rect = app.getBoundingClientRect();
+                offsetX = cx - rect.left - (cx - rect.left - offsetX) * (z / scale);
+                offsetY = cy - rect.top - (cy - rect.top - offsetY) * (z / scale);
+                scale = z;
+                lastDist = dist;
+                updateTransform();
+                updateMinimap();
+            } else if (e.touches.length === 1 && isPanning) {
+                offsetX = e.touches[0].clientX - startX;
+                offsetY = e.touches[0].clientY - startY;
+                updateTransform();
+                updateMinimap();
+            }
+        }, { passive: false });
+
+        app.addEventListener('touchend', () => isPanning = false);
+
+        // Drag & Drop
+        let dragCount = 0;
+        window.addEventListener('dragenter', e => { e.preventDefault(); dragCount++; dropZone.classList.add('active'); });
+        window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragCount === 0) dropZone.classList.remove('active'); });
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('drop', e => {
+            e.preventDefault();
+            dragCount = 0;
+            dropZone.classList.remove('active');
+            const rect = app.getBoundingClientRect();
+            const x = (e.clientX - rect.left - offsetX) / scale - 100;
+            const y = (e.clientY - rect.top - offsetY) / scale - 70;
+            if (e.dataTransfer.files.length) {
+                [...e.dataTransfer.files].forEach((f, i) => handleFile(f, x + i * 24, y + i * 24));
+                return;
+            }
+            const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+            if (url?.startsWith('http')) addLink(url, '', x, y);
+        });
+
+        function handleFile(file, x, y) {
+            const type = file.type;
+            if (type.startsWith('image/')) addImage(file, x, y);
+            else if (type.startsWith('video/')) addVideo(file, x, y);
+        }
+
+        function addImage(file, x, y) {
+            const r = new FileReader();
+            r.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width, h = img.height;
+                    if (w > 400) { h = 400 / w * h; w = 400; }
+                    if (h > 300) { w = 300 / h * w; h = 300; }
+                    const pos = findFreePosition(x, y, w, h);
+                    createItem({ type: 'image', x: pos.x, y: pos.y, w, h, content: e.target.result });
+                };
+                img.src = e.target.result;
+            };
+            r.readAsDataURL(file);
+        }
+
+        function addVideo(file, x, y) {
+            const r = new FileReader();
+            r.onload = e => {
+                const pos = findFreePosition(x, y, 400, 225);
+                createItem({ type: 'video', x: pos.x, y: pos.y, w: 400, h: 225, content: e.target.result });
+            };
+            r.readAsDataURL(file);
+        }
+
+        function addLink(url, title, x, y) {
+            const display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+            const domain = new URL(url).hostname;
+            const pos = findFreePosition(x ?? 200, y ?? 200, 260, 100);
+            return createItem({ type: 'link', x: pos.x, y: pos.y, w: 260, h: 100, content: { url, title: title || domain, display } });
+        }
+
+        function addNote(title = '', body = '', x, y, color = null) {
+            const pos = findFreePosition(x ?? 200, y ?? 200, 220, 140);
+            return createItem({ type: 'note', x: pos.x, y: pos.y, w: 220, h: 140, content: { title, body }, color });
+        }
+
+        // Item creation
+        function createItem(cfg, loading = false) {
+            const el = document.createElement('div');
+            el.className = 'canvas-item' + (loading ? '' : ' new');
+            el.style.cssText = `left:${cfg.x}px;top:${cfg.y}px;width:${cfg.w}px;height:${cfg.h}px;z-index:${++highestZ}`;
+
+            let html = '';
+            switch (cfg.type) {
+                case 'image': html = `<img class="item-image" src="${cfg.content}">`; break;
+                case 'video': html = `<video class="item-video" src="${cfg.content}" controls></video>`; break;
+                case 'note': html = `<div class="item-note"><input class="note-title" placeholder="Title..." value="${esc(cfg.content.title)}"><textarea class="note-body" placeholder="Write something...">${esc(cfg.content.body)}</textarea></div>`; break;
+                case 'link': html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`; break;
+            }
+
+            if (cfg.color) {
+                el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[cfg.color]}`);
+            }
+
+            el.innerHTML = `
+                <div class="item-content">${html}</div>
+                <button class="delete-btn">×</button>
+                <button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg></button>
+                <div class="color-picker">
+                    <div class="color-opt none" data-color="" title="None"></div>
+                    ${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}
+                </div>
+                <div class="resize-handle"></div>
+                <div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div>
+                <div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div>
+                <button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button>
+                <button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
+
+            canvas.appendChild(el);
+
+            const item = { id: cfg.id || `i${++itemId}`, el, type: cfg.type, x: cfg.x, y: cfg.y, w: cfg.w, h: cfg.h, content: cfg.content, color: cfg.color || null };
+            items.push(item);
+            setupItemEvents(item);
+            if (!loading) {
+                updateMinimap();
+                if (activeFilter !== 'all' && item.color !== activeFilter) {
+                    item.el.classList.add('filtered-out');
+                }
+            }
+            setTimeout(() => el.classList.remove('new'), 250);
+            return item;
+        }
+
+        function setItemColor(item, color) {
+            item.color = color || null;
+            if (color) {
+                item.el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[color]}`);
+            } else {
+                item.el.style.setProperty('--tag-shadow', '0 0 0 0 transparent');
+            }
+            
+            item.el.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (color || '')));
+            
+            if (activeFilter !== 'all') {
+                item.el.classList.toggle('filtered-out', item.color !== activeFilter);
+            }
+            updateMinimap();
+        }
+
+        function setupItemEvents(item) {
+            const el = item.el;
+            const colorBtn = el.querySelector('.color-btn');
+            const colorPicker = el.querySelector('.color-picker');
+
+            el.addEventListener('mousedown', e => {
+                const t = e.target;
+                if (t.classList.contains('delete-btn') || t.classList.contains('resize-handle') || 
+                    t.classList.contains('connection-handle') || t.classList.contains('add-child-btn') ||
+                    t.classList.contains('color-btn') || t.classList.contains('color-opt') ||
+                    t.closest('.color-picker') ||
+                    t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+                e.stopPropagation();
+                selectItem(item);
+                el.style.zIndex = ++highestZ;
+                const rect = el.getBoundingClientRect();
+                item.ox = (e.clientX - rect.left) / scale;
+                item.oy = (e.clientY - rect.top) / scale;
+                draggedItem = item;
+                el.classList.add('dragging');
+                canvas.classList.add('dragging-item');
+            });
+
+            el.querySelector('.resize-handle').addEventListener('mousedown', e => { e.stopPropagation(); resizingItem = item; });
+            el.querySelector('.delete-btn').addEventListener('click', e => { e.stopPropagation(); deleteItem(item); });
+
+            colorBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                document.querySelectorAll('.color-picker.active').forEach(p => { if (p !== colorPicker) p.classList.remove('active'); });
+                colorPicker.classList.toggle('active');
+                colorPicker.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (item.color || '')));
+            });
+
+            colorPicker.querySelectorAll('.color-opt').forEach(opt => {
+                opt.addEventListener('click', e => {
+                    e.stopPropagation();
+                    setItemColor(item, opt.dataset.color || null);
+                    colorPicker.classList.remove('active');
+                });
+            });
+
+            el.querySelectorAll('.add-child-btn').forEach(btn => {
+                btn.addEventListener('click', e => { e.stopPropagation(); addChildNode(item, btn.dataset.d); });
+            });
+
+            el.querySelectorAll('.connection-handle').forEach(h => {
+                h.addEventListener('mousedown', e => {
+                    e.stopPropagation();
+                    if (connectSource) completeConnection(item, h.dataset.h);
+                    else startConnection(item, h.dataset.h);
+                });
+                h.addEventListener('mouseenter', () => { if (connectSource && connectSource !== item) el.classList.add('connect-target'); });
+                h.addEventListener('mouseleave', () => el.classList.remove('connect-target'));
+            });
+
+            el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); selectItem(item); showContextMenu(e.clientX, e.clientY); });
+
+            if (item.type === 'note') {
+                const ti = el.querySelector('.note-title'), tb = el.querySelector('.note-body');
+                ti.addEventListener('input', () => item.content.title = ti.value);
+                tb.addEventListener('input', () => item.content.body = tb.value);
+            }
+        }
+
+        function selectItem(item) { deselectAll(); item.el.classList.add('selected'); selectedItem = item; }
+
+        function deselectAll() {
+            items.forEach(i => i.el.classList.remove('selected'));
+            selectedItem = null;
+            if (selectedConn) { selectedConn.el.classList.remove('selected'); selectedConn = null; }
+            hideMenus();
+            document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
+        }
+
+        function deleteItem(item) {
+            connections.filter(c => c.from === item || c.to === item).forEach(deleteConnection);
+            const i = items.indexOf(item);
+            if (i > -1) { items.splice(i, 1); item.el.remove(); }
+            updateMinimap();
+        }
+
+        function duplicateItem(item) {
+            const pos = findFreePosition(item.x + 24, item.y + 24, item.w, item.h);
+            createItem({ type: item.type, x: pos.x, y: pos.y, w: item.w, h: item.h, content: JSON.parse(JSON.stringify(item.content)), color: item.color });
+        }
+
+        // Connections
+        function toggleConnectMode() {
+            connectMode = !connectMode;
+            $('connectModeBtn').classList.toggle('connect-mode', connectMode);
+            canvas.classList.toggle('connecting', connectMode);
+            if (!connectMode) cancelConnection();
+        }
+
+        function startConnection(item, handle) {
+            connectSource = item;
+            connectHandle = handle;
+            item.el.classList.add('connect-source');
+            const pos = getHandlePos(item, handle);
+            tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            tempLine.classList.add('connection-line', 'temp');
+            connectionsSvg.appendChild(tempLine);
+            updateTempLine(pos.x, pos.y);
+        }
+
+        function updateTempLine(ex, ey) {
+            if (!tempLine || !connectSource) return;
+            const sp = getHandlePos(connectSource, connectHandle);
+            tempLine.setAttribute('d', curvePath(sp.x, sp.y, ex, ey));
+        }
+
+        function completeConnection(target, handle) {
+            if (!connectSource || connectSource === target) { cancelConnection(); return; }
+            const exists = connections.some(c => (c.from === connectSource && c.to === target) || (c.from === target && c.to === connectSource));
+            if (!exists) addConnection(connectSource, connectHandle, target, handle);
+            cancelConnection();
+        }
+
+        function cancelConnection() {
+            if (connectSource) connectSource.el.classList.remove('connect-source');
+            if (tempLine) { tempLine.remove(); tempLine = null; }
+            connectSource = connectHandle = null;
+            items.forEach(i => i.el.classList.remove('connect-target'));
+        }
+
+        function addConnection(from, fh, to, th) {
+            const conn = { id: `c${Date.now()}`, from, fh, to, th, el: null };
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.classList.add('connection-line');
+            path.addEventListener('click', e => { e.stopPropagation(); selectConnection(conn); });
+            path.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); selectConnection(conn); showConnMenu(e.clientX, e.clientY); });
+            connectionsSvg.appendChild(path);
+            conn.el = path;
+            connections.push(conn);
+            updateConnection(conn);
+            updateMinimap();
+            return conn;
+        }
+
+        function updateConnection(c) {
+            const fp = getHandlePos(c.from, c.fh), tp = getHandlePos(c.to, c.th);
+            c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y));
+        }
+
+        function updateAllConnections() { connections.forEach(updateConnection); }
+
+        function getHandlePos(item, h) {
+            const { x, y, w, h: ih } = item, off = 10000;
+            switch (h) {
+                case 'top': return { x: x + w / 2 + off, y: y + off };
+                case 'bottom': return { x: x + w / 2 + off, y: y + ih + off };
+                case 'left': return { x: x + off, y: y + ih / 2 + off };
+                case 'right': return { x: x + w + off, y: y + ih / 2 + off };
+            }
+        }
+
+        function curvePath(x1, y1, x2, y2) {
+            const dx = x2 - x1, dy = y2 - y1;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const curve = Math.min(dist * 0.3, 80);
+            return `M${x1} ${y1} C${x1 + curve * Math.sign(dx || 1)} ${y1}, ${x2 - curve * Math.sign(dx || 1)} ${y2}, ${x2} ${y2}`;
+        }
+
+        function selectConnection(c) { deselectAll(); selectedConn = c; c.el.classList.add('selected'); }
+
+        function deleteConnection(c) {
+            const i = connections.indexOf(c);
+            if (i > -1) { connections.splice(i, 1); c.el.remove(); selectedConn = null; updateMinimap(); }
+        }
+
+        function addChildNode(parent, dir) {
+            const gap = 72, cw = 220, ch = 140;
+            let x, y, fh, th;
+            switch (dir) {
+                case 'top': x = parent.x + parent.w / 2 - cw / 2; y = parent.y - ch - gap; fh = 'top'; th = 'bottom'; break;
+                case 'bottom': x = parent.x + parent.w / 2 - cw / 2; y = parent.y + parent.h + gap; fh = 'bottom'; th = 'top'; break;
+                case 'left': x = parent.x - cw - gap; y = parent.y + parent.h / 2 - ch / 2; fh = 'left'; th = 'right'; break;
+                case 'right': x = parent.x + parent.w + gap; y = parent.y + parent.h / 2 - ch / 2; fh = 'right'; th = 'left'; break;
+            }
+            const child = addNote('', '', x, y, parent.color);
+            addConnection(parent, fh, child, th);
+            return child;
+        }
+
+        // Context menus
+        function showContextMenu(x, y) { contextMenu.style.left = x + 'px'; contextMenu.style.top = y + 'px'; contextMenu.classList.add('active'); }
+        function showConnMenu(x, y) { connContextMenu.style.left = x + 'px'; connContextMenu.style.top = y + 'px'; connContextMenu.classList.add('active'); }
+        function hideMenus() { contextMenu.classList.remove('active'); connContextMenu.classList.remove('active'); filterDropdown.classList.remove('active'); }
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.color-picker') && !e.target.closest('.color-btn')) {
+                document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
+            }
+            if (!e.target.closest('#filterBtn') && !e.target.closest('#filterDropdown')) {
+                filterDropdown.classList.remove('active');
+            }
+            if (!e.target.closest('.context-menu')) {
+                contextMenu.classList.remove('active');
+                connContextMenu.classList.remove('active');
+            }
+        });
+
+        contextMenu.querySelectorAll('.context-menu-item').forEach(el => {
+            el.addEventListener('click', () => {
+                if (selectedItem) {
+                    switch (el.dataset.action) {
+                        case 'connect': startConnection(selectedItem, 'right'); break;
+                        case 'bring-front': selectedItem.el.style.zIndex = ++highestZ; break;
+                        case 'send-back': selectedItem.el.style.zIndex = 1; break;
+                        case 'duplicate': duplicateItem(selectedItem); break;
+                        case 'delete': deleteItem(selectedItem); break;
+                    }
+                }
+                hideMenus();
+            });
+        });
+
+        connContextMenu.querySelector('[data-action="delete-conn"]').addEventListener('click', () => {
+            if (selectedConn) deleteConnection(selectedConn);
+            hideMenus();
+        });
+
+        // Filter dropdown
+        filterBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            filterDropdown.classList.toggle('active');
+        });
+
+        filterDropdown.querySelectorAll('.filter-opt').forEach(opt => {
+            opt.addEventListener('click', e => {
+                e.stopPropagation();
+                setFilter(opt.dataset.color);
+                filterDropdown.classList.remove('active');
+            });
+        });
+
+        // Modals
+        const linkModal = $('linkModal');
+        function openLinkModal() { linkModal.classList.add('active'); setTimeout(() => $('linkUrl').focus(), 100); }
+        function closeLinkModal() { linkModal.classList.remove('active'); $('linkTitle').value = ''; $('linkUrl').value = ''; }
+
+        linkModal.addEventListener('click', e => { if (e.target === linkModal) closeLinkModal(); });
+        linkModal.querySelector('[data-close]').addEventListener('click', closeLinkModal);
+
+        $('linkSubmit').addEventListener('click', () => {
+            let url = $('linkUrl').value.trim();
+            if (url) {
+                if (!url.startsWith('http')) url = 'https://' + url;
+                const x = (innerWidth / 2 - offsetX) / scale - 130;
+                const y = (innerHeight / 2 - offsetY) / scale - 50;
+                addLink(url, $('linkTitle').value.trim(), x, y);
+                closeLinkModal();
+            }
+        });
+
+        // Keyboard
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveCurrentCanvas(); return; }
+            if ((e.key === 'c' || e.key === 'C') && !e.target.matches('input,textarea')) toggleConnectMode();
+            if (e.key === 'Escape') { cancelConnection(); if (connectMode) toggleConnectMode(); closeLinkModal(); }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input,textarea')) {
+                if (selectedConn) deleteConnection(selectedConn);
+                else if (selectedItem) deleteItem(selectedItem);
+            }
+        });
+
+        // Toolbar
+        $('addNoteBtn').addEventListener('click', () => {
+            const x = (innerWidth / 2 - offsetX) / scale - 110;
+            const y = (innerHeight / 2 - offsetY) / scale - 70;
+            addNote('', '', x, y);
+        });
+        $('addLinkBtn').addEventListener('click', openLinkModal);
+        $('addFileBtn').addEventListener('click', () => fileInput.click());
+        $('connectModeBtn').addEventListener('click', toggleConnectMode);
+        $('saveBtn').addEventListener('click', saveCurrentCanvas);
+        $('loadBtn').addEventListener('click', () => {
+            if (currentCanvasId) {
+                if (items.length && !confirm('Reload saved data?')) return;
+                connections.forEach(c => c.el.remove()); connections = [];
+                items.forEach(i => i.el.remove()); items = [];
+                loadCanvasData(currentCanvasId);
+                showToast('Loaded');
+            }
+        });
+        $('clearBtn').addEventListener('click', () => {
+            if (!confirm('Clear all items?')) return;
+            connections.forEach(c => c.el.remove()); connections = [];
+            items.forEach(i => i.el.remove()); items = [];
+            selectedItem = selectedConn = null; itemId = highestZ = 1;
+            updateMinimap();
+            showToast('Cleared');
+        });
+        $('zoomInBtn').addEventListener('click', () => setZoom(scale * 1.25));
+        $('zoomOutBtn').addEventListener('click', () => setZoom(scale / 1.25));
+        $('resetViewBtn').addEventListener('click', () => { scale = 1; offsetX = offsetY = 0; updateTransform(); updateMinimap(); });
+        $('themeToggle').addEventListener('click', toggleTheme);
+
+        fileInput.addEventListener('change', e => {
+            if (e.target.files.length) {
+                const x = (innerWidth / 2 - offsetX) / scale - 100;
+                const y = (innerHeight / 2 - offsetY) / scale - 70;
+                [...e.target.files].forEach((f, i) => handleFile(f, x + i * 24, y + i * 24));
+            }
+            fileInput.value = '';
+        });
+
+        // Minimap
+        function updateMinimap() {
+            const visibleItems = items.filter(i => !i.el.classList.contains('filtered-out'));
+            if (!visibleItems.length) { minimapContent.innerHTML = '<div class="minimap-viewport"></div>'; return; }
+            
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            visibleItems.forEach(i => { minX = Math.min(minX, i.x); minY = Math.min(minY, i.y); maxX = Math.max(maxX, i.x + i.w); maxY = Math.max(maxY, i.y + i.h); });
+            const pad = 80;
+            minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+            const ww = maxX - minX, wh = maxY - minY;
+            const s = Math.min(160 / ww, 100 / wh);
+
+            let svg = '<svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">';
+            connections.forEach(c => {
+                if (c.from.el.classList.contains('filtered-out') || c.to.el.classList.contains('filtered-out')) return;
+                const fx = (c.from.x + c.from.w / 2 - minX) * s, fy = (c.from.y + c.from.h / 2 - minY) * s;
+                const tx = (c.to.x + c.to.w / 2 - minX) * s, ty = (c.to.y + c.to.h / 2 - minY) * s;
+                svg += `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="var(--connection-color)" stroke-width="1"/>`;
+            });
+            svg += '</svg>';
+
+            visibleItems.forEach(i => {
+                const ix = (i.x - minX) * s, iy = (i.y - minY) * s;
+                const iw = Math.max(3, i.w * s), ih = Math.max(2, i.h * s);
+                const bg = i.color ? COLOR_MAP[i.color] : 'var(--text-secondary)';
+                svg += `<div class="minimap-item" style="left:${ix}px;top:${iy}px;width:${iw}px;height:${ih}px;background:${bg}"></div>`;
+            });
+
+            const vx = (-offsetX / scale - minX) * s, vy = (-offsetY / scale - minY) * s;
+            const vw = innerWidth / scale * s, vh = innerHeight / scale * s;
+            svg += `<div class="minimap-viewport" style="left:${vx}px;top:${vy}px;width:${vw}px;height:${vh}px"></div>`;
+
+            minimapContent.innerHTML = svg;
+        }
+
+        function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+        // Init
+        loadTheme();
+        updateTransform();
+        loadCanvases();
+    })();
+    </script>
+</body>
+</html>
