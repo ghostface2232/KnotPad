@@ -120,6 +120,7 @@
             overflow: hidden;
             background: var(--bg-primary);
             cursor: grab; 
+            outline: none; 
         }
         #app:active { cursor: grabbing; }
         #canvas {
@@ -836,11 +837,10 @@
         </svg>
     </button>
 
-    <div id="app">
+    <div id="app" tabindex="0">
         <div id="canvas">
             <div class="grid-overlay"></div>
             <svg id="connectionsSvg"></svg>
-        <div id="selectionBox"></div>
         </div>
     </div>
 
@@ -1193,6 +1193,7 @@
 
         // 2. 마우스 다운
         app.addEventListener('mousedown', e => {
+            app.focus(); 
             // [A] 가운데 버튼: 패닝
             if (e.button === 1) {
                 e.preventDefault();
@@ -1708,19 +1709,59 @@
             }
         });
         window.addEventListener('paste', e => {
-            if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+            // 1. 입력창에서는 붙여넣기 허용 (기본 동작)
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // 2. 이벤트 감지 확인용 로그
+            console.log('📋 붙여넣기 감지됨!');
+
             e.preventDefault();
-            const items = (e.clipboardData||e.originalEvent.clipboardData).items;
-            const x = (innerWidth/2-offsetX)/scale-100, y = (innerHeight/2-offsetY)/scale-100;
-            for (let i=0; i<items.length; i++) {
+            
+            // 3. 클립보드 데이터 가져오기
+            const clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData) {
+                console.warn('⚠️ 클립보드 데이터가 비어있거나 권한이 없습니다.');
+                return;
+            }
+
+            const items = clipboardData.items;
+            console.log(`🔍 발견된 아이템 개수: ${items.length}`);
+
+            // 붙여넣기 위치: 현재 화면의 중앙
+            const x = (innerWidth / 2 - offsetX) / scale - 100;
+            const y = (innerHeight / 2 - offsetY) / scale - 100;
+
+            for (let i = 0; i < items.length; i++) {
                 const item = items[i];
-                if (item.type.indexOf('image')!==-1) handleFile(item.getAsFile(), x+i*20, y+i*20);
-                else if (item.kind==='string') item.getAsString(text => {
-                    text = text.trim(); if(!text)return;
-                    if (/^(http|https):\/\/[^ "]+$/.test(text)) addLink(text, '', x+i*20, y+i*20);
-                    else addNote('', text, x+i*20, y+i*20);
-                    triggerAutoSave();
-                });
+                console.log(`- 아이템 ${i}: kind=${item.kind}, type=${item.type}`);
+
+                // [이미지 처리]
+                if (item.type.indexOf('image') !== -1) {
+                    const blob = item.getAsFile();
+                    console.log('📸 이미지 파일 처리 중...');
+                    handleFile(blob, x + i * 20, y + i * 20);
+                } 
+                // [텍스트 처리]
+                else if (item.kind === 'string' && item.type.indexOf('text/plain') !== -1) {
+                    item.getAsString(text => {
+                        text = text.trim();
+                        if (!text) return;
+                        
+                        console.log('📝 텍스트 처리 중:', text.substring(0, 20) + '...');
+
+                        // URL인지 확인
+                        const isUrl = /^(http|https):\/\/[^ "]+$/.test(text);
+
+                        if (isUrl) {
+                            addLink(text, '', x + i * 20, y + i * 20);
+                        } else {
+                            addNote('', text, x + i * 20, y + i * 20);
+                        }
+                        triggerAutoSave();
+                    });
+                }
             }
         });
         function handleFile(file, x, y) {
