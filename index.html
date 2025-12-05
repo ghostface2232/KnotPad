@@ -686,7 +686,7 @@
         <button class="toolbar-btn" id="addNoteBtn" title="Add Note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15h6"/></svg></button>
         <button class="toolbar-btn" id="addMemoBtn" title="Add Memo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></button>
         <button class="toolbar-btn" id="addLinkBtn" title="Add Link"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></button>
-        <button class="toolbar-btn" id="addFileBtn" title="Add File"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
+        <button class="toolbar-btn" id="addFileBtn" title="Add Image/Video"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button>
         <div class="toolbar-sep"></div>
         <button class="toolbar-btn" id="connectModeBtn" title="Connect (C)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="3"/><circle cx="19" cy="12" r="3"/><path d="M8 12h8"/></svg></button>
         <div class="toolbar-sep"></div>
@@ -764,6 +764,60 @@
     const COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
     const COLOR_MAP = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#8b5cf6', pink: '#ec4899' };
 
+    // IndexedDB for media storage
+    let mediaDB = null;
+    const DB_NAME = 'knotpad-media';
+    const DB_VERSION = 1;
+    const MEDIA_STORE = 'media';
+
+    function initMediaDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => { mediaDB = request.result; resolve(mediaDB); };
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(MEDIA_STORE)) {
+                    db.createObjectStore(MEDIA_STORE, { keyPath: 'id' });
+                }
+            };
+        });
+    }
+
+    function saveMedia(id, blob) {
+        return new Promise((resolve, reject) => {
+            if (!mediaDB) { reject('DB not ready'); return; }
+            const tx = mediaDB.transaction(MEDIA_STORE, 'readwrite');
+            const store = tx.objectStore(MEDIA_STORE);
+            store.put({ id, blob, timestamp: Date.now() });
+            tx.oncomplete = () => resolve(id);
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    function loadMedia(id) {
+        return new Promise((resolve, reject) => {
+            if (!mediaDB) { reject('DB not ready'); return; }
+            const tx = mediaDB.transaction(MEDIA_STORE, 'readonly');
+            const store = tx.objectStore(MEDIA_STORE);
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result?.blob || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    function deleteMedia(id) {
+        return new Promise((resolve) => {
+            if (!mediaDB) { resolve(); return; }
+            const tx = mediaDB.transaction(MEDIA_STORE, 'readwrite');
+            tx.objectStore(MEDIA_STORE).delete(id);
+            tx.oncomplete = () => resolve();
+        });
+    }
+
+    // URL cache for blob URLs
+    const blobURLCache = new Map();
+
     let scale = 1, offsetX = 0, offsetY = 0;
     let isPanning = false, startX = 0, startY = 0;
     let isSelecting = false, selStartX = 0, selStartY = 0;
@@ -795,14 +849,14 @@
     // Canvas management
     function generateId() { return 'c' + Date.now() + Math.random().toString(36).substr(2, 5); }
 
-    function loadCanvases() {
+    async function loadCanvases() {
         try {
             canvases = JSON.parse(localStorage.getItem(CANVASES_KEY) || '[]');
             if (!canvases.length) canvases = [{ id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 }];
             saveCanvasesList();
             const lastId = localStorage.getItem('knotpad-active-canvas');
             const target = canvases.find(c => c.id === lastId) || canvases[0];
-            if (target) switchCanvas(target.id);
+            if (target) await switchCanvas(target.id);
             renderCanvasList();
         } catch (e) { console.error('Load failed:', e); }
     }
@@ -824,7 +878,7 @@
         } catch (e) { showToast('Save failed', 'error'); }
     }
 
-    function loadCanvasData(id) {
+    async function loadCanvasData(id) {
         try {
             const saved = localStorage.getItem('knotpad-data-' + id);
             if (!saved) return;
@@ -832,6 +886,16 @@
             itemId = data.itemId || 0;
             highestZ = data.highestZ || 1;
             if (data.view) { scale = data.view.scale; offsetX = data.view.offsetX; offsetY = data.view.offsetY; updateTransform(); }
+            
+            // Preload all media from IndexedDB
+            const mediaItems = data.items.filter(d => (d.type === 'image' || d.type === 'video') && d.content?.startsWith('media_'));
+            for (const d of mediaItems) {
+                if (!blobURLCache.has(d.content)) {
+                    const blob = await loadMedia(d.content);
+                    if (blob) blobURLCache.set(d.content, URL.createObjectURL(blob));
+                }
+            }
+            
             const map = {};
             data.items.forEach(d => { const i = createItem(d, true); i.el.style.zIndex = d.z || 1; map[d.id] = i; });
             data.connections.forEach(d => { if (map[d.from] && map[d.to]) addConnection(map[d.from], d.fh, map[d.to], d.th); });
@@ -839,7 +903,11 @@
         } catch (e) { console.error('Load failed:', e); }
     }
 
-    function switchCanvas(id) {
+    async function switchCanvas(id) {
+        // Revoke old blob URLs
+        blobURLCache.forEach(url => URL.revokeObjectURL(url));
+        blobURLCache.clear();
+        
         connections.forEach(c => c.el.remove()); connections = [];
         items.forEach(i => i.el.remove()); items = [];
         selectedItems.clear(); selectedConn = null;
@@ -848,20 +916,20 @@
         updateTransform();
         currentCanvasId = id;
         localStorage.setItem('knotpad-active-canvas', id);
-        loadCanvasData(id);
+        await loadCanvasData(id);
         setFilter('all');
         updateMinimap();
         renderCanvasList();
     }
 
-    function createNewCanvas() {
+    async function createNewCanvas() {
         const nc = { id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 };
         canvases.unshift(nc);
         saveCanvasesList();
-        switchCanvas(nc.id);
+        await switchCanvas(nc.id);
     }
 
-    function deleteCanvas(id) {
+    async function deleteCanvas(id) {
         if (canvases.length <= 1) { showToast('Cannot delete last canvas', 'error'); return; }
         if (!confirm('Delete this canvas?')) return;
         const idx = canvases.findIndex(c => c.id === id);
@@ -869,7 +937,7 @@
             canvases.splice(idx, 1);
             localStorage.removeItem('knotpad-data-' + id);
             saveCanvasesList();
-            if (currentCanvasId === id) switchCanvas(canvases[0].id);
+            if (currentCanvasId === id) await switchCanvas(canvases[0].id);
             else renderCanvasList();
             showToast('Canvas deleted');
         }
@@ -892,7 +960,7 @@
             </div>`).join('');
         canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
             const id = entry.dataset.id;
-            entry.addEventListener('click', e => { if (!e.target.closest('.canvas-action-btn') && id !== currentCanvasId) { saveCurrentCanvas(); switchCanvas(id); } });
+            entry.addEventListener('click', async e => { if (!e.target.closest('.canvas-action-btn') && id !== currentCanvasId) { saveCurrentCanvas(); await switchCanvas(id); } });
             entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
             entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
         });
@@ -1079,9 +1147,22 @@
         el.className = 'canvas-item' + (loading ? '' : ' new');
         el.style.cssText = `left:${cfg.x}px;top:${cfg.y}px;width:${cfg.w}px;height:${cfg.h}px;z-index:${++highestZ}`;
         let html = '';
+        
+        // For media items, get blob URL
+        let mediaSrc = '';
+        if ((cfg.type === 'image' || cfg.type === 'video') && cfg.content) {
+            // Check if it's a media ID (not a data URL for backwards compatibility)
+            if (cfg.content.startsWith('media_')) {
+                mediaSrc = blobURLCache.get(cfg.content) || '';
+            } else {
+                // Legacy base64 data URL
+                mediaSrc = cfg.content;
+            }
+        }
+        
         switch (cfg.type) {
-            case 'image': html = `<img class="item-image" src="${cfg.content}">`; break;
-            case 'video': html = `<video class="item-video" src="${cfg.content}" controls></video>`; break;
+            case 'image': html = `<img class="item-image" src="${mediaSrc}" data-media-id="${cfg.content.startsWith('media_') ? cfg.content : ''}">`; break;
+            case 'video': html = `<video class="item-video" src="${mediaSrc}" data-media-id="${cfg.content.startsWith('media_') ? cfg.content : ''}" controls></video>`; break;
             case 'note': html = `<div class="item-note"><input class="note-title" placeholder="Title..." value="${esc(cfg.content.title)}"><textarea class="note-body" placeholder="Write something...">${esc(cfg.content.body)}</textarea></div>`; break;
             case 'memo': html = `<div class="item-memo"><textarea class="memo-body" placeholder="Quick memo...">${esc(cfg.content)}</textarea></div>`; break;
             case 'link': html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`; break;
@@ -1184,6 +1265,14 @@
     }
     function deleteItem(item, update = true) {
         connections.filter(c => c.from === item || c.to === item).forEach(deleteConnection);
+        
+        // Clean up media from IndexedDB
+        if ((item.type === 'image' || item.type === 'video') && item.content?.startsWith('media_')) {
+            deleteMedia(item.content);
+            const url = blobURLCache.get(item.content);
+            if (url) { URL.revokeObjectURL(url); blobURLCache.delete(item.content); }
+        }
+        
         const i = items.indexOf(item);
         if (i > -1) { items.splice(i, 1); item.el.remove(); }
         if (update) { throttledMinimap(); triggerAutoSave(); }
@@ -1378,22 +1467,39 @@
                     text = text.trim();
                     if (!text) return;
                     if (/^https?:\/\/[^ "]+$/.test(text)) addLink(text, '', x, y);
-                    else addNote('', text, x, y);
+                    else addMemo(text, x, y);
                     triggerAutoSave();
                 });
             }
         }
     });
 
-    function handleFile(file, x, y) {
+    async function handleFile(file, x, y) {
+        const mediaId = 'media_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
         if (file.type.startsWith('image/')) {
-            const r = new FileReader();
-            r.onload = e => { const img = new Image(); img.onload = () => { let w = img.width, h = img.height; if (w > 400) { h = 400 / w * h; w = 400; } if (h > 300) { w = 300 / h * w; h = 300; } createItem({ type: 'image', x, y, w, h, content: e.target.result }); triggerAutoSave(); }; img.src = e.target.result; };
-            r.readAsDataURL(file);
+            // Get dimensions first
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = async () => {
+                let w = img.width, h = img.height;
+                if (w > 400) { h = 400 / w * h; w = 400; }
+                if (h > 300) { w = 300 / h * w; h = 300; }
+                URL.revokeObjectURL(url);
+                
+                // Save blob to IndexedDB
+                await saveMedia(mediaId, file);
+                blobURLCache.set(mediaId, URL.createObjectURL(file));
+                
+                createItem({ type: 'image', x, y, w, h, content: mediaId });
+                triggerAutoSave();
+            };
+            img.src = url;
         } else if (file.type.startsWith('video/')) {
-            const r = new FileReader();
-            r.onload = e => { createItem({ type: 'video', x, y, w: 400, h: 225, content: e.target.result }); triggerAutoSave(); };
-            r.readAsDataURL(file);
+            await saveMedia(mediaId, file);
+            blobURLCache.set(mediaId, URL.createObjectURL(file));
+            createItem({ type: 'video', x, y, w: 400, h: 225, content: mediaId });
+            triggerAutoSave();
         }
     }
     function addLink(url, title, x, y) {
@@ -1459,7 +1565,7 @@
     // Init
     loadTheme();
     updateTransform();
-    loadCanvases();
+    initMediaDB().then(() => loadCanvases()).catch(e => { console.error('DB init failed:', e); loadCanvases(); });
 })();
 </script>
 </body>
