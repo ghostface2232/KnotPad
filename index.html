@@ -28,6 +28,14 @@
         font-weight: 700;
         font-style: normal;
     }
+        #selectionBox {
+            position: absolute;
+            border: 1px solid var(--accent);
+            background: var(--accent-glow);
+            display: none;
+            pointer-events: none;
+            z-index: 9999;
+        }
 
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -832,6 +840,7 @@
         <div id="canvas">
             <div class="grid-overlay"></div>
             <svg id="connectionsSvg"></svg>
+        <div id="selectionBox"></div>
         </div>
     </div>
 
@@ -999,7 +1008,7 @@
         });
       }
     </script>
- <script>
+<script>
     (function() {
         const $ = id => document.getElementById(id);
         const canvas = $('canvas'), app = $('app'), dropZone = $('dropZone');
@@ -1008,9 +1017,10 @@
         const fileInput = $('fileInput'), toast = $('toast'), zoomDisplay = $('zoomDisplay');
         const filterDropdown = $('filterDropdown'), filterBtn = $('filterBtn');
         const sidebar = $('sidebar'), sidebarToggle = $('sidebarToggle'), canvasList = $('canvasList');
-        
-        // 새로 추가된 요소 (파일 교체용)
         const replaceInput = $('replaceInput');
+        
+        // 새로 추가된 선택 박스
+        const selectionBox = $('selectionBox');
 
         const CANVASES_KEY = 'knotpad-canvases';
         const THEME_KEY = 'knotpad-theme';
@@ -1021,221 +1031,140 @@
         };
         
         let scale = 1, offsetX = 0, offsetY = 0;
-        let isPanning = false, startX = 0, startY = 0;
+        let isPanning = false, startX = 0, startY = 0; // 패닝용
+        let isSelecting = false, selStartX = 0, selStartY = 0; // 선택박스용
+        
         let items = [], connections = [];
-        let selectedItem = null, selectedConn = null;
+        let selectedItems = new Set(); // 다중 선택을 위한 Set
+        let selectedConn = null;
         let highestZ = 1, itemId = 0;
-        let draggedItem = null, resizingItem = null;
+        
+        let draggedItem = null; // 드래그 리더 아이템
+        let resizingItem = null;
         let connectMode = false, connectSource = null, connectHandle = null, tempLine = null;
         let activeFilter = 'all';
-        let autoSaveTimer = null; // 자동 저장 타이머
+        let autoSaveTimer = null;
 
         let canvases = [];
         let currentCanvasId = null;
 
-        // --- 자동 저장 로직 ---
+        // --- 자동 저장 ---
         function triggerAutoSave() {
             if (!currentCanvasId) return;
             clearTimeout(autoSaveTimer);
-            // 1초 뒤 자동 저장 (조용히)
-            autoSaveTimer = setTimeout(() => {
-                saveCurrentCanvas(true);
-            }, 1000);
+            autoSaveTimer = setTimeout(() => saveCurrentCanvas(true), 1000);
         }
 
         // --- 초기화 및 데이터 로드 ---
-        function generateId() {
-            return 'c' + Date.now() + Math.random().toString(36).substr(2, 9);
-        }
-
+        function generateId() { return 'c' + Date.now() + Math.random().toString(36).substr(2, 9); }
         function loadCanvases() {
             try {
                 const saved = localStorage.getItem(CANVASES_KEY);
-                if (saved) {
-                    canvases = JSON.parse(saved);
-                } else {
-                    const defaultCanvas = { id: generateId(), name: 'Untitled', createdAt: Date.now(), updatedAt: Date.now() };
-                    canvases = [defaultCanvas];
-                    saveCanvasesList();
+                if (saved) canvases = JSON.parse(saved);
+                else {
+                    const def = { id: generateId(), name: 'Untitled', createdAt: Date.now(), updatedAt: Date.now() };
+                    canvases = [def]; saveCanvasesList();
                 }
-                const lastActiveId = localStorage.getItem('knotpad-active-canvas');
-                const targetCanvas = canvases.find(c => c.id === lastActiveId) || canvases[0];
-                if (targetCanvas) switchCanvas(targetCanvas.id);
-                else switchCanvas(canvases[0].id);
-            } catch (e) {
-                console.error('Failed to load canvases:', e);
-            }
+                const last = localStorage.getItem('knotpad-active-canvas');
+                const target = canvases.find(c => c.id === last) || canvases[0];
+                switchCanvas(target.id);
+            } catch (e) { console.error(e); }
         }
-
-        function saveCanvasesList() {
-            localStorage.setItem(CANVASES_KEY, JSON.stringify(canvases));
-        }
-
+        function saveCanvasesList() { localStorage.setItem(CANVASES_KEY, JSON.stringify(canvases)); }
         function saveCurrentCanvas(isAuto = false) {
             if (!currentCanvasId) return;
-            
             const data = {
                 items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, z: i.el.style.zIndex })),
                 connections: connections.map(c => ({ id: c.id, from: c.from.id, fh: c.fh, to: c.to.id, th: c.th })),
                 view: { scale, offsetX, offsetY }, itemId, highestZ
             };
-            
             try {
                 localStorage.setItem('knotpad-data-' + currentCanvasId, JSON.stringify(data));
-                const canvas = canvases.find(c => c.id === currentCanvasId);
-                if (canvas) {
-                    canvas.updatedAt = Date.now();
-                    canvas.itemCount = items.length;
-                    saveCanvasesList();
-                    if (!isAuto) renderCanvasList();
-                }
+                const c = canvases.find(x => x.id === currentCanvasId);
+                if (c) { c.updatedAt = Date.now(); c.itemCount = items.length; saveCanvasesList(); if (!isAuto) renderCanvasList(); }
                 if (!isAuto) showToast('Saved');
-            } catch (e) {
-                if (!isAuto) showToast('Save failed', 'error');
-            }
+            } catch (e) { if (!isAuto) showToast('Save failed', 'error'); }
         }
-
-        function loadCanvasData(canvasId) {
-            try {
-                const saved = localStorage.getItem('knotpad-data-' + canvasId);
-                if (!saved) return;
-                
-                const data = JSON.parse(saved);
-                itemId = data.itemId || 0;
-                highestZ = data.highestZ || 1;
-                if (data.view) {
-                    scale = data.view.scale;
-                    offsetX = data.view.offsetX;
-                    offsetY = data.view.offsetY;
-                    updateTransform();
-                }
-                const map = {};
-                data.items.forEach(d => {
-                    const i = createItem(d, true);
-                    i.el.style.zIndex = d.z || 1;
-                    map[d.id] = i;
-                });
-                data.connections.forEach(d => {
-                    if (map[d.from] && map[d.to]) addConnection(map[d.from], d.fh, map[d.to], d.th);
-                });
-                updateMinimap();
-            } catch (e) {
-                console.error('Load failed:', e);
-            }
+        function loadCanvasData(id) {
+            const saved = localStorage.getItem('knotpad-data-' + id);
+            if (!saved) return;
+            const data = JSON.parse(saved);
+            itemId = data.itemId || 0; highestZ = data.highestZ || 1;
+            if (data.view) { scale = data.view.scale; offsetX = data.view.offsetX; offsetY = data.view.offsetY; updateTransform(); }
+            const map = {};
+            data.items.forEach(d => { const i = createItem(d, true); i.el.style.zIndex = d.z || 1; map[d.id] = i; });
+            data.connections.forEach(d => { if (map[d.from] && map[d.to]) addConnection(map[d.from], d.fh, map[d.to], d.th); });
+            updateMinimap();
         }
-
-        function switchCanvas(canvasId) {
+        function switchCanvas(id) {
             connections.forEach(c => c.el.remove()); connections = [];
             items.forEach(i => i.el.remove()); items = [];
-            selectedItem = selectedConn = null;
-            itemId = highestZ = 1;
-            scale = 1; offsetX = offsetY = 0;
-            updateTransform();
-            
-            currentCanvasId = canvasId;
-            localStorage.setItem('knotpad-active-canvas', canvasId);
-            
-            loadCanvasData(canvasId);
-            setFilter('all');
-            updateMinimap();
-            renderCanvasList();
+            selectedItems.clear(); selectedConn = null;
+            itemId = highestZ = 1; scale = 1; offsetX = offsetY = 0;
+            updateTransform(); currentCanvasId = id;
+            localStorage.setItem('knotpad-active-canvas', id);
+            loadCanvasData(id); setFilter('all'); updateMinimap(); renderCanvasList();
         }
-
         function createNewCanvas() {
-            const newCanvas = { id: generateId(), name: 'Untitled', createdAt: Date.now(), updatedAt: Date.now(), itemCount: 0 };
-            canvases.unshift(newCanvas);
-            saveCanvasesList();
-            switchCanvas(newCanvas.id);
+            const nc = { id: generateId(), name: 'Untitled', createdAt: Date.now(), updatedAt: Date.now(), itemCount: 0 };
+            canvases.unshift(nc); saveCanvasesList(); switchCanvas(nc.id);
         }
-
-        function deleteCanvas(canvasId) {
-            if (canvases.length <= 1) { showToast('Cannot delete last canvas', 'error'); return; }
-            if (!confirm('Delete this canvas?')) return;
-            const idx = canvases.findIndex(c => c.id === canvasId);
+        function deleteCanvas(id) {
+            if (canvases.length <= 1) { showToast('Cannot delete last', 'error'); return; }
+            if (!confirm('Delete canvas?')) return;
+            const idx = canvases.findIndex(c => c.id === id);
             if (idx > -1) {
-                canvases.splice(idx, 1);
-                localStorage.removeItem('knotpad-data-' + canvasId);
-                saveCanvasesList();
-                if (currentCanvasId === canvasId) switchCanvas(canvases[0].id);
-                else renderCanvasList();
-                showToast('Canvas deleted');
+                canvases.splice(idx, 1); localStorage.removeItem('knotpad-data-' + id); saveCanvasesList();
+                currentCanvasId === id ? switchCanvas(canvases[0].id) : renderCanvasList();
+                showToast('Deleted');
             }
         }
-
-        function renameCanvas(canvasId, newName) {
-            const canvas = canvases.find(c => c.id === canvasId);
-            if (canvas) {
-                canvas.name = newName || 'Untitled';
-                canvas.updatedAt = Date.now();
-                saveCanvasesList();
-                renderCanvasList();
-            }
+        function renameCanvas(id, name) {
+            const c = canvases.find(x => x.id === id);
+            if (c) { c.name = name || 'Untitled'; saveCanvasesList(); renderCanvasList(); }
         }
-
         function renderCanvasList() {
             canvasList.innerHTML = canvases.map(c => `
                 <div class="canvas-item-entry ${c.id === currentCanvasId ? 'active' : ''}" data-id="${c.id}">
                     <div class="canvas-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6"/></svg></div>
                     <div class="canvas-info"><div class="canvas-name">${escapeHtml(c.name)}</div><div class="canvas-meta">${c.itemCount || 0} items</div></div>
                     <div class="canvas-actions">
-                        <button class="canvas-action-btn rename" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                        <button class="canvas-action-btn delete" title="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>
+                        <button class="canvas-action-btn rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                        <button class="canvas-action-btn delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>
                     </div>
-                </div>
-            `).join('');
-
+                </div>`).join('');
             canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
                 const id = entry.dataset.id;
-                entry.addEventListener('click', e => {
-                    if (e.target.closest('.canvas-action-btn')) return;
-                    if (id !== currentCanvasId) { saveCurrentCanvas(); switchCanvas(id); }
-                });
+                entry.addEventListener('click', e => { if (!e.target.closest('.canvas-action-btn') && id !== currentCanvasId) { saveCurrentCanvas(); switchCanvas(id); } });
                 entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
                 entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
             });
         }
-
-        function startRename(entry, canvasId) {
+        function startRename(entry, id) {
             const nameEl = entry.querySelector('.canvas-name');
-            const currentName = canvases.find(c => c.id === canvasId)?.name || '';
+            const oldName = canvases.find(c => c.id === id)?.name || '';
             const input = document.createElement('input');
-            input.type = 'text'; input.className = 'canvas-name-input'; input.value = currentName;
+            input.className = 'canvas-name-input'; input.value = oldName;
             nameEl.replaceWith(input); input.focus(); input.select();
-            const finish = () => { renameCanvas(canvasId, input.value.trim() || 'Untitled'); };
-            input.addEventListener('blur', finish);
-            input.addEventListener('keydown', e => {
-                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-                if (e.key === 'Escape') { input.value = currentName; input.blur(); }
-            });
+            const fin = () => renameCanvas(id, input.value.trim() || 'Untitled');
+            input.addEventListener('blur', fin);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { input.value = oldName; input.blur(); } });
         }
-
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
         sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
         $('addCanvasBtn').addEventListener('click', () => { saveCurrentCanvas(); createNewCanvas(); });
 
-        function loadTheme() {
-            const t = localStorage.getItem(THEME_KEY);
-            if (t === 'light') document.documentElement.classList.add('light');
-            updateThemeIcon();
-        }
-        function toggleTheme() {
-            document.documentElement.classList.toggle('light');
-            localStorage.setItem(THEME_KEY, document.documentElement.classList.contains('light') ? 'light' : 'dark');
-            updateThemeIcon();
-        }
-        function updateThemeIcon() {
-            const isLight = document.documentElement.classList.contains('light');
-            $('themeToggle').querySelector('.moon').style.display = isLight ? 'none' : 'block';
-            $('themeToggle').querySelector('.sun').style.display = isLight ? 'block' : 'none';
+        // --- 테마 ---
+        function loadTheme() { if (localStorage.getItem(THEME_KEY) === 'light') document.documentElement.classList.add('light'); updTheme(); }
+        function toggleTheme() { document.documentElement.classList.toggle('light'); localStorage.setItem(THEME_KEY, document.documentElement.classList.contains('light') ? 'light' : 'dark'); updTheme(); }
+        function updTheme() {
+            const L = document.documentElement.classList.contains('light');
+            $('themeToggle').querySelector('.moon').style.display = L ? 'none' : 'block';
+            $('themeToggle').querySelector('.sun').style.display = L ? 'block' : 'none';
         }
 
-        function showToast(msg, type = 'success') {
-            toast.textContent = msg; toast.className = 'toast ' + type;
-            requestAnimationFrame(() => toast.classList.add('show'));
-            setTimeout(() => toast.classList.remove('show'), 2000);
-        }
-
+        // --- 뷰포트 ---
         function updateTransform() {
             canvas.style.transform = `translate(${offsetX}px,${offsetY}px) scale(${scale})`;
             zoomDisplay.textContent = Math.round(scale * 100) + '%';
@@ -1245,32 +1174,12 @@
             z = Math.max(0.1, Math.min(5, z));
             offsetX = cx - (cx - offsetX) * (z / scale);
             offsetY = cy - (cy - offsetY) * (z / scale);
-            scale = z;
-            updateTransform(); updateMinimap();
-        }
-        function setFilter(color) {
-            activeFilter = color;
-            filterDropdown.querySelectorAll('.filter-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === color));
-            filterBtn.classList.toggle('filter-active', color !== 'all');
-            items.forEach(item => {
-                if (color === 'all' || item.color === color) item.el.classList.remove('filtered-out');
-                else item.el.classList.add('filtered-out');
-            });
-            updateMinimap();
+            scale = z; updateTransform(); updateMinimap();
         }
 
-        function findFreePosition(x, y, w, h) {
-            const offset = 6, maxTries = 50;
-            let tries = 0;
-            while (tries < maxTries) {
-                const overlaps = items.some(item => Math.abs(x - item.x) < 10 && Math.abs(y - item.y) < 10);
-                if (!overlaps) break;
-                x += offset; y += offset; tries++;
-            }
-            return { x, y };
-        }
-
-        // --- 입력 처리 (마우스/터치) ---
+        // --- 입력 처리 (핵심 변경 부분) ---
+        
+        // 1. 휠: 줌
         app.addEventListener('wheel', e => {
             e.preventDefault();
             const d = e.deltaY > 0 ? 0.9 : 1.1;
@@ -1279,48 +1188,89 @@
             const mx = e.clientX - rect.left, my = e.clientY - rect.top;
             offsetX = mx - (mx - offsetX) * (z / scale);
             offsetY = my - (my - offsetY) * (z / scale);
-            scale = z;
-            updateTransform(); updateMinimap();
+            scale = z; updateTransform(); updateMinimap();
         }, { passive: false });
 
+        // 2. 마우스 다운
         app.addEventListener('mousedown', e => {
-            // 휠 클릭: 패닝 (브라우저 자동 스크롤 방지)
+            // [A] 가운데 버튼: 패닝
             if (e.button === 1) {
                 e.preventDefault();
                 isPanning = true;
                 startX = e.clientX - offsetX;
                 startY = e.clientY - offsetY;
                 canvas.style.cursor = 'grabbing';
+                app.style.cursor = 'grabbing';
                 return;
             }
-            // 좌클릭 배경: 패닝 및 선택 해제
-            if (e.button === 0 && (e.target === canvas || e.target.classList.contains('grid-overlay'))) {
-                isPanning = true;
-                startX = e.clientX - offsetX;
-                startY = e.clientY - offsetY;
-                canvas.style.cursor = 'grabbing';
-                app.style.cursor = 'grabbing';
-                deselectAll();
+
+            // [B] 왼쪽 버튼
+            if (e.button === 0) {
+                // 배경 클릭 시: 다중 선택 박스 시작
+                if (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app) {
+                    if (!e.shiftKey) deselectAll(); // Shift 안누르면 기존 선택 해제
+                    isSelecting = true;
+                    selStartX = e.clientX;
+                    selStartY = e.clientY;
+                    selectionBox.style.display = 'block';
+                    selectionBox.style.width = '0px';
+                    selectionBox.style.height = '0px';
+                    selectionBox.style.left = selStartX + 'px';
+                    selectionBox.style.top = selStartY + 'px';
+                }
             }
         });
 
+        // 3. 마우스 무브
         window.addEventListener('mousemove', e => {
+            // 패닝 중
             if (isPanning) {
-                canvas.style.cursor = connectMode ? 'crosshair' : 'grab';
-                app.style.cursor = connectMode ? 'crosshair' : 'grab'; 
                 offsetX = e.clientX - startX;
                 offsetY = e.clientY - startY;
                 updateTransform(); updateMinimap();
+                return;
             }
+
+            // 선택 박스 드래그 중
+            if (isSelecting) {
+                const curX = e.clientX, curY = e.clientY;
+                const minX = Math.min(selStartX, curX), maxX = Math.max(selStartX, curX);
+                const minY = Math.min(selStartY, curY), maxY = Math.max(selStartY, curY);
+                selectionBox.style.left = minX + 'px';
+                selectionBox.style.top = minY + 'px';
+                selectionBox.style.width = (maxX - minX) + 'px';
+                selectionBox.style.height = (maxY - minY) + 'px';
+                return;
+            }
+
+            // 아이템 드래그 중 (다중 이동 지원)
             if (draggedItem) {
                 const rect = app.getBoundingClientRect();
-                const x = (e.clientX - rect.left - offsetX) / scale - draggedItem.ox;
-                const y = (e.clientY - rect.top - offsetY) / scale - draggedItem.oy;
-                draggedItem.el.style.left = x + 'px';
-                draggedItem.el.style.top = y + 'px';
-                draggedItem.x = x; draggedItem.y = y;
+                // 마우스 위치의 캔버스 좌표 변화량 계산
+                // 현재 마우스 위치의 캔버스 좌표
+                const curCanvasX = (e.clientX - rect.left - offsetX) / scale;
+                const curCanvasY = (e.clientY - rect.top - offsetY) / scale;
+                
+                // 리더(draggedItem)의 새로운 위치
+                const newX = curCanvasX - draggedItem.ox;
+                const newY = curCanvasY - draggedItem.oy;
+                
+                // 이동량(Delta) 계산
+                const dx = newX - draggedItem.x;
+                const dy = newY - draggedItem.y;
+
+                // 선택된 모든 아이템 이동
+                selectedItems.forEach(item => {
+                    item.x += dx;
+                    item.y += dy;
+                    item.el.style.left = item.x + 'px';
+                    item.el.style.top = item.y + 'px';
+                });
+
                 updateAllConnections(); updateMinimap();
             }
+
+            // 리사이즈
             if (resizingItem) {
                 const rect = app.getBoundingClientRect();
                 const x = (e.clientX - rect.left - offsetX) / scale;
@@ -1332,6 +1282,8 @@
                 resizingItem.w = w; resizingItem.h = h;
                 updateAllConnections(); updateMinimap();
             }
+
+            // 연결선 그리기
             if (tempLine) {
                 const rect = app.getBoundingClientRect();
                 const x = (e.clientX - rect.left - offsetX) / scale + 10000;
@@ -1340,151 +1292,77 @@
             }
         });
 
-        window.addEventListener('mouseup', () => {
-            if (isPanning) { isPanning = false; canvas.style.cursor = connectMode ? 'crosshair' : 'grab'; }
-            if (draggedItem || resizingItem) {
-                if (draggedItem) { draggedItem.el.classList.remove('dragging'); canvas.classList.remove('dragging-item'); draggedItem = null; }
-                resizingItem = null;
-                triggerAutoSave(); // 변경사항 자동 저장
+        // 4. 마우스 업
+        window.addEventListener('mouseup', e => {
+            if (isPanning) {
+                isPanning = false;
+                canvas.style.cursor = connectMode ? 'crosshair' : 'grab';
+                app.style.cursor = connectMode ? 'crosshair' : 'grab';
             }
-        });
 
-        // 터치 지원
-        let lastDist = 0;
-        app.addEventListener('touchstart', e => {
-            if (e.touches.length === 2) {
-                lastDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-            } else if (e.touches.length === 1 && (e.target === canvas || e.target.classList.contains('grid-overlay'))) {
-                isPanning = true;
-                startX = e.touches[0].clientX - offsetX;
-                startY = e.touches[0].clientY - offsetY;
-            }
-        });
+            // 선택 박스 종료 및 계산
+            if (isSelecting) {
+                isSelecting = false;
+                selectionBox.style.display = 'none';
+                
+                // 박스 좌표 (Screen Space)
+                const sb = selectionBox.getBoundingClientRect();
+                if (sb.width > 2 && sb.height > 2) {
+                    // 캔버스 좌표로 변환하여 교차 검사
+                    const rect = app.getBoundingClientRect();
+                    // Screen -> Canvas 변환 공식: (screen - offset) / scale
+                    const bx = (sb.left - rect.left - offsetX) / scale;
+                    const by = (sb.top - rect.top - offsetY) / scale;
+                    const bw = sb.width / scale;
+                    const bh = sb.height / scale;
 
-        app.addEventListener('touchmove', e => {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-                const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                const z = Math.max(0.1, Math.min(5, scale * dist / lastDist));
-                const rect = app.getBoundingClientRect();
-                offsetX = cx - rect.left - (cx - rect.left - offsetX) * (z / scale);
-                offsetY = cy - rect.top - (cy - rect.top - offsetY) * (z / scale);
-                scale = z;
-                lastDist = dist;
-                updateTransform(); updateMinimap();
-            } else if (e.touches.length === 1 && isPanning) {
-                offsetX = e.touches[0].clientX - startX;
-                offsetY = e.touches[0].clientY - startY;
-                updateTransform(); updateMinimap();
-            }
-        }, { passive: false });
-        app.addEventListener('touchend', () => isPanning = false);
-
-        // 드래그 앤 드롭
-        let dragCount = 0;
-        window.addEventListener('dragenter', e => { e.preventDefault(); dragCount++; dropZone.classList.add('active'); });
-        window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragCount === 0) dropZone.classList.remove('active'); });
-        window.addEventListener('dragover', e => e.preventDefault());
-        window.addEventListener('drop', e => {
-            e.preventDefault();
-            dragCount = 0;
-            dropZone.classList.remove('active');
-            const rect = app.getBoundingClientRect();
-            const x = (e.clientX - rect.left - offsetX) / scale - 100;
-            const y = (e.clientY - rect.top - offsetY) / scale - 70;
-            if (e.dataTransfer.files.length) {
-                [...e.dataTransfer.files].forEach((f, i) => handleFile(f, x + i * 24, y + i * 24));
-                return;
-            }
-            const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-            if (url?.startsWith('http')) {
-                addLink(url, '', x, y);
-                triggerAutoSave();
-            }
-        });
-
-        // --- 붙여넣기 기능 (Ctrl+V) ---
-        window.addEventListener('paste', e => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            e.preventDefault();
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            const x = (innerWidth / 2 - offsetX) / scale - 100;
-            const y = (innerHeight / 2 - offsetY) / scale - 100;
-
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                if (item.type.indexOf('image') !== -1) {
-                    const blob = item.getAsFile();
-                    handleFile(blob, x + i * 20, y + i * 20);
-                } else if (item.kind === 'string') {
-                    item.getAsString(text => {
-                        text = text.trim();
-                        if (!text) return;
-                        const isUrl = /^(http|https):\/\/[^ "]+$/.test(text);
-                        if (isUrl) addLink(text, '', x + i * 20, y + i * 20);
-                        else addNote('', text, x + i * 20, y + i * 20);
-                        triggerAutoSave();
+                    items.forEach(item => {
+                        // 간단한 AABB 충돌 검사
+                        if (item.x < bx + bw && item.x + item.w > bx &&
+                            item.y < by + bh && item.y + item.h > by) {
+                            selectItem(item, true); // true = 누적 선택
+                        }
                     });
                 }
             }
+
+            if (draggedItem || resizingItem) {
+                if (draggedItem) { 
+                    selectedItems.forEach(i => i.el.classList.remove('dragging')); 
+                    canvas.classList.remove('dragging-item'); 
+                    draggedItem = null; 
+                }
+                resizingItem = null;
+                triggerAutoSave();
+            }
         });
 
-        function handleFile(file, x, y) {
-            const type = file.type;
-            if (type.startsWith('image/')) addImage(file, x, y);
-            else if (type.startsWith('video/')) addVideo(file, x, y);
-        }
+        // 터치 (간략화: 터치는 패닝 위주)
+        let lastDist = 0;
+        app.addEventListener('touchstart', e => {
+            if (e.touches.length === 2) lastDist = Math.hypot(e.touches[1].clientX-e.touches[0].clientX, e.touches[1].clientY-e.touches[0].clientY);
+            else if (e.touches.length === 1 && (e.target === canvas || e.target === app)) { isPanning = true; startX = e.touches[0].clientX - offsetX; startY = e.touches[0].clientY - offsetY; }
+        });
+        app.addEventListener('touchmove', e => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dist = Math.hypot(e.touches[1].clientX-e.touches[0].clientX, e.touches[1].clientY-e.touches[0].clientY);
+                const z = Math.max(0.1, Math.min(5, scale * dist / lastDist));
+                const cx = (e.touches[0].clientX+e.touches[1].clientX)/2, cy = (e.touches[0].clientY+e.touches[1].clientY)/2;
+                const rect = app.getBoundingClientRect();
+                offsetX = cx - rect.left - (cx - rect.left - offsetX)*(z/scale);
+                offsetY = cy - rect.top - (cy - rect.top - offsetY)*(z/scale);
+                scale = z; lastDist = dist; updateTransform(); updateMinimap();
+            } else if (isPanning) { offsetX = e.touches[0].clientX - startX; offsetY = e.touches[0].clientY - startY; updateTransform(); updateMinimap(); }
+        }, {passive:false});
+        app.addEventListener('touchend', () => isPanning = false);
 
-        function addImage(file, x, y) {
-            const r = new FileReader();
-            r.onload = e => {
-                const img = new Image();
-                img.onload = () => {
-                    let w = img.width, h = img.height;
-                    if (w > 400) { h = 400 / w * h; w = 400; }
-                    if (h > 300) { w = 300 / h * w; h = 300; }
-                    const pos = findFreePosition(x, y, w, h);
-                    createItem({ type: 'image', x: pos.x, y: pos.y, w, h, content: e.target.result });
-                    triggerAutoSave();
-                };
-                img.src = e.target.result;
-            };
-            r.readAsDataURL(file);
-        }
-
-        function addVideo(file, x, y) {
-            const r = new FileReader();
-            r.onload = e => {
-                const pos = findFreePosition(x, y, 400, 225);
-                createItem({ type: 'video', x: pos.x, y: pos.y, w: 400, h: 225, content: e.target.result });
-                triggerAutoSave();
-            };
-            r.readAsDataURL(file);
-        }
-
-        function addLink(url, title, x, y) {
-            const display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            const domain = new URL(url).hostname;
-            const pos = findFreePosition(x ?? 200, y ?? 200, 260, 100);
-            const item = createItem({ type: 'link', x: pos.x, y: pos.y, w: 260, h: 100, content: { url, title: title || domain, display } });
-            triggerAutoSave();
-            return item;
-        }
-
-        function addNote(title = '', body = '', x, y, color = null) {
-            const pos = findFreePosition(x ?? 200, y ?? 200, 220, 140);
-            const item = createItem({ type: 'note', x: pos.x, y: pos.y, w: 220, h: 140, content: { title, body }, color });
-            triggerAutoSave();
-            return item;
-        }
-
+        // --- 아이템 관리 ---
         function createItem(cfg, loading = false) {
             const el = document.createElement('div');
             el.className = 'canvas-item' + (loading ? '' : ' new');
             el.style.cssText = `left:${cfg.x}px;top:${cfg.y}px;width:${cfg.w}px;height:${cfg.h}px;z-index:${++highestZ}`;
-
+            
             let html = '';
             switch (cfg.type) {
                 case 'image': html = `<img class="item-image" src="${cfg.content}">`; break;
@@ -1492,78 +1370,97 @@
                 case 'note': html = `<div class="item-note"><input class="note-title" placeholder="Title..." value="${esc(cfg.content.title)}"><textarea class="note-body" placeholder="Write something...">${esc(cfg.content.body)}</textarea></div>`; break;
                 case 'link': html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`; break;
             }
-
             if (cfg.color) el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[cfg.color]}`);
-
-            el.innerHTML = `
-                <div class="item-content">${html}</div>
+            
+            el.innerHTML = `<div class="item-content">${html}</div>
                 <button class="delete-btn">×</button>
                 <button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg></button>
-                <div class="color-picker">
-                    <div class="color-opt none" data-color="" title="None"></div>
-                    ${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}
-                </div>
+                <div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div>
                 <div class="resize-handle"></div>
-                <div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div>
-                <div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div>
-                <button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button>
-                <button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
-
+                <div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div>
+                <button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
+            
             canvas.appendChild(el);
             const item = { id: cfg.id || `i${++itemId}`, el, type: cfg.type, x: cfg.x, y: cfg.y, w: cfg.w, h: cfg.h, content: cfg.content, color: cfg.color || null };
             items.push(item);
             setupItemEvents(item);
-            if (!loading) {
-                updateMinimap();
-                if (activeFilter !== 'all' && item.color !== activeFilter) item.el.classList.add('filtered-out');
-            }
+            if (!loading) { updateMinimap(); if (activeFilter !== 'all' && item.color !== activeFilter) item.el.classList.add('filtered-out'); }
             setTimeout(() => el.classList.remove('new'), 250);
             return item;
         }
 
-        function setItemColor(item, color) {
-            item.color = color || null;
-            if (color) item.el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[color]}`);
-            else item.el.style.setProperty('--tag-shadow', '0 0 0 0 transparent');
-            item.el.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (color || '')));
-            if (activeFilter !== 'all') item.el.classList.toggle('filtered-out', item.color !== activeFilter);
-            updateMinimap();
-            triggerAutoSave();
+        // 일괄 색상 변경
+        function setItemColor(targetItem, color) {
+            // 타겟이 선택 그룹에 없다면 타겟만 변경 (혹은 그룹에 추가)
+            // 여기선 타겟이 포함된 그룹 전체 변경
+            const targets = selectedItems.has(targetItem) ? selectedItems : [targetItem];
+            
+            targets.forEach(item => {
+                item.color = color || null;
+                if (color) item.el.style.setProperty('--tag-shadow', `inset 0 4px 0 0 ${COLOR_MAP[color]}`);
+                else item.el.style.setProperty('--tag-shadow', '0 0 0 0 transparent');
+                
+                // UI 업데이트 (현재 열린 피커가 있는 아이템만)
+                item.el.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (color || '')));
+                
+                if (activeFilter !== 'all') item.el.classList.toggle('filtered-out', item.color !== activeFilter);
+            });
+            updateMinimap(); triggerAutoSave();
         }
 
         function setupItemEvents(item) {
             const el = item.el;
-            const colorBtn = el.querySelector('.color-btn');
-            const colorPicker = el.querySelector('.color-picker');
-
+            
+            // 아이템 드래그 시작
             el.addEventListener('mousedown', e => {
                 const t = e.target;
                 if (t.classList.contains('delete-btn') || t.classList.contains('resize-handle') || 
                     t.classList.contains('connection-handle') || t.classList.contains('add-child-btn') ||
                     t.classList.contains('color-btn') || t.classList.contains('color-opt') ||
-                    t.closest('.color-picker') ||
-                    t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+                    t.closest('.color-picker') || t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+                
                 e.stopPropagation();
-                selectItem(item);
+                
+                // 이미 선택된 아이템을 클릭했다면 그룹 유지, 아니라면 단일 선택
+                if (!selectedItems.has(item) && !e.shiftKey) {
+                    selectItem(item, false);
+                } else if (e.shiftKey) {
+                    // Shift 클릭 토글
+                    if (selectedItems.has(item)) selectedItems.delete(item);
+                    else selectedItems.add(item);
+                    item.el.classList.toggle('selected');
+                } else {
+                    // 이미 선택된 그룹 중 하나 클릭 -> 리더로 설정하고 그룹 드래그 준비
+                    selectItem(item, true); // true = keep others
+                }
+
+                // 드래그 준비 (리더 기준)
                 el.style.zIndex = ++highestZ;
                 const rect = el.getBoundingClientRect();
                 item.ox = (e.clientX - rect.left) / scale;
                 item.oy = (e.clientY - rect.top) / scale;
                 draggedItem = item;
-                el.classList.add('dragging');
+                
+                selectedItems.forEach(i => i.el.classList.add('dragging'));
                 canvas.classList.add('dragging-item');
             });
 
             el.querySelector('.resize-handle').addEventListener('mousedown', e => { e.stopPropagation(); resizingItem = item; });
-            el.querySelector('.delete-btn').addEventListener('click', e => { e.stopPropagation(); deleteItem(item); });
+            
+            // 일괄 삭제
+            el.querySelector('.delete-btn').addEventListener('click', e => { 
+                e.stopPropagation(); 
+                if (selectedItems.has(item)) deleteSelectedItems();
+                else deleteItem(item); 
+            });
 
+            const colorBtn = el.querySelector('.color-btn'), colorPicker = el.querySelector('.color-picker');
             colorBtn.addEventListener('click', e => {
                 e.stopPropagation();
                 document.querySelectorAll('.color-picker.active').forEach(p => { if (p !== colorPicker) p.classList.remove('active'); });
                 colorPicker.classList.toggle('active');
                 colorPicker.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (item.color || '')));
             });
-
             colorPicker.querySelectorAll('.color-opt').forEach(opt => {
                 opt.addEventListener('click', e => {
                     e.stopPropagation();
@@ -1572,10 +1469,7 @@
                 });
             });
 
-            el.querySelectorAll('.add-child-btn').forEach(btn => {
-                btn.addEventListener('click', e => { e.stopPropagation(); addChildNode(item, btn.dataset.d); });
-            });
-
+            el.querySelectorAll('.add-child-btn').forEach(btn => { btn.addEventListener('click', e => { e.stopPropagation(); addChildNode(item, btn.dataset.d); }); });
             el.querySelectorAll('.connection-handle').forEach(h => {
                 h.addEventListener('mousedown', e => {
                     e.stopPropagation();
@@ -1585,9 +1479,7 @@
                 h.addEventListener('mouseenter', () => { if (connectSource && connectSource !== item) el.classList.add('connect-target'); });
                 h.addEventListener('mouseleave', () => el.classList.remove('connect-target'));
             });
-
-            el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); selectItem(item); showContextMenu(e.clientX, e.clientY); });
-
+            el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); if (!selectedItems.has(item)) selectItem(item); showContextMenu(e.clientX, e.clientY); });
             if (item.type === 'note') {
                 const ti = el.querySelector('.note-title'), tb = el.querySelector('.note-body');
                 ti.addEventListener('input', () => { item.content.title = ti.value; triggerAutoSave(); });
@@ -1595,21 +1487,36 @@
             }
         }
 
-        function selectItem(item) { deselectAll(); item.el.classList.add('selected'); selectedItem = item; }
+        // 다중 선택 관리
+        function selectItem(item, accumulate = false) {
+            if (!accumulate) deselectAll();
+            selectedItems.add(item);
+            item.el.classList.add('selected');
+            // 마지막 선택된 놈을 대표(selectedItem)로 둠 (컨텍스트 메뉴 등용)
+            // 하지만 selectedItems Set이 메인임
+            window.selectedItem = item; 
+        }
         function deselectAll() {
-            items.forEach(i => i.el.classList.remove('selected'));
-            selectedItem = null;
+            selectedItems.forEach(i => i.el.classList.remove('selected'));
+            selectedItems.clear();
+            window.selectedItem = null;
             if (selectedConn) { selectedConn.el.classList.remove('selected'); selectedConn = null; }
             hideMenus();
             document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
         }
 
-        function deleteItem(item) {
+        // 다중 삭제
+        function deleteSelectedItems() {
+            if (selectedItems.size === 0) return;
+            selectedItems.forEach(item => deleteItem(item, false)); // false = no minimap update yet
+            selectedItems.clear();
+            updateMinimap(); triggerAutoSave();
+        }
+        function deleteItem(item, update = true) {
             connections.filter(c => c.from === item || c.to === item).forEach(deleteConnection);
             const i = items.indexOf(item);
             if (i > -1) { items.splice(i, 1); item.el.remove(); }
-            updateMinimap();
-            triggerAutoSave();
+            if (update) { updateMinimap(); triggerAutoSave(); }
         }
 
         function duplicateItem(item) {
@@ -1617,7 +1524,16 @@
             createItem({ type: item.type, x: pos.x, y: pos.y, w: item.w, h: item.h, content: JSON.parse(JSON.stringify(item.content)), color: item.color });
             triggerAutoSave();
         }
+        function findFreePosition(x, y, w, h) {
+            const offset = 6, maxTries = 50; let tries = 0;
+            while (tries < maxTries) {
+                if (!items.some(i => Math.abs(x - i.x) < 10 && Math.abs(y - i.y) < 10)) break;
+                x += offset; y += offset; tries++;
+            }
+            return { x, y };
+        }
 
+        // 연결선
         function toggleConnectMode() {
             connectMode = !connectMode;
             $('connectModeBtn').classList.toggle('connect-mode', connectMode);
@@ -1630,25 +1546,19 @@
             const pos = getHandlePos(item, handle);
             tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             tempLine.classList.add('connection-line', 'temp');
-            connectionsSvg.appendChild(tempLine);
-            updateTempLine(pos.x, pos.y);
+            connectionsSvg.appendChild(tempLine); updateTempLine(pos.x, pos.y);
         }
-        function updateTempLine(ex, ey) {
-            if (!tempLine || !connectSource) return;
-            const sp = getHandlePos(connectSource, connectHandle);
-            tempLine.setAttribute('d', curvePath(sp.x, sp.y, ex, ey));
-        }
+        function updateTempLine(ex, ey) { if (tempLine && connectSource) tempLine.setAttribute('d', curvePath(getHandlePos(connectSource, connectHandle).x, getHandlePos(connectSource, connectHandle).y, ex, ey)); }
         function completeConnection(target, handle) {
-            if (!connectSource || connectSource === target) { cancelConnection(); return; }
-            const exists = connections.some(c => (c.from === connectSource && c.to === target) || (c.from === target && c.to === connectSource));
-            if (!exists) { addConnection(connectSource, connectHandle, target, handle); triggerAutoSave(); }
+            if (connectSource && connectSource !== target && !connections.some(c => (c.from===connectSource && c.to===target) || (c.from===target && c.to===connectSource))) {
+                addConnection(connectSource, connectHandle, target, handle); triggerAutoSave();
+            }
             cancelConnection();
         }
         function cancelConnection() {
             if (connectSource) connectSource.el.classList.remove('connect-source');
             if (tempLine) { tempLine.remove(); tempLine = null; }
-            connectSource = connectHandle = null;
-            items.forEach(i => i.el.classList.remove('connect-target'));
+            connectSource = null; items.forEach(i => i.el.classList.remove('connect-target'));
         }
         function addConnection(from, fh, to, th) {
             const conn = { id: `c${Date.now()}`, from, fh, to, th, el: null };
@@ -1656,230 +1566,222 @@
             path.classList.add('connection-line');
             path.addEventListener('click', e => { e.stopPropagation(); selectConnection(conn); });
             path.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); selectConnection(conn); showConnMenu(e.clientX, e.clientY); });
-            connectionsSvg.appendChild(path);
-            conn.el = path;
-            connections.push(conn);
-            updateConnection(conn); updateMinimap();
-            return conn;
+            connectionsSvg.appendChild(path); conn.el = path; connections.push(conn); updateConnection(conn); updateMinimap(); return conn;
         }
-        function updateConnection(c) {
-            const fp = getHandlePos(c.from, c.fh), tp = getHandlePos(c.to, c.th);
-            c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y));
-        }
+        function updateConnection(c) { const fp = getHandlePos(c.from, c.fh), tp = getHandlePos(c.to, c.th); c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y)); }
         function updateAllConnections() { connections.forEach(updateConnection); }
         function getHandlePos(item, h) {
-            const { x, y, w, h: ih } = item, off = 10000;
-            switch (h) {
-                case 'top': return { x: x + w / 2 + off, y: y + off };
-                case 'bottom': return { x: x + w / 2 + off, y: y + ih + off };
-                case 'left': return { x: x + off, y: y + ih / 2 + off };
-                case 'right': return { x: x + w + off, y: y + ih / 2 + off };
-            }
+            const off = 10000;
+            if (h==='top') return {x:item.x+item.w/2+off, y:item.y+off};
+            if (h==='bottom') return {x:item.x+item.w/2+off, y:item.y+item.h+off};
+            if (h==='left') return {x:item.x+off, y:item.y+item.h/2+off};
+            return {x:item.x+item.w+off, y:item.y+item.h/2+off};
         }
-        function curvePath(x1, y1, x2, y2) {
-            const dx = x2 - x1, dy = y2 - y1;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const curve = Math.min(dist * 0.3, 80);
-            return `M${x1} ${y1} C${x1 + curve * Math.sign(dx || 1)} ${y1}, ${x2 - curve * Math.sign(dx || 1)} ${y2}, ${x2} ${y2}`;
-        }
+        function curvePath(x1, y1, x2, y2) { const dx = x2-x1; const curve = Math.min(Math.sqrt(dx*dx+(y2-y1)*(y2-y1))*0.3, 80); return `M${x1} ${y1} C${x1+curve*Math.sign(dx||1)} ${y1}, ${x2-curve*Math.sign(dx||1)} ${y2}, ${x2} ${y2}`; }
         function selectConnection(c) { deselectAll(); selectedConn = c; c.el.classList.add('selected'); }
-        function deleteConnection(c) {
-            const i = connections.indexOf(c);
-            if (i > -1) { connections.splice(i, 1); c.el.remove(); selectedConn = null; updateMinimap(); triggerAutoSave(); }
-        }
+        function deleteConnection(c) { const i = connections.indexOf(c); if (i > -1) { connections.splice(i, 1); c.el.remove(); selectedConn = null; updateMinimap(); triggerAutoSave(); } }
         function addChildNode(parent, dir) {
-            const gap = 72, cw = 220, ch = 140;
-            let x, y, fh, th;
-            switch (dir) {
-                case 'top': x = parent.x + parent.w / 2 - cw / 2; y = parent.y - ch - gap; fh = 'top'; th = 'bottom'; break;
-                case 'bottom': x = parent.x + parent.w / 2 - cw / 2; y = parent.y + parent.h + gap; fh = 'bottom'; th = 'top'; break;
-                case 'left': x = parent.x - cw - gap; y = parent.y + parent.h / 2 - ch / 2; fh = 'left'; th = 'right'; break;
-                case 'right': x = parent.x + parent.w + gap; y = parent.y + parent.h / 2 - ch / 2; fh = 'right'; th = 'left'; break;
-            }
-            const child = addNote('', '', x, y, parent.color);
-            addConnection(parent, fh, child, th);
-            return child;
+            const gap = 72, cw = 220, ch = 140; let x, y, fh, th;
+            if (dir==='top') { x=parent.x+parent.w/2-cw/2; y=parent.y-ch-gap; fh='top'; th='bottom'; }
+            else if (dir==='bottom') { x=parent.x+parent.w/2-cw/2; y=parent.y+parent.h+gap; fh='bottom'; th='top'; }
+            else if (dir==='left') { x=parent.x-cw-gap; y=parent.y+parent.h/2-ch/2; fh='left'; th='right'; }
+            else { x=parent.x+parent.w+gap; y=parent.y+parent.h/2-ch/2; fh='right'; th='left'; }
+            const child = addNote('', '', x, y, parent.color); addConnection(parent, fh, child, th); return child;
         }
 
-        // --- 컨텍스트 메뉴 수정 (편집 기능 포함) ---
+        // 컨텍스트 메뉴
         function showContextMenu(x, y) {
-            const isLink = selectedItem.type === 'link';
-            const isMedia = selectedItem.type === 'image' || selectedItem.type === 'video';
-            
+            const target = window.selectedItem; // Set 중 대표
+            if (!target) return;
+            const isLink = target.type === 'link';
+            const isMedia = target.type === 'image' || target.type === 'video';
             contextMenu.querySelector('[data-action="edit-link"]').style.display = isLink ? 'flex' : 'none';
             contextMenu.querySelector('[data-action="replace-file"]').style.display = isMedia ? 'flex' : 'none';
             contextMenu.querySelector('#editSep').style.display = (isLink || isMedia) ? 'block' : 'none';
-            
-            if (selectedItem.type === 'image') replaceInput.accept = 'image/*';
-            if (selectedItem.type === 'video') replaceInput.accept = 'video/*';
-            
+            if (target.type === 'image') replaceInput.accept = 'image/*';
+            if (target.type === 'video') replaceInput.accept = 'video/*';
             contextMenu.style.left = x + 'px'; contextMenu.style.top = y + 'px'; contextMenu.classList.add('active');
         }
         function showConnMenu(x, y) { connContextMenu.style.left = x + 'px'; connContextMenu.style.top = y + 'px'; connContextMenu.classList.add('active'); }
         function hideMenus() { contextMenu.classList.remove('active'); connContextMenu.classList.remove('active'); filterDropdown.classList.remove('active'); }
-
         document.addEventListener('click', e => {
             if (!e.target.closest('.color-picker') && !e.target.closest('.color-btn')) document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
             if (!e.target.closest('#filterBtn') && !e.target.closest('#filterDropdown')) filterDropdown.classList.remove('active');
             if (!e.target.closest('.context-menu')) { contextMenu.classList.remove('active'); connContextMenu.classList.remove('active'); }
         });
-
         contextMenu.querySelectorAll('.context-menu-item').forEach(el => {
             el.addEventListener('click', () => {
-                if (selectedItem) {
+                const target = window.selectedItem;
+                if (target) {
                     switch (el.dataset.action) {
-                        case 'edit-link':
-                            $('linkTitle').value = selectedItem.content.title;
-                            $('linkUrl').value = selectedItem.content.url;
-                            $('linkModal').dataset.mode = 'edit';
-                            openLinkModal();
-                            break;
-                        case 'replace-file':
-                            replaceInput.click();
-                            break;
-                        case 'connect': startConnection(selectedItem, 'right'); break;
-                        case 'bring-front': selectedItem.el.style.zIndex = ++highestZ; triggerAutoSave(); break;
-                        case 'send-back': selectedItem.el.style.zIndex = 1; triggerAutoSave(); break;
-                        case 'duplicate': duplicateItem(selectedItem); break;
-                        case 'delete': deleteItem(selectedItem); break;
+                        case 'edit-link': $('linkTitle').value = target.content.title; $('linkUrl').value = target.content.url; $('linkModal').dataset.mode = 'edit'; openLinkModal(); break;
+                        case 'replace-file': replaceInput.click(); break;
+                        case 'connect': startConnection(target, 'right'); break;
+                        case 'bring-front': target.el.style.zIndex = ++highestZ; triggerAutoSave(); break;
+                        case 'send-back': target.el.style.zIndex = 1; triggerAutoSave(); break;
+                        case 'duplicate': duplicateItem(target); break;
+                        case 'delete': deleteSelectedItems(); break;
                     }
                 }
                 hideMenus();
             });
         });
 
-        // 파일 교체 처리
         replaceInput.addEventListener('change', e => {
-            if (e.target.files.length && selectedItem) {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = evt => {
-                    selectedItem.content = evt.target.result;
-                    if (selectedItem.type === 'image') selectedItem.el.querySelector('img').src = evt.target.result;
-                    else if (selectedItem.type === 'video') selectedItem.el.querySelector('video').src = evt.target.result;
+            if (e.target.files.length && window.selectedItem) {
+                const r = new FileReader();
+                r.onload = evt => {
+                    window.selectedItem.content = evt.target.result;
+                    if (window.selectedItem.type === 'image') window.selectedItem.el.querySelector('img').src = evt.target.result;
+                    else if (window.selectedItem.type === 'video') window.selectedItem.el.querySelector('video').src = evt.target.result;
                     triggerAutoSave();
                 };
-                reader.readAsDataURL(file);
+                r.readAsDataURL(e.target.files[0]);
             }
             replaceInput.value = '';
         });
-
-        connContextMenu.querySelector('[data-action="delete-conn"]').addEventListener('click', () => {
-            if (selectedConn) deleteConnection(selectedConn);
-            hideMenus();
-        });
-
+        connContextMenu.querySelector('[data-action="delete-conn"]').addEventListener('click', () => { if(selectedConn) deleteConnection(selectedConn); hideMenus(); });
+        
+        // 필터 및 기타 버튼
         filterBtn.addEventListener('click', e => { e.stopPropagation(); filterDropdown.classList.toggle('active'); });
         filterDropdown.querySelectorAll('.filter-opt').forEach(opt => {
             opt.addEventListener('click', e => { e.stopPropagation(); setFilter(opt.dataset.color); filterDropdown.classList.remove('active'); });
         });
-
+        function setFilter(color) {
+            activeFilter = color;
+            filterDropdown.querySelectorAll('.filter-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === color));
+            filterBtn.classList.toggle('filter-active', color !== 'all');
+            items.forEach(item => { if (color === 'all' || item.color === color) item.el.classList.remove('filtered-out'); else item.el.classList.add('filtered-out'); });
+            updateMinimap();
+        }
+        
+        // 링크 모달, 줌, 파일, 단축키 등
         const linkModal = $('linkModal');
         function openLinkModal() { linkModal.classList.add('active'); setTimeout(() => $('linkUrl').focus(), 100); }
         function closeLinkModal() { linkModal.classList.remove('active'); $('linkTitle').value = ''; $('linkUrl').value = ''; $('linkModal').dataset.mode = ''; }
         linkModal.addEventListener('click', e => { if (e.target === linkModal) closeLinkModal(); });
         linkModal.querySelector('[data-close]').addEventListener('click', closeLinkModal);
-
-        // 링크 모달 (추가 및 수정 통합)
         $('linkSubmit').addEventListener('click', () => {
             let url = $('linkUrl').value.trim();
             if (url) {
                 if (!url.startsWith('http')) url = 'https://' + url;
-                if ($('linkModal').dataset.mode === 'edit' && selectedItem) {
-                    selectedItem.content.url = url;
-                    selectedItem.content.title = $('linkTitle').value.trim() || new URL(url).hostname;
-                    selectedItem.content.display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-                    const linkEl = selectedItem.el.querySelector('.item-link');
-                    linkEl.querySelector('.link-title').textContent = selectedItem.content.title;
+                if ($('linkModal').dataset.mode === 'edit' && window.selectedItem) {
+                    window.selectedItem.content.url = url;
+                    window.selectedItem.content.title = $('linkTitle').value.trim() || new URL(url).hostname;
+                    window.selectedItem.content.display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                    const linkEl = window.selectedItem.el.querySelector('.item-link');
+                    linkEl.querySelector('.link-title').textContent = window.selectedItem.content.title;
                     linkEl.querySelector('.link-url').href = url;
-                    linkEl.querySelector('.link-url').textContent = selectedItem.content.display;
+                    linkEl.querySelector('.link-url').textContent = window.selectedItem.content.display;
                     linkEl.querySelector('.link-favicon').src = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`;
                     triggerAutoSave();
                 } else {
-                    const x = (innerWidth / 2 - offsetX) / scale - 130;
-                    const y = (innerHeight / 2 - offsetY) / scale - 50;
+                    const x = (innerWidth/2-offsetX)/scale-130, y = (innerHeight/2-offsetY)/scale-50;
                     addLink(url, $('linkTitle').value.trim(), x, y);
                 }
                 closeLinkModal();
             }
         });
 
+        // 단축키
         document.addEventListener('keydown', e => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveCurrentCanvas(); return; }
-            if ((e.key === 'c' || e.key === 'C') && !e.target.matches('input,textarea')) toggleConnectMode();
-            if (e.key === 'Escape') { cancelConnection(); if (connectMode) toggleConnectMode(); closeLinkModal(); }
-            if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input,textarea')) {
-                if (selectedConn) deleteConnection(selectedConn);
-                else if (selectedItem) deleteItem(selectedItem);
+            if ((e.ctrlKey||e.metaKey) && e.key === 's') { e.preventDefault(); saveCurrentCanvas(); return; }
+            if ((e.key==='c'||e.key==='C') && !e.target.matches('input,textarea')) toggleConnectMode();
+            if (e.key==='Escape') { cancelConnection(); if(connectMode) toggleConnectMode(); closeLinkModal(); }
+            if ((e.key==='Delete'||e.key==='Backspace') && !e.target.matches('input,textarea')) {
+                if (selectedItems.size > 0) deleteSelectedItems();
+                else if (selectedConn) deleteConnection(selectedConn);
             }
         });
 
-        $('addNoteBtn').addEventListener('click', () => { const x = (innerWidth / 2 - offsetX) / scale - 110; const y = (innerHeight / 2 - offsetY) / scale - 70; addNote('', '', x, y); });
+        // 드래그앤드롭 & 붙여넣기
+        window.addEventListener('dragenter', e => { e.preventDefault(); dropZone.classList.add('active'); });
+        window.addEventListener('dragleave', e => { e.preventDefault(); dropZone.classList.remove('active'); });
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('drop', e => {
+            e.preventDefault(); dropZone.classList.remove('active');
+            const x = (e.clientX-app.getBoundingClientRect().left-offsetX)/scale-100, y = (e.clientY-app.getBoundingClientRect().top-offsetY)/scale-70;
+            if (e.dataTransfer.files.length) [...e.dataTransfer.files].forEach((f, i) => handleFile(f, x+i*24, y+i*24));
+            else {
+                const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+                if (url?.startsWith('http')) { addLink(url, '', x, y); triggerAutoSave(); }
+            }
+        });
+        window.addEventListener('paste', e => {
+            if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+            e.preventDefault();
+            const items = (e.clipboardData||e.originalEvent.clipboardData).items;
+            const x = (innerWidth/2-offsetX)/scale-100, y = (innerHeight/2-offsetY)/scale-100;
+            for (let i=0; i<items.length; i++) {
+                const item = items[i];
+                if (item.type.indexOf('image')!==-1) handleFile(item.getAsFile(), x+i*20, y+i*20);
+                else if (item.kind==='string') item.getAsString(text => {
+                    text = text.trim(); if(!text)return;
+                    if (/^(http|https):\/\/[^ "]+$/.test(text)) addLink(text, '', x+i*20, y+i*20);
+                    else addNote('', text, x+i*20, y+i*20);
+                    triggerAutoSave();
+                });
+            }
+        });
+        function handleFile(file, x, y) {
+            if (file.type.startsWith('image/')) {
+                const r = new FileReader();
+                r.onload = e => { const img = new Image(); img.onload = () => { let w=img.width, h=img.height; if(w>400){h=400/w*h;w=400} if(h>300){w=300/h*w;h=300} createItem({type:'image', x, y, w, h, content:e.target.result}); triggerAutoSave(); }; img.src = e.target.result; };
+                r.readAsDataURL(file);
+            } else if (file.type.startsWith('video/')) {
+                const r = new FileReader();
+                r.onload = e => { createItem({type:'video', x, y, w:400, h:225, content:e.target.result}); triggerAutoSave(); };
+                r.readAsDataURL(file);
+            }
+        }
+        function addLink(url, title, x, y) {
+            const domain = new URL(url).hostname;
+            createItem({type:'link', x, y, w:260, h:100, content:{url, title:title||domain, display:url.replace(/^https?:\/\//,'').replace(/\/$/,'')}});
+            triggerAutoSave();
+        }
+        function addNote(title='', body='', x, y, color=null) {
+            createItem({type:'note', x, y, w:220, h:140, content:{title, body}, color});
+            triggerAutoSave();
+        }
+
+        // 툴바 버튼 연결
+        $('addNoteBtn').addEventListener('click', () => { const x = (innerWidth/2-offsetX)/scale-110, y = (innerHeight/2-offsetY)/scale-70; addNote('', '', x, y); });
         $('addLinkBtn').addEventListener('click', openLinkModal);
         $('addFileBtn').addEventListener('click', () => fileInput.click());
         $('connectModeBtn').addEventListener('click', toggleConnectMode);
         $('saveBtn').addEventListener('click', () => saveCurrentCanvas());
-        $('loadBtn').addEventListener('click', () => {
-            if (currentCanvasId) {
-                if (items.length && !confirm('Reload saved data?')) return;
-                loadCanvasData(currentCanvasId);
-                showToast('Loaded');
-            }
-        });
-        $('clearBtn').addEventListener('click', () => {
-            if (!confirm('Clear all items?')) return;
-            connections.forEach(c => c.el.remove()); connections = [];
-            items.forEach(i => i.el.remove()); items = [];
-            selectedItem = selectedConn = null; itemId = highestZ = 1;
-            updateMinimap(); triggerAutoSave(); showToast('Cleared');
-        });
+        $('loadBtn').addEventListener('click', () => { if(confirm('Reload?')) { loadCanvasData(currentCanvasId); showToast('Loaded'); } });
+        $('clearBtn').addEventListener('click', () => { if(confirm('Clear all?')) { connections.forEach(c=>c.el.remove()); connections=[]; items.forEach(i=>i.el.remove()); items=[]; selectedItems.clear(); updateMinimap(); triggerAutoSave(); showToast('Cleared'); } });
         $('zoomInBtn').addEventListener('click', () => setZoom(scale * 1.25));
         $('zoomOutBtn').addEventListener('click', () => setZoom(scale / 1.25));
-        $('resetViewBtn').addEventListener('click', () => { scale = 1; offsetX = offsetY = 0; updateTransform(); updateMinimap(); });
+        $('resetViewBtn').addEventListener('click', () => { scale=1; offsetX=0; offsetY=0; updateTransform(); updateMinimap(); });
         $('themeToggle').addEventListener('click', toggleTheme);
-
-        fileInput.addEventListener('change', e => {
-            if (e.target.files.length) {
-                const x = (innerWidth / 2 - offsetX) / scale - 100;
-                const y = (innerHeight / 2 - offsetY) / scale - 70;
-                [...e.target.files].forEach((f, i) => handleFile(f, x + i * 24, y + i * 24));
-            }
-            fileInput.value = '';
-        });
-
+        fileInput.addEventListener('change', e => { if(e.target.files.length) { const x = (innerWidth/2-offsetX)/scale-100, y = (innerHeight/2-offsetY)/scale-70; [...e.target.files].forEach((f, i) => handleFile(f, x+i*24, y+i*24)); fileInput.value = ''; } });
+        
         function updateMinimap() {
-            const visibleItems = items.filter(i => !i.el.classList.contains('filtered-out'));
-            if (!visibleItems.length) { minimapContent.innerHTML = '<div class="minimap-viewport"></div>'; return; }
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            visibleItems.forEach(i => { minX = Math.min(minX, i.x); minY = Math.min(minY, i.y); maxX = Math.max(maxX, i.x + i.w); maxY = Math.max(maxY, i.y + i.h); });
-            const pad = 80; minX -= pad; minY -= pad; maxX += pad; maxY += pad;
-            const ww = maxX - minX, wh = maxY - minY;
-            const s = Math.min(160 / ww, 100 / wh);
+            const visible = items.filter(i => !i.el.classList.contains('filtered-out'));
+            if (!visible.length) { minimapContent.innerHTML = '<div class="minimap-viewport"></div>'; return; }
+            let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+            visible.forEach(i => { minX=Math.min(minX,i.x); minY=Math.min(minY,i.y); maxX=Math.max(maxX,i.x+i.w); maxY=Math.max(maxY,i.y+i.h); });
+            minX-=80; minY-=80; maxX+=80; maxY+=80;
+            const s = Math.min(160/(maxX-minX), 100/(maxY-minY));
             let svg = '<svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">';
             connections.forEach(c => {
-                if (c.from.el.classList.contains('filtered-out') || c.to.el.classList.contains('filtered-out')) return;
-                const fx = (c.from.x + c.from.w / 2 - minX) * s, fy = (c.from.y + c.from.h / 2 - minY) * s;
-                const tx = (c.to.x + c.to.w / 2 - minX) * s, ty = (c.to.y + c.to.h / 2 - minY) * s;
+                if (c.from.el.classList.contains('filtered-out')||c.to.el.classList.contains('filtered-out')) return;
+                const fx=(c.from.x+c.from.w/2-minX)*s, fy=(c.from.y+c.from.h/2-minY)*s, tx=(c.to.x+c.to.w/2-minX)*s, ty=(c.to.y+c.to.h/2-minY)*s;
                 svg += `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="var(--connection-color)" stroke-width="1"/>`;
             });
             svg += '</svg>';
-            visibleItems.forEach(i => {
-                const ix = (i.x - minX) * s, iy = (i.y - minY) * s;
-                const iw = Math.max(3, i.w * s), ih = Math.max(2, i.h * s);
+            visible.forEach(i => {
                 const bg = i.color ? COLOR_MAP[i.color] : 'var(--text-secondary)';
-                svg += `<div class="minimap-item" style="left:${ix}px;top:${iy}px;width:${iw}px;height:${ih}px;background:${bg}"></div>`;
+                svg += `<div class="minimap-item" style="left:${(i.x-minX)*s}px;top:${(i.y-minY)*s}px;width:${Math.max(3,i.w*s)}px;height:${Math.max(2,i.h*s)}px;background:${bg}"></div>`;
             });
-            const vx = (-offsetX / scale - minX) * s, vy = (-offsetY / scale - minY) * s;
-            const vw = innerWidth / scale * s, vh = innerHeight / scale * s;
-            svg += `<div class="minimap-viewport" style="left:${vx}px;top:${vy}px;width:${vw}px;height:${vh}px"></div>`;
+            const vx=(-offsetX/scale-minX)*s, vy=(-offsetY/scale-minY)*s;
+            svg += `<div class="minimap-viewport" style="left:${vx}px;top:${vy}px;width:${innerWidth/scale*s}px;height:${innerHeight/scale*s}px"></div>`;
             minimapContent.innerHTML = svg;
         }
 
-        function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-
-        loadTheme();
-        updateTransform();
-        loadCanvases();
+        loadTheme(); updateTransform(); loadCanvases();
     })();
     </script>
 </body>
