@@ -111,8 +111,9 @@
             position: relative;
             overflow: hidden;
             background: var(--bg-primary);
+            cursor: grab; 
         }
-
+        #app:active { cursor: grabbing; }
         #canvas {
             position: absolute;
             width: 100%;
@@ -1298,12 +1299,15 @@
                 startX = e.clientX - offsetX;
                 startY = e.clientY - offsetY;
                 canvas.style.cursor = 'grabbing';
+                app.style.cursor = 'grabbing';
                 deselectAll();
             }
         });
 
         window.addEventListener('mousemove', e => {
             if (isPanning) {
+                canvas.style.cursor = connectMode ? 'crosshair' : 'grab';
+                app.style.cursor = connectMode ? 'crosshair' : 'grab'; 
                 offsetX = e.clientX - startX;
                 offsetY = e.clientY - startY;
                 updateTransform(); updateMinimap();
