@@ -1,11 +1,16 @@
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = 'knotpad-' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './style.css',
+  './app.js',
   './manifest.json',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './fonts/SFKR-Regular.otf',
+  './fonts/SFKR-Medium.otf',
+  './fonts/SFKR-Bold.otf'
 ];
 
 self.addEventListener('install', (event) => {
