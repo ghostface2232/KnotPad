@@ -22,9 +22,9 @@
     --grid-color: rgba(255, 255, 255, 0.03);
     --scrollbar: rgba(255, 255, 255, 0.16);
     --danger: #ef4444;
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --radius-lg: 8px;
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
     --transition: 0.15s ease;
     --tag-red: #ef4444; --tag-orange: #f97316; --tag-yellow: #eab308;
     --tag-green: #22c55e; --tag-blue: #3b82f6; --tag-purple: #8b5cf6; --tag-pink: #ec4899;
@@ -152,8 +152,11 @@ input, textarea, button { font-family: inherit; }
 }
 .connection-handle::before {
     content: ''; position: absolute;
-    top: -20px; left: -20px; right: -20px; bottom: -20px;
+    top: -6px; left: -6px; right: -6px; bottom: -6px;
     border-radius: 50%;
+}
+#canvas.connecting .connection-handle::before {
+    top: -20px; left: -20px; right: -20px; bottom: -20px;
 }
 .canvas-item:hover .connection-handle { opacity: 1; }
 .connection-handle:hover { transform: scale(1.4); }
