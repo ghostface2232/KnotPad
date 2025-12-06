@@ -467,6 +467,8 @@ function setItemColor(targetItem, color) {
         }
         item.el.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (color || '')));
         if (activeFilter !== 'all') item.el.classList.toggle('filtered-out', item.color !== activeFilter);
+        // Update connections from this node
+        connections.filter(c => c.from === item).forEach(updateConnection);
     });
     throttledMinimap(); saveState(); triggerAutoSave();
 }
@@ -567,6 +569,9 @@ function startConnection(item, handle) {
     const pos = getHandlePos(item, handle);
     tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     tempLine.classList.add('connection-line', 'temp');
+    if (item.color && COLOR_MAP[item.color]) {
+        tempLine.style.stroke = COLOR_MAP[item.color];
+    }
     connectionsSvg.appendChild(tempLine);
     updateTempLine(pos.x, pos.y);
 }
@@ -596,6 +601,12 @@ function addConnection(from, fh, to, th, loading = false) {
 function updateConnection(c) {
     const fp = getHandlePos(c.from, c.fh), tp = getHandlePos(c.to, c.th);
     c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y));
+    // Apply color from source node
+    if (c.from.color && COLOR_MAP[c.from.color]) {
+        c.el.style.stroke = COLOR_MAP[c.from.color];
+    } else {
+        c.el.style.stroke = '';
+    }
     updateConnectionArrow(c);
 }
 function updateConnectionArrow(c) {
@@ -607,6 +618,10 @@ function updateConnectionArrow(c) {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.classList.add('connection-arrow');
     if (selectedConn === c) g.classList.add('selected');
+    // Apply color from source node
+    if (c.from.color && COLOR_MAP[c.from.color]) {
+        g.style.fill = COLOR_MAP[c.from.color];
+    }
     const size = 8;
     if (c.dir === 'forward' || c.dir === 'both') {
         const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');

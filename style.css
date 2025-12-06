@@ -28,6 +28,8 @@
     --transition: 0.15s ease;
     --tag-red: #ef4444; --tag-orange: #f97316; --tag-yellow: #eab308;
     --tag-green: #22c55e; --tag-blue: #3b82f6; --tag-purple: #8b5cf6; --tag-pink: #ec4899;
+    --conn-default: rgba(255, 255, 255, 0.35);
+    --conn-hover: rgba(255, 255, 255, 0.6);
 }
 
 :root.light {
@@ -38,6 +40,8 @@
     --accent: #2563eb; --accent-glow: rgba(37, 99, 235, 0.16); --accent-dim: rgba(37, 99, 235, 0.3);
     --shadow-md: 0 8px 24px rgba(0,0,0,0.08); --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
     --grid-color: rgba(0, 0, 0, 0.04); --scrollbar: rgba(0, 0, 0, 0.16); --danger: #dc2626;
+    --conn-default: rgba(0, 0, 0, 0.3);
+    --conn-hover: rgba(0, 0, 0, 0.5);
 }
 
 html, body {
@@ -62,12 +66,12 @@ input, textarea, button { font-family: inherit; }
 
 #connectionsSvg { position: absolute; inset: -10000px; width: 20000px; height: 20000px; pointer-events: none; overflow: visible; }
 
-.connection-line { fill: none; stroke: var(--accent-dim); stroke-width: 2; pointer-events: stroke; cursor: pointer; }
-.connection-line:hover { stroke: var(--accent); stroke-width: 3; }
+.connection-line { fill: none; stroke: var(--conn-default); stroke-width: 2; pointer-events: stroke; cursor: pointer; }
+.connection-line:hover { stroke: var(--conn-hover); stroke-width: 3; }
 .connection-line.selected { stroke: var(--accent); stroke-width: 3; }
-.connection-line.temp { stroke-dasharray: 6 4; opacity: 0.6; }
+.connection-line.temp { stroke: var(--accent-dim); stroke-dasharray: 6 4; opacity: 0.7; }
 
-.connection-arrow { fill: var(--accent-dim); pointer-events: none; }
+.connection-arrow { fill: var(--conn-default); pointer-events: none; }
 .connection-arrow.selected { fill: var(--accent); }
 
 #selectionBox { position: fixed; border: 1.5px solid var(--accent); background: var(--accent-glow); display: none; pointer-events: none; z-index: 9999; border-radius: 4px; }
