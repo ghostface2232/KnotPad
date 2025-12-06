@@ -22,8 +22,8 @@
     --grid-color: rgba(255, 255, 255, 0.03);
     --scrollbar: rgba(255, 255, 255, 0.16);
     --danger: #ef4444;
-    --radius-sm: 8px;
-    --radius-md: 10px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
     --radius-lg: 14px;
     --transition: 0.15s ease;
     --tag-red: #ef4444; --tag-orange: #f97316; --tag-yellow: #eab308;
