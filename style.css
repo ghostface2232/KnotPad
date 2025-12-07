@@ -106,7 +106,7 @@ input, textarea, button { font-family: inherit; }
 
 .item-content { width: 100%; height: 100%; overflow: hidden; border-radius: calc(var(--radius-md) - 1px); }
 
-.canvas-item .delete-btn, .canvas-item .color-btn {
+.canvas-item .delete-btn, .canvas-item .color-btn, .canvas-item .font-size-btn {
     position: absolute; top: -10px; width: 24px; height: 24px; border-radius: 50%;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     color: var(--text-secondary); cursor: pointer;
@@ -114,13 +114,14 @@ input, textarea, button { font-family: inherit; }
     opacity: 0; transition: all var(--transition); font-size: 14px; z-index: 10;
 }
 .canvas-item .delete-btn { right: -10px; }
-.canvas-item .color-btn { right: 18px; }
-.canvas-item:hover .delete-btn, .canvas-item:hover .color-btn { opacity: 1; }
+.canvas-item .font-size-btn { right: 18px; }
+.canvas-item .color-btn { right: 46px; }
+.canvas-item:hover .delete-btn, .canvas-item:hover .color-btn, .canvas-item:hover .font-size-btn { opacity: 1; }
 .canvas-item .delete-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
-.canvas-item .color-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.canvas-item .color-btn:hover, .canvas-item .font-size-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 .color-picker {
-    position: absolute; top: 18px; right: -10px;
+    position: absolute; top: 18px; right: 18px;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm); padding: 6px;
     display: none; gap: 4px; flex-wrap: wrap; width: 76px;
@@ -210,6 +211,19 @@ input, textarea, button { font-family: inherit; }
 .memo-body::placeholder { color: var(--text-placeholder); }
 .memo-body::-webkit-scrollbar { width: 4px; }
 .memo-body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+
+/* Font size variants */
+.canvas-item.font-size-medium .note-title { font-size: 16px; }
+.canvas-item.font-size-medium .note-body,
+.canvas-item.font-size-medium .memo-body { font-size: 15px; }
+
+.canvas-item.font-size-large .note-title { font-size: 18px; }
+.canvas-item.font-size-large .note-body,
+.canvas-item.font-size-large .memo-body { font-size: 17px; }
+
+.canvas-item.font-size-xlarge .note-title { font-size: 22px; }
+.canvas-item.font-size-xlarge .note-body,
+.canvas-item.font-size-xlarge .memo-body { font-size: 20px; }
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
 .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); }

@@ -18,6 +18,7 @@ const minimap = $('minimap');
 const CANVASES_KEY = 'knotpad-canvases', THEME_KEY = 'knotpad-theme';
 const COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
 const COLOR_MAP = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#8b5cf6', pink: '#ec4899' };
+const FONT_SIZES = [null, 'medium', 'large', 'xlarge'];
 
 const CANVAS_ICONS = {
     canvas: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6"/></svg>',
@@ -71,7 +72,7 @@ const MAX_HISTORY = 50;
 let undoStack = [], redoStack = [];
 function saveState() {
     const state = {
-        items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: JSON.parse(JSON.stringify(i.content)), color: i.color, locked: i.locked, z: parseInt(i.el.style.zIndex) })),
+        items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: JSON.parse(JSON.stringify(i.content)), color: i.color, fontSize: i.fontSize, locked: i.locked, z: parseInt(i.el.style.zIndex) })),
         connections: connections.map(c => ({ id: c.id, from: c.from.id, fh: c.fh, to: c.to.id, th: c.th, dir: c.dir }))
     };
     undoStack.push(JSON.stringify(state));
@@ -191,7 +192,7 @@ function saveCanvasesList() { localStorage.setItem(CANVASES_KEY, JSON.stringify(
 function saveCurrentCanvas() {
     if (!currentCanvasId) return;
     const data = {
-        items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, locked: i.locked, z: parseInt(i.el.style.zIndex) })),
+        items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, fontSize: i.fontSize, locked: i.locked, z: parseInt(i.el.style.zIndex) })),
         connections: connections.map(c => ({ id: c.id, from: c.from.id, fh: c.fh, to: c.to.id, th: c.th, dir: c.dir })),
         view: { scale, offsetX, offsetY }, itemId, highestZ
     };
@@ -444,9 +445,17 @@ function createItem(cfg, loading = false) {
         el.style.setProperty('--tag-color', COLOR_MAP[cfg.color]);
         el.classList.add('has-color');
     }
-    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn">×</button><button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
+    // Font size class for note/memo
+    if (cfg.fontSize && (cfg.type === 'note' || cfg.type === 'memo')) {
+        el.classList.add('font-size-' + cfg.fontSize);
+    }
+    // Font size button only for note/memo
+    const fontSizeBtn = (cfg.type === 'note' || cfg.type === 'memo') 
+        ? `<button class="font-size-btn" title="Font Size"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>` 
+        : '';
+    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn">×</button>${fontSizeBtn}<button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
     canvas.appendChild(el);
-    const item = { id: cfg.id || `i${++itemId}`, el, type: cfg.type, x: cfg.x, y: cfg.y, w: cfg.w, h: cfg.h, content: cfg.content, color: cfg.color || null, locked: cfg.locked || false };
+    const item = { id: cfg.id || `i${++itemId}`, el, type: cfg.type, x: cfg.x, y: cfg.y, w: cfg.w, h: cfg.h, content: cfg.content, color: cfg.color || null, fontSize: cfg.fontSize || null, locked: cfg.locked || false };
     items.push(item);
     setupItemEvents(item);
     if (!loading) { throttledMinimap(); if (activeFilter !== 'all' && item.color !== activeFilter) item.el.classList.add('filtered-out'); }
@@ -473,11 +482,28 @@ function setItemColor(targetItem, color) {
     throttledMinimap(); saveState(); triggerAutoSave();
 }
 
+function setItemFontSize(item) {
+    if (item.type !== 'note' && item.type !== 'memo') return;
+    // Cycle through font sizes: null -> medium -> large -> xlarge -> null
+    const currentIndex = FONT_SIZES.indexOf(item.fontSize);
+    const nextIndex = (currentIndex + 1) % FONT_SIZES.length;
+    const newSize = FONT_SIZES[nextIndex];
+    // Remove old class
+    FONT_SIZES.forEach(s => { if (s) item.el.classList.remove('font-size-' + s); });
+    // Apply new size
+    item.fontSize = newSize;
+    if (newSize) {
+        item.el.classList.add('font-size-' + newSize);
+    }
+    saveState();
+    triggerAutoSave();
+}
+
 function setupItemEvents(item) {
     const el = item.el;
     el.addEventListener('mousedown', e => {
         const t = e.target;
-        if (t.classList.contains('delete-btn') || t.classList.contains('resize-handle') || t.classList.contains('connection-handle') || t.classList.contains('add-child-btn') || t.classList.contains('color-btn') || t.classList.contains('color-opt') || t.closest('.color-picker') || t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+        if (t.classList.contains('delete-btn') || t.classList.contains('resize-handle') || t.classList.contains('connection-handle') || t.classList.contains('add-child-btn') || t.classList.contains('color-btn') || t.classList.contains('font-size-btn') || t.classList.contains('color-opt') || t.closest('.color-picker') || t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
         if (item.locked) return;
         e.stopPropagation();
         if (!selectedItems.has(item) && !e.shiftKey) selectItem(item, false);
@@ -500,6 +526,11 @@ function setupItemEvents(item) {
         colorPicker.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.color === (item.color || '')));
     });
     colorPicker.querySelectorAll('.color-opt').forEach(opt => { opt.addEventListener('click', e => { e.stopPropagation(); setItemColor(item, opt.dataset.color || null); colorPicker.classList.remove('active'); }); });
+    // Font size button
+    const fontSizeBtn = el.querySelector('.font-size-btn');
+    if (fontSizeBtn) {
+        fontSizeBtn.addEventListener('click', e => { e.stopPropagation(); setItemFontSize(item); });
+    }
     el.querySelectorAll('.add-child-btn').forEach(btn => { btn.addEventListener('click', e => { e.stopPropagation(); showChildTypePicker(item, btn.dataset.d, e); }); });
     el.querySelectorAll('.connection-handle').forEach(h => {
         h.addEventListener('mousedown', e => { e.stopPropagation(); if (connectSource) completeConnection(item, h.dataset.h); else startConnection(item, h.dataset.h); });
@@ -559,7 +590,7 @@ function deleteItem(item, update = true) {
     const i = items.indexOf(item); if (i > -1) { items.splice(i, 1); item.el.remove(); }
     if (update) { saveState(); throttledMinimap(); triggerAutoSave(); }
 }
-function duplicateItem(item) { const pos = findFreePosition(item.x + 24, item.y + 24); createItem({ type: item.type, x: pos.x, y: pos.y, w: item.w, h: item.h, content: JSON.parse(JSON.stringify(item.content)), color: item.color }); saveState(); triggerAutoSave(); }
+function duplicateItem(item) { const pos = findFreePosition(item.x + 24, item.y + 24); createItem({ type: item.type, x: pos.x, y: pos.y, w: item.w, h: item.h, content: JSON.parse(JSON.stringify(item.content)), color: item.color, fontSize: item.fontSize }); saveState(); triggerAutoSave(); }
 function findFreePosition(x, y) { let tries = 0; while (tries < 50 && items.some(i => Math.abs(x - i.x) < 10 && Math.abs(y - i.y) < 10)) { x += 6; y += 6; tries++; } return { x, y }; }
 
 // Connections
@@ -745,7 +776,7 @@ $('linkSubmit').addEventListener('click', () => {
 // Export directly
 $('exportBtn').addEventListener('click', async () => {
     const data = {
-        items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, locked: i.locked })),
+        items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, fontSize: i.fontSize, locked: i.locked })),
         connections: connections.map(c => ({ from: c.from.id, fh: c.fh, to: c.to.id, th: c.th, dir: c.dir })),
         name: canvases.find(c => c.id === currentCanvasId)?.name || 'canvas'
     };
