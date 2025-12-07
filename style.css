@@ -215,15 +215,15 @@ input, textarea, button { font-family: inherit; }
 /* Font size variants */
 .canvas-item.font-size-medium .note-title { font-size: 16px; }
 .canvas-item.font-size-medium .note-body,
-.canvas-item.font-size-medium .memo-body { font-size: 15px; }
+.canvas-item.font-size-medium .memo-body { font-size: 14px; }
 
-.canvas-item.font-size-large .note-title { font-size: 18px; }
+.canvas-item.font-size-large .note-title { font-size: 20px; }
 .canvas-item.font-size-large .note-body,
-.canvas-item.font-size-large .memo-body { font-size: 17px; }
+.canvas-item.font-size-large .memo-body { font-size: 15px; }
 
-.canvas-item.font-size-xlarge .note-title { font-size: 22px; }
+.canvas-item.font-size-xlarge .note-title { font-size: 24px; }
 .canvas-item.font-size-xlarge .note-body,
-.canvas-item.font-size-xlarge .memo-body { font-size: 20px; }
+.canvas-item.font-size-xlarge .memo-body { font-size: 16px; }
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
 .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); }
