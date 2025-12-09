@@ -124,8 +124,26 @@ function restoreState(state) {
 
 // Search
 let searchResults = [], searchIndex = -1;
-function openSearch() { searchBar.classList.add('active'); searchInput.focus(); }
-function closeSearch() { searchBar.classList.remove('active'); searchInput.value = ''; clearSearchHighlights(); searchResults = []; updateSearchCount(); }
+function toggleSearch() {
+    if (searchBar.classList.contains('active')) {
+        closeSearch();
+    } else {
+        openSearch();
+    }
+}
+function openSearch() {
+    searchBar.classList.add('active');
+    $('searchBtn').classList.add('active');
+    searchInput.focus();
+}
+function closeSearch() {
+    searchBar.classList.remove('active');
+    $('searchBtn').classList.remove('active');
+    searchInput.value = '';
+    clearSearchHighlights();
+    searchResults = [];
+    updateSearchCount();
+}
 function clearSearchHighlights() { items.forEach(i => i.el.classList.remove('search-highlight')); }
 function doSearch() {
     const q = searchInput.value.toLowerCase().trim();
@@ -239,6 +257,7 @@ async function switchCanvas(id) {
     setFilter('all');
     updateMinimap();
     renderCanvasList();
+    updateTopbarCanvasName();
 }
 async function createNewCanvas() {
     const nc = { id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 };
@@ -258,7 +277,11 @@ async function deleteCanvas(id) {
         showToast('Canvas deleted');
     }
 }
-function renameCanvas(id, name) { const c = canvases.find(x => x.id === id); if (c) { c.name = name || 'Untitled'; c.updatedAt = Date.now(); saveCanvasesList(); renderCanvasList(); } }
+function renameCanvas(id, name) { const c = canvases.find(x => x.id === id); if (c) { c.name = name || 'Untitled'; c.updatedAt = Date.now(); saveCanvasesList(); renderCanvasList(); updateTopbarCanvasName(); } }
+function updateTopbarCanvasName() {
+    const c = canvases.find(x => x.id === currentCanvasId);
+    $('topbarCanvasName').textContent = c?.name || 'Untitled';
+}
 function getCanvasIconHTML(c) { if (c.icon && CANVAS_ICONS[c.icon]) return CANVAS_ICONS[c.icon]; return `<span class="icon-letter">${esc((c.name || 'U').charAt(0).toUpperCase())}</span>`; }
 function renderCanvasList() {
     canvasList.innerHTML = canvases.map(c => `<div class="canvas-item-entry ${c.id === currentCanvasId ? 'active' : ''}" data-id="${c.id}"><div class="canvas-icon" data-canvas-id="${c.id}">${getCanvasIconHTML(c)}</div><div class="canvas-info"><div class="canvas-name">${esc(c.name)}</div><div class="canvas-meta">${c.itemCount || 0} items</div></div><div class="canvas-actions"><button class="canvas-action-btn rename" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="canvas-action-btn delete" title="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button></div></div>`).join('');
@@ -618,37 +641,36 @@ function autoResizeItem(item) {
     const textarea = item.el.querySelector('.note-body, .memo-body');
     if (!textarea) return;
 
-    // Calculate font size multiplier for padding
+    // Calculate font size multiplier
     let fontMultiplier = 1;
-    if (item.fontSize === 'medium') fontMultiplier = 1.15;
-    else if (item.fontSize === 'large') fontMultiplier = 1.35;
-    else if (item.fontSize === 'xlarge') fontMultiplier = 1.55;
+    if (item.fontSize === 'medium') fontMultiplier = 1.1;
+    else if (item.fontSize === 'large') fontMultiplier = 1.25;
+    else if (item.fontSize === 'xlarge') fontMultiplier = 1.4;
 
-    // Reset height to measure actual content
+    // Save original height, reset to measure content
+    const origH = textarea.style.height;
     textarea.style.height = '0px';
     const scrollH = textarea.scrollHeight;
-    textarea.style.height = '';
+    textarea.style.height = origH;
 
-    // Calculate header height based on font size
-    let headerH = 0;
+    // Calculate total height needed
+    let extraH;
     if (item.type === 'note') {
-        const titleEl = item.el.querySelector('.note-title');
-        if (titleEl) {
-            headerH = titleEl.offsetHeight + 20; // title height + gaps + padding
-        } else {
-            headerH = Math.round(40 * fontMultiplier);
-        }
+        // Note: title input (~20-24px base) + gap (6px) + padding (14*2=28px)
+        const baseTitleH = Math.round(24 * fontMultiplier);
+        extraH = baseTitleH + 6 + 28 + 5; // +5px buffer for scrollbar prevention
+    } else {
+        // Memo: just padding (12*2=24px)
+        extraH = 24 + 5; // +5px buffer for scrollbar prevention
     }
 
-    // Calculate minimum height based on font size
     const minH = Math.round((item.type === 'note' ? 100 : 80) * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
-    const padding = item.type === 'note' ? 28 : 24; // top + bottom padding
 
-    const newH = Math.min(Math.max(scrollH + headerH + padding, minH), maxH);
+    const newH = Math.min(Math.max(scrollH + extraH, minH), maxH);
 
-    // Update if difference is significant or content needs more space
-    if (newH > item.h || Math.abs(newH - item.h) > 5) {
+    // Only update if difference is significant (> 8px)
+    if (Math.abs(newH - item.h) > 8) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
         updateAllConnections();
@@ -1003,7 +1025,7 @@ $('addLinkBtn').addEventListener('click', openLinkModal);
 $('addFileBtn').addEventListener('click', () => fileInput.click());
 $('undoBtn').addEventListener('click', undo);
 $('redoBtn').addEventListener('click', redo);
-$('searchBtn').addEventListener('click', openSearch);
+$('searchBtn').addEventListener('click', toggleSearch);
 $('zoomInBtn').addEventListener('click', () => setZoom(scale * 1.25));
 $('zoomOutBtn').addEventListener('click', () => setZoom(scale / 1.25));
 $('fitViewBtn').addEventListener('click', fitToScreen);

@@ -341,7 +341,7 @@ input, textarea, button { font-family: inherit; }
 .modal-btn-submit:hover { filter: brightness(1.1); }
 
 .search-bar {
-    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    position: fixed; top: 16px; right: 16px;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md); padding: 8px 16px;
     display: none; align-items: center; gap: 12px;
@@ -480,15 +480,20 @@ input, textarea, button { font-family: inherit; }
 
 /* Topbar */
 .topbar {
-    position: fixed; top: 16px; right: 16px;
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 8px;
     z-index: 100;
 }
-.topbar-left, .topbar-right {
+.topbar-group {
     display: flex; align-items: center; gap: 4px;
-    padding: 6px 8px;
+    padding: 6px 12px;
     background: var(--bg-secondary); border-radius: var(--radius-md);
     border: 1px solid var(--border-subtle); box-shadow: var(--shadow-md);
+}
+.topbar-canvas-name {
+    font-size: 13px; font-weight: 500; color: var(--text-primary);
+    padding: 0 8px; max-width: 150px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
 }
 .topbar-btn {
     width: 36px; height: 36px; border-radius: var(--radius-sm);
@@ -496,5 +501,6 @@ input, textarea, button { font-family: inherit; }
     cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .topbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.topbar-btn.active { background: var(--accent); color: white; }
 .topbar-btn.disabled { opacity: 0.35; pointer-events: none; cursor: default; }
 .topbar-sep { width: 1px; height: 20px; background: var(--border-subtle); margin: 0 4px; }
