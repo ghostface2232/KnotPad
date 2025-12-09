@@ -486,7 +486,7 @@ input, textarea, button { font-family: inherit; }
 }
 .topbar-group {
     display: flex; align-items: center; gap: 4px;
-    padding: 6px 12px;
+    padding: 6px 8px;
     background: var(--bg-secondary); border-radius: var(--radius-md);
     border: 1px solid var(--border-subtle); box-shadow: var(--shadow-md);
 }
