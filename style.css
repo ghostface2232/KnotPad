@@ -491,7 +491,7 @@ input, textarea, button { font-family: inherit; }
     border: 1px solid var(--border-subtle); box-shadow: var(--shadow-md);
 }
 .topbar-canvas-name {
-    font-size: 13px; font-weight: 500; color: var(--text-primary);
+    font-size: 16px; font-weight: 500; color: var(--text-primary);
     padding: 0 8px; max-width: 150px; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
 }
