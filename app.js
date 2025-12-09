@@ -13,6 +13,7 @@ const linkModal = $('linkModal');
 const searchBar = $('searchBar'), searchInput = $('searchInput');
 const connDirectionPicker = $('connDirectionPicker');
 const childTypePicker = $('childTypePicker');
+const newNodePicker = $('newNodePicker');
 const minimap = $('minimap');
 
 const CANVASES_KEY = 'knotpad-canvases', THEME_KEY = 'knotpad-theme';
@@ -52,6 +53,7 @@ const blobURLCache = new Map();
 
 let scale = 1, offsetX = 0, offsetY = 0;
 let isPanning = false, startX = 0, startY = 0;
+let isSpacePressed = false, isSpacePanning = false;
 let isSelecting = false, selStartX = 0, selStartY = 0;
 let items = [], connections = [];
 let selectedItems = new Set();
@@ -66,6 +68,7 @@ let minimapThrottle = null;
 let sidebarPinned = localStorage.getItem('knotpad-sidebar-pinned') === 'true';
 let iconPickerTarget = null;
 let childPickerData = null;
+let newNodePickerData = null;
 
 // Undo/Redo
 const MAX_HISTORY = 50;
@@ -295,12 +298,50 @@ function updTheme() { const L = document.documentElement.classList.contains('lig
 
 // Viewport
 function updateTransform() { canvas.style.transform = `translate(${offsetX}px,${offsetY}px) scale(${scale})`; zoomDisplay.textContent = Math.round(scale * 100) + '%'; }
-function setZoom(z, cx, cy) {
+let zoomAnimationFrame = null;
+function setZoom(z, cx, cy, animate = true) {
     cx = cx ?? innerWidth / 2; cy = cy ?? innerHeight / 2;
     z = Math.max(0.1, Math.min(5, z));
-    offsetX = cx - (cx - offsetX) * (z / scale);
-    offsetY = cy - (cy - offsetY) * (z / scale);
-    scale = z; updateTransform(); throttledMinimap();
+
+    if (zoomAnimationFrame) {
+        cancelAnimationFrame(zoomAnimationFrame);
+        zoomAnimationFrame = null;
+    }
+
+    if (!animate) {
+        offsetX = cx - (cx - offsetX) * (z / scale);
+        offsetY = cy - (cy - offsetY) * (z / scale);
+        scale = z;
+        updateTransform();
+        throttledMinimap();
+        return;
+    }
+
+    const startScale = scale;
+    const startOffsetX = offsetX;
+    const startOffsetY = offsetY;
+    const targetOffsetX = cx - (cx - offsetX) * (z / startScale);
+    const targetOffsetY = cy - (cy - offsetY) * (z / startScale);
+    const startTime = performance.now();
+    const duration = 150;
+
+    function animateZoom(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+        const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+        scale = startScale + (z - startScale) * ease;
+        offsetX = startOffsetX + (targetOffsetX - startOffsetX) * ease;
+        offsetY = startOffsetY + (targetOffsetY - startOffsetY) * ease;
+        updateTransform();
+
+        if (t < 1) {
+            zoomAnimationFrame = requestAnimationFrame(animateZoom);
+        } else {
+            zoomAnimationFrame = null;
+            updateMinimap();
+        }
+    }
+    zoomAnimationFrame = requestAnimationFrame(animateZoom);
 }
 function fitToScreen() {
     if (!items.length) { scale = 1; offsetX = offsetY = 0; updateTransform(); return; }
@@ -338,7 +379,7 @@ app.addEventListener('wheel', e => {
     e.preventDefault();
     const d = e.deltaY > 0 ? 0.9 : 1.1;
     const rect = app.getBoundingClientRect();
-    setZoom(scale * d, e.clientX - rect.left, e.clientY - rect.top);
+    setZoom(scale * d, e.clientX - rect.left, e.clientY - rect.top, false);
 }, { passive: false });
 
 // Mouse handling
@@ -346,6 +387,13 @@ app.addEventListener('mousedown', e => {
     app.focus();
     closeSidebarIfUnpinned();
     if (e.button === 1) { e.preventDefault(); startPan(e.clientX, e.clientY); return; }
+    // Space + left click for panning
+    if (e.button === 0 && isSpacePressed) {
+        e.preventDefault();
+        isSpacePanning = true;
+        startPan(e.clientX, e.clientY);
+        return;
+    }
     if (e.button === 0 && (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app)) {
         if (!e.shiftKey) deselectAll();
         isSelecting = true;
@@ -353,6 +401,16 @@ app.addEventListener('mousedown', e => {
         selectionBox.style.display = 'block';
         selectionBox.style.left = selStartX + 'px'; selectionBox.style.top = selStartY + 'px';
         selectionBox.style.width = '0px'; selectionBox.style.height = '0px';
+    }
+});
+
+// Double-click to create new node
+app.addEventListener('dblclick', e => {
+    if (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app) {
+        const rect = app.getBoundingClientRect();
+        const canvasX = (e.clientX - rect.left - offsetX) / scale - 100;
+        const canvasY = (e.clientY - rect.top - offsetY) / scale - 70;
+        showNewNodePicker(e.clientX, e.clientY, canvasX, canvasY);
     }
 });
 function startPan(x, y) { isPanning = true; startX = x - offsetX; startY = y - offsetY; app.classList.add('panning'); }
@@ -389,7 +447,11 @@ window.addEventListener('mousemove', e => {
 });
 
 window.addEventListener('mouseup', e => {
-    if (isPanning) { isPanning = false; app.classList.remove('panning'); }
+    if (isPanning) {
+        isPanning = false;
+        if (!isSpacePressed) app.classList.remove('panning');
+        isSpacePanning = false;
+    }
     if (isSelecting) {
         isSelecting = false;
         const sb = selectionBox.getBoundingClientRect();
@@ -421,7 +483,7 @@ app.addEventListener('touchmove', e => {
         const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
         const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         const rect = app.getBoundingClientRect();
-        setZoom(scale * dist / lastDist, cx - rect.left, cy - rect.top);
+        setZoom(scale * dist / lastDist, cx - rect.left, cy - rect.top, false);
         lastDist = dist;
     } else if (isPanning) { offsetX = e.touches[0].clientX - startX; offsetY = e.touches[0].clientY - startY; updateTransform(); throttledMinimap(); }
 }, { passive: false });
@@ -495,6 +557,8 @@ function setItemFontSize(item) {
     if (newSize) {
         item.el.classList.add('font-size-' + newSize);
     }
+    // Trigger resize after font change
+    setTimeout(() => autoResizeItem(item), 10);
     saveState();
     triggerAutoSave();
 }
@@ -553,9 +617,38 @@ function autoResizeItem(item) {
     if (item.type !== 'note' && item.type !== 'memo') return;
     const textarea = item.el.querySelector('.note-body, .memo-body');
     if (!textarea) return;
-    textarea.style.height = 'auto';
-    const newH = Math.min(Math.max(textarea.scrollHeight + (item.type === 'note' ? 50 : 24), 80), 400);
-    if (Math.abs(newH - item.h) > 10) {
+
+    // Calculate font size multiplier for padding
+    let fontMultiplier = 1;
+    if (item.fontSize === 'medium') fontMultiplier = 1.15;
+    else if (item.fontSize === 'large') fontMultiplier = 1.35;
+    else if (item.fontSize === 'xlarge') fontMultiplier = 1.55;
+
+    // Reset height to measure actual content
+    textarea.style.height = '0px';
+    const scrollH = textarea.scrollHeight;
+    textarea.style.height = '';
+
+    // Calculate header height based on font size
+    let headerH = 0;
+    if (item.type === 'note') {
+        const titleEl = item.el.querySelector('.note-title');
+        if (titleEl) {
+            headerH = titleEl.offsetHeight + 20; // title height + gaps + padding
+        } else {
+            headerH = Math.round(40 * fontMultiplier);
+        }
+    }
+
+    // Calculate minimum height based on font size
+    const minH = Math.round((item.type === 'note' ? 100 : 80) * fontMultiplier);
+    const maxH = Math.round(500 * fontMultiplier);
+    const padding = item.type === 'note' ? 28 : 24; // top + bottom padding
+
+    const newH = Math.min(Math.max(scrollH + headerH + padding, minH), maxH);
+
+    // Update if difference is significant or content needs more space
+    if (newH > item.h || Math.abs(newH - item.h) > 5) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
         updateAllConnections();
@@ -576,6 +669,29 @@ childTypePicker.querySelectorAll('button').forEach(btn => {
         childPickerData = null;
     });
 });
+
+// New node picker for double-click
+newNodePicker.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (!newNodePickerData) return;
+        const { x, y } = newNodePickerData;
+        if (btn.dataset.type === 'memo') {
+            addMemo('', x, y);
+        } else {
+            addNote('', '', x, y);
+        }
+        saveState();
+        newNodePicker.classList.remove('active');
+        newNodePickerData = null;
+    });
+});
+
+function showNewNodePicker(clientX, clientY, canvasX, canvasY) {
+    newNodePickerData = { x: canvasX, y: canvasY };
+    newNodePicker.style.left = clientX + 'px';
+    newNodePicker.style.top = clientY + 'px';
+    newNodePicker.classList.add('active');
+}
 
 function selectItem(item, accumulate = false) { if (!accumulate) deselectAll(); selectedItems.add(item); item.el.classList.add('selected'); window.selectedItem = item; }
 function deselectAll() {
@@ -727,7 +843,7 @@ function showContextMenu(x, y, item) {
     contextMenu.style.left = x + 'px'; contextMenu.style.top = y + 'px';
     contextMenu.classList.add('active');
 }
-function hideMenus() { contextMenu.classList.remove('active'); filterDropdown.classList.remove('active'); colorDropdown.classList.remove('active'); connDirectionPicker.classList.remove('active'); childTypePicker.classList.remove('active'); canvasIconPicker.classList.remove('active'); }
+function hideMenus() { contextMenu.classList.remove('active'); filterDropdown.classList.remove('active'); colorDropdown.classList.remove('active'); connDirectionPicker.classList.remove('active'); childTypePicker.classList.remove('active'); canvasIconPicker.classList.remove('active'); newNodePicker.classList.remove('active'); newNodePickerData = null; }
 
 document.addEventListener('click', e => {
     if (!e.target.closest('.color-picker') && !e.target.closest('.color-btn')) document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
@@ -737,6 +853,7 @@ document.addEventListener('click', e => {
     if (!e.target.closest('.conn-direction-picker') && !e.target.closest('.connection-line')) connDirectionPicker.classList.remove('active');
     if (!e.target.closest('.child-type-picker') && !e.target.closest('.add-child-btn')) childTypePicker.classList.remove('active');
     if (!e.target.closest('.canvas-icon-picker') && !e.target.closest('.canvas-icon')) { canvasIconPicker.classList.remove('active'); iconPickerTarget = null; }
+    if (!e.target.closest('.new-node-picker')) { newNodePicker.classList.remove('active'); newNodePickerData = null; }
 });
 
 contextMenu.querySelectorAll('.context-menu-item').forEach(el => {
@@ -815,6 +932,21 @@ document.addEventListener('keydown', e => {
         if (selectedItems.size > 0) deleteSelectedItems();
         else if (selectedConn) deleteConnection(selectedConn);
     }
+    // Space for pan mode
+    if (e.code === 'Space' && !e.target.matches('input,textarea') && !isSpacePressed) {
+        e.preventDefault();
+        isSpacePressed = true;
+        app.classList.add('space-pan-mode');
+    }
+});
+
+document.addEventListener('keyup', e => {
+    if (e.code === 'Space' && isSpacePressed) {
+        isSpacePressed = false;
+        isSpacePanning = false;
+        app.classList.remove('space-pan-mode');
+        app.classList.remove('panning');
+    }
 });
 
 // Drag & Drop & Paste
@@ -871,6 +1003,7 @@ $('addLinkBtn').addEventListener('click', openLinkModal);
 $('addFileBtn').addEventListener('click', () => fileInput.click());
 $('undoBtn').addEventListener('click', undo);
 $('redoBtn').addEventListener('click', redo);
+$('searchBtn').addEventListener('click', openSearch);
 $('zoomInBtn').addEventListener('click', () => setZoom(scale * 1.25));
 $('zoomOutBtn').addEventListener('click', () => setZoom(scale / 1.25));
 $('fitViewBtn').addEventListener('click', fitToScreen);
