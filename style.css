@@ -510,3 +510,90 @@ input, textarea, button { font-family: inherit; }
 .topbar-btn.active { background: var(--accent); color: white; }
 .topbar-btn.disabled { opacity: 0.35; pointer-events: none; cursor: default; }
 .topbar-sep { width: 1px; height: 20px; background: var(--border-subtle); margin: 0 4px; }
+
+/* Storage Indicator */
+.storage-indicator {
+    width: auto !important;
+    padding: 0 12px !important;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+.storage-indicator:hover { color: var(--text-primary); }
+.storage-indicator.connected { color: var(--tag-green); }
+.storage-indicator.connected:hover { color: var(--tag-green); background: rgba(34, 197, 94, 0.1); }
+.storage-status-text {
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+/* Storage Modal */
+.storage-modal-box {
+    max-width: 420px;
+}
+.storage-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.storage-modal-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 12px 16px;
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+}
+.storage-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    flex-shrink: 0;
+}
+.storage-status-dot.connected {
+    background: var(--tag-green);
+    box-shadow: 0 0 8px var(--tag-green);
+}
+.storage-modal-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.storage-modal-info p {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+.storage-modal-info strong {
+    color: var(--text-primary);
+}
+.storage-modal-actions {
+    display: flex;
+    gap: 12px;
+}
+.storage-modal-actions .modal-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.modal-btn-danger {
+    background: var(--danger) !important;
+}
+.modal-btn-danger:hover {
+    background: #dc2626 !important;
+}
+.storage-modal-note {
+    font-size: 11px;
+    color: var(--text-placeholder);
+    line-height: 1.4;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+}
