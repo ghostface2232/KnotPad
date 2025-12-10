@@ -304,10 +304,14 @@ export function autoResizeItem(item) {
     else if (item.fontSize === 'large') fontMultiplier = 1.25;
     else if (item.fontSize === 'xlarge') fontMultiplier = 1.4;
 
+    // Temporarily remove flex to measure true content height
+    const origFlex = textarea.style.flex;
     const origH = textarea.style.height;
+    textarea.style.flex = 'none';
     textarea.style.height = '0px';
     const scrollH = textarea.scrollHeight;
     textarea.style.height = origH;
+    textarea.style.flex = origFlex;
 
     let extraH;
     if (item.type === 'note') {
