@@ -1,9 +1,8 @@
 // KnotPad - Main Entry Point
 
-import { FS_STORAGE_KEY } from './constants.js';
 import { $ } from './utils.js';
 import * as state from './state.js';
-import { initMediaDB, updateStorageIndicator } from './storage.js';
+import { initMediaDB } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
 import { setExternalFunctions as setItemsExternal, createItem, addNote, addMemo, setFilter, setItemColor } from './items.js';
 import {
@@ -39,7 +38,7 @@ import {
     showChildTypePicker,
     setupNewNodePicker,
     setupLinkModal,
-    setupStorageModal,
+    setupSettingsModal,
     handleFile
 } from './ui.js';
 import {
@@ -301,9 +300,6 @@ async function init() {
     // Update undo/redo buttons
     updateUndoRedoButtons();
 
-    // Update storage indicator
-    updateStorageIndicator(localStorage.getItem(FS_STORAGE_KEY) === 'true');
-
     // Setup all event handlers
     setupToolbarEvents();
     setupSidebarEvents();
@@ -317,7 +313,7 @@ async function init() {
     setupChildTypePicker();
     setupNewNodePicker();
     setupLinkModal();
-    setupStorageModal();
+    setupSettingsModal();
     setupMouseEvents();
     setupTouchEvents();
     setupKeyboardEvents();

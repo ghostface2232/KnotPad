@@ -27,7 +27,9 @@ export function setupMouseEvents() {
             if (t.scrollHeight > t.clientHeight) return;
         }
         e.preventDefault();
-        const d = e.deltaY > 0 ? 0.9 : 1.1;
+        // Apply invert wheel zoom setting
+        let d = e.deltaY > 0 ? 0.9 : 1.1;
+        if (state.invertWheelZoom) d = 1 / d;
         const rect = app.getBoundingClientRect();
         setZoom(state.scale * d, e.clientX - rect.left, e.clientY - rect.top, false);
     }, { passive: false });

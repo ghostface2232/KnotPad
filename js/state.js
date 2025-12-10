@@ -71,6 +71,10 @@ export let zoomAnimationFrame = null;
 // Blob URL cache
 export const blobURLCache = new Map();
 
+// Settings
+export let defaultFontSize = localStorage.getItem('knotpad-default-font-size') || 'small';
+export let invertWheelZoom = localStorage.getItem('knotpad-invert-wheel-zoom') === 'true';
+
 // Setters for state updates
 export function setScale(val) { scale = val; }
 export function setOffsetX(val) { offsetX = val; }
@@ -107,6 +111,8 @@ export function setRedoStack(val) { redoStack = val; }
 export function setSearchResults(val) { searchResults = val; }
 export function setSearchIndex(val) { searchIndex = val; }
 export function setZoomAnimationFrame(val) { zoomAnimationFrame = val; }
+export function setDefaultFontSize(val) { defaultFontSize = val; localStorage.setItem('knotpad-default-font-size', val); }
+export function setInvertWheelZoom(val) { invertWheelZoom = val; localStorage.setItem('knotpad-invert-wheel-zoom', val); }
 
 // Reset viewport state
 export function resetViewport() {

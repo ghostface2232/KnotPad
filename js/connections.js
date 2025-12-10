@@ -125,6 +125,30 @@ export function updateConnection(c) {
     updateConnectionArrow(c);
 }
 
+// Calculate point on cubic Bezier curve at parameter t
+function bezierPoint(p0, p1, p2, p3, t) {
+    const mt = 1 - t;
+    const mt2 = mt * mt;
+    const mt3 = mt2 * mt;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return {
+        x: mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x,
+        y: mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y
+    };
+}
+
+// Calculate tangent angle on cubic Bezier curve at parameter t
+function bezierTangent(p0, p1, p2, p3, t) {
+    const mt = 1 - t;
+    const mt2 = mt * mt;
+    const t2 = t * t;
+    // Derivative of Bezier curve
+    const dx = 3 * mt2 * (p1.x - p0.x) + 6 * mt * t * (p2.x - p1.x) + 3 * t2 * (p3.x - p2.x);
+    const dy = 3 * mt2 * (p1.y - p0.y) + 6 * mt * t * (p2.y - p1.y) + 3 * t2 * (p3.y - p2.y);
+    return Math.atan2(dy, dx);
+}
+
 // Update connection arrow based on direction
 export function updateConnectionArrow(c) {
     if (c.arrow) {
@@ -136,9 +160,21 @@ export function updateConnectionArrow(c) {
 
     const fp = getHandlePos(c.from, c.fh);
     const tp = getHandlePos(c.to, c.th);
-    const mx = (fp.x + tp.x) / 2;
-    const my = (fp.y + tp.y) / 2;
-    const angle = Math.atan2(tp.y - fp.y, tp.x - fp.x);
+
+    // Calculate control points for the cubic Bezier curve (matching curvePath in utils.js)
+    const dx = tp.x - fp.x;
+    const dy = tp.y - fp.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const curve = Math.min(dist * 0.3, 80);
+
+    const p0 = { x: fp.x, y: fp.y };
+    const p1 = { x: fp.x + curve * Math.sign(dx || 1), y: fp.y };
+    const p2 = { x: tp.x - curve * Math.sign(dx || 1), y: tp.y };
+    const p3 = { x: tp.x, y: tp.y };
+
+    // Get midpoint on the actual Bezier curve
+    const mid = bezierPoint(p0, p1, p2, p3, 0.5);
+    const angle = bezierTangent(p0, p1, p2, p3, 0.5);
 
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.classList.add('connection-arrow');
@@ -150,21 +186,44 @@ export function updateConnectionArrow(c) {
         g.style.fill = COLOR_MAP[c.from.color];
     }
 
-    const size = 8;
+    const size = 12; // Increased arrow size for better visibility
 
     if (c.dir === 'forward' || c.dir === 'both') {
         const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        const x = mx + 10, y = my;
-        arr.setAttribute('points', `${x},${y} ${x - size},${y - size / 2} ${x - size},${y + size / 2}`);
-        arr.setAttribute('transform', `rotate(${angle * 180 / Math.PI}, ${mx}, ${my})`);
+        // Arrow pointing in direction of curve
+        const offset = 8;
+        const ax = mid.x + offset * Math.cos(angle);
+        const ay = mid.y + offset * Math.sin(angle);
+        // Calculate arrow vertices
+        const tipX = ax + size * Math.cos(angle);
+        const tipY = ay + size * Math.sin(angle);
+        const backAngle1 = angle + Math.PI * 0.85;
+        const backAngle2 = angle - Math.PI * 0.85;
+        const back1X = ax + size * 0.7 * Math.cos(backAngle1);
+        const back1Y = ay + size * 0.7 * Math.sin(backAngle1);
+        const back2X = ax + size * 0.7 * Math.cos(backAngle2);
+        const back2Y = ay + size * 0.7 * Math.sin(backAngle2);
+        arr.setAttribute('points', `${tipX},${tipY} ${back1X},${back1Y} ${back2X},${back2Y}`);
         g.appendChild(arr);
     }
 
     if (c.dir === 'backward' || c.dir === 'both') {
         const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        const x = mx - 10, y = my;
-        arr.setAttribute('points', `${x},${y} ${x + size},${y - size / 2} ${x + size},${y + size / 2}`);
-        arr.setAttribute('transform', `rotate(${angle * 180 / Math.PI}, ${mx}, ${my})`);
+        // Arrow pointing opposite to direction of curve
+        const offset = -8;
+        const ax = mid.x + offset * Math.cos(angle);
+        const ay = mid.y + offset * Math.sin(angle);
+        const reverseAngle = angle + Math.PI;
+        // Calculate arrow vertices
+        const tipX = ax + size * Math.cos(reverseAngle);
+        const tipY = ay + size * Math.sin(reverseAngle);
+        const backAngle1 = reverseAngle + Math.PI * 0.85;
+        const backAngle2 = reverseAngle - Math.PI * 0.85;
+        const back1X = ax + size * 0.7 * Math.cos(backAngle1);
+        const back1Y = ay + size * 0.7 * Math.sin(backAngle1);
+        const back2X = ax + size * 0.7 * Math.cos(backAngle2);
+        const back2Y = ay + size * 0.7 * Math.sin(backAngle2);
+        arr.setAttribute('points', `${tipX},${tipY} ${back1X},${back1Y} ${back2X},${back2Y}`);
         g.appendChild(arr);
     }
 

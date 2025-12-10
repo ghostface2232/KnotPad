@@ -425,6 +425,8 @@ export function duplicateItem(item) {
 // Add note
 export function addNote(title = '', body = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
+    // Apply default font size setting
+    const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
     const item = createItem({
         type: 'note',
         x: pos.x,
@@ -432,7 +434,8 @@ export function addNote(title = '', body = '', x, y, color = null) {
         w: 220,
         h: 140,
         content: { title, body },
-        color
+        color,
+        fontSize
     });
     triggerAutoSaveFn();
     return item;
@@ -441,6 +444,8 @@ export function addNote(title = '', body = '', x, y, color = null) {
 // Add memo
 export function addMemo(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
+    // Apply default font size setting
+    const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
     const item = createItem({
         type: 'memo',
         x: pos.x,
@@ -448,7 +453,8 @@ export function addMemo(text = '', x, y, color = null) {
         w: 180,
         h: 100,
         content: text,
-        color
+        color,
+        fontSize
     });
     triggerAutoSaveFn();
     return item;
