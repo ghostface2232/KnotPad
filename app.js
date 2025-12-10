@@ -51,6 +51,224 @@ function loadMedia(id) { return new Promise((res) => { if (!mediaDB) { res(null)
 function deleteMedia(id) { if (!mediaDB) return; const tx = mediaDB.transaction(MEDIA_STORE, 'readwrite'); tx.objectStore(MEDIA_STORE).delete(id); }
 const blobURLCache = new Map();
 
+// File System Access API - Persistent Storage
+let fsDirectoryHandle = null;
+const FS_STORAGE_KEY = 'knotpad-fs-enabled';
+const CANVASES_DIR = 'canvases';
+const MEDIA_DIR = 'media';
+
+function isFileSystemSupported() {
+    return 'showDirectoryPicker' in window;
+}
+
+async function selectStorageFolder() {
+    if (!isFileSystemSupported()) {
+        showToast('File System API not supported in this browser', 'error');
+        return false;
+    }
+    try {
+        fsDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        // Create subdirectories
+        await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
+        await fsDirectoryHandle.getDirectoryHandle(MEDIA_DIR, { create: true });
+        localStorage.setItem(FS_STORAGE_KEY, 'true');
+        updateStorageIndicator(true);
+        showToast('Storage folder connected');
+        // Migrate existing data to file system
+        await migrateToFileSystem();
+        return true;
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.error('Failed to select folder:', e);
+            showToast('Failed to select folder', 'error');
+        }
+        return false;
+    }
+}
+
+async function disconnectStorageFolder() {
+    fsDirectoryHandle = null;
+    localStorage.removeItem(FS_STORAGE_KEY);
+    updateStorageIndicator(false);
+    showToast('Storage folder disconnected');
+}
+
+async function requestFsPermission() {
+    if (!fsDirectoryHandle) return false;
+    try {
+        const permission = await fsDirectoryHandle.queryPermission({ mode: 'readwrite' });
+        if (permission === 'granted') return true;
+        const request = await fsDirectoryHandle.requestPermission({ mode: 'readwrite' });
+        return request === 'granted';
+    } catch (e) {
+        console.error('Permission error:', e);
+        return false;
+    }
+}
+
+function updateStorageIndicator(connected) {
+    const indicator = $('storageIndicator');
+    const statusText = $('storageStatusText');
+    if (indicator) {
+        indicator.classList.toggle('connected', connected);
+        indicator.title = connected ? 'File storage connected - Click to manage' : 'Using browser storage - Click to connect folder';
+    }
+    if (statusText) {
+        statusText.textContent = connected ? 'File Storage' : 'Browser Storage';
+    }
+}
+
+async function migrateToFileSystem() {
+    if (!fsDirectoryHandle) return;
+    const hasPermission = await requestFsPermission();
+    if (!hasPermission) return;
+
+    try {
+        // Migrate all canvases
+        for (const canvas of canvases) {
+            const dataKey = 'knotpad-data-' + canvas.id;
+            const saved = localStorage.getItem(dataKey);
+            if (saved) {
+                await saveCanvasToFileSystem(canvas.id, JSON.parse(saved));
+            }
+        }
+        // Migrate canvases list
+        await saveCanvasesListToFileSystem();
+        showToast('Data migrated to file storage');
+    } catch (e) {
+        console.error('Migration error:', e);
+    }
+}
+
+async function saveCanvasesListToFileSystem() {
+    if (!fsDirectoryHandle) return;
+    try {
+        const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
+        const fileHandle = await canvasesDir.getFileHandle('_index.json', { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(canvases, null, 2));
+        await writable.close();
+    } catch (e) {
+        console.error('Failed to save canvases list to file system:', e);
+    }
+}
+
+async function loadCanvasesListFromFileSystem() {
+    if (!fsDirectoryHandle) return null;
+    try {
+        const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR);
+        const fileHandle = await canvasesDir.getFileHandle('_index.json');
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        return JSON.parse(text);
+    } catch (e) {
+        return null;
+    }
+}
+
+async function saveCanvasToFileSystem(canvasId, data) {
+    if (!fsDirectoryHandle) return;
+    try {
+        const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
+        const fileHandle = await canvasesDir.getFileHandle(canvasId + '.json', { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(data, null, 2));
+        await writable.close();
+    } catch (e) {
+        console.error('Failed to save canvas to file system:', e);
+    }
+}
+
+async function loadCanvasFromFileSystem(canvasId) {
+    if (!fsDirectoryHandle) return null;
+    try {
+        const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR);
+        const fileHandle = await canvasesDir.getFileHandle(canvasId + '.json');
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        return JSON.parse(text);
+    } catch (e) {
+        return null;
+    }
+}
+
+async function deleteCanvasFromFileSystem(canvasId) {
+    if (!fsDirectoryHandle) return;
+    try {
+        const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR);
+        await canvasesDir.removeEntry(canvasId + '.json');
+    } catch (e) {
+        console.error('Failed to delete canvas from file system:', e);
+    }
+}
+
+async function saveMediaToFileSystem(mediaId, blob) {
+    if (!fsDirectoryHandle) return;
+    try {
+        const mediaDir = await fsDirectoryHandle.getDirectoryHandle(MEDIA_DIR, { create: true });
+        // Determine file extension from blob type
+        const ext = getExtensionFromMimeType(blob.type);
+        const fileHandle = await mediaDir.getFileHandle(mediaId + ext, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+    } catch (e) {
+        console.error('Failed to save media to file system:', e);
+    }
+}
+
+async function loadMediaFromFileSystem(mediaId) {
+    if (!fsDirectoryHandle) return null;
+    try {
+        const mediaDir = await fsDirectoryHandle.getDirectoryHandle(MEDIA_DIR);
+        // Try common extensions
+        const extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov'];
+        for (const ext of extensions) {
+            try {
+                const fileHandle = await mediaDir.getFileHandle(mediaId + ext);
+                const file = await fileHandle.getFile();
+                return file;
+            } catch (e) {
+                continue;
+            }
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function deleteMediaFromFileSystem(mediaId) {
+    if (!fsDirectoryHandle) return;
+    try {
+        const mediaDir = await fsDirectoryHandle.getDirectoryHandle(MEDIA_DIR);
+        const extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov'];
+        for (const ext of extensions) {
+            try {
+                await mediaDir.removeEntry(mediaId + ext);
+                return;
+            } catch (e) {
+                continue;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to delete media from file system:', e);
+    }
+}
+
+function getExtensionFromMimeType(mimeType) {
+    const map = {
+        'image/png': '.png',
+        'image/jpeg': '.jpg',
+        'image/gif': '.gif',
+        'image/webp': '.webp',
+        'video/mp4': '.mp4',
+        'video/webm': '.webm',
+        'video/quicktime': '.mov'
+    };
+    return map[mimeType] || '.bin';
+}
+
 let scale = 1, offsetX = 0, offsetY = 0;
 let isPanning = false, startX = 0, startY = 0;
 let isSpacePressed = false, isSpacePanning = false;
@@ -209,8 +427,14 @@ async function loadCanvases() {
         renderCanvasList();
     } catch (e) { console.error(e); }
 }
-function saveCanvasesList() { localStorage.setItem(CANVASES_KEY, JSON.stringify(canvases)); }
-function saveCurrentCanvas() {
+function saveCanvasesList() {
+    localStorage.setItem(CANVASES_KEY, JSON.stringify(canvases));
+    // Also save to file system if connected
+    if (fsDirectoryHandle) {
+        saveCanvasesListToFileSystem();
+    }
+}
+async function saveCurrentCanvas() {
     if (!currentCanvasId) return;
     const data = {
         items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, fontSize: i.fontSize, locked: i.locked, z: parseInt(i.el.style.zIndex) })),
@@ -218,20 +442,44 @@ function saveCurrentCanvas() {
         view: { scale, offsetX, offsetY }, itemId, highestZ
     };
     try {
+        // Always save to localStorage as fallback
         localStorage.setItem('knotpad-data-' + currentCanvasId, JSON.stringify(data));
+        // Save to file system if connected
+        if (fsDirectoryHandle) {
+            await saveCanvasToFileSystem(currentCanvasId, data);
+        }
         const c = canvases.find(x => x.id === currentCanvasId);
         if (c) { c.updatedAt = Date.now(); c.itemCount = items.length; saveCanvasesList(); renderCanvasList(); }
     } catch (e) { showToast('Save failed', 'error'); }
 }
 async function loadCanvasData(id) {
     try {
-        const saved = localStorage.getItem('knotpad-data-' + id);
-        if (!saved) return;
-        const data = JSON.parse(saved);
+        // Try loading from file system first, then fallback to localStorage
+        let data = null;
+        if (fsDirectoryHandle) {
+            data = await loadCanvasFromFileSystem(id);
+        }
+        if (!data) {
+            const saved = localStorage.getItem('knotpad-data-' + id);
+            if (!saved) return;
+            data = JSON.parse(saved);
+        }
         itemId = data.itemId || 0; highestZ = data.highestZ || 1;
         if (data.view) { scale = data.view.scale; offsetX = data.view.offsetX; offsetY = data.view.offsetY; updateTransform(); }
         const mediaItems = data.items.filter(d => (d.type === 'image' || d.type === 'video') && d.content?.startsWith('media_'));
-        for (const d of mediaItems) { if (!blobURLCache.has(d.content)) { const blob = await loadMedia(d.content); if (blob) blobURLCache.set(d.content, URL.createObjectURL(blob)); } }
+        for (const d of mediaItems) {
+            if (!blobURLCache.has(d.content)) {
+                // Try file system first, then IndexedDB
+                let blob = null;
+                if (fsDirectoryHandle) {
+                    blob = await loadMediaFromFileSystem(d.content);
+                }
+                if (!blob) {
+                    blob = await loadMedia(d.content);
+                }
+                if (blob) blobURLCache.set(d.content, URL.createObjectURL(blob));
+            }
+        }
         const map = {};
         data.items.forEach(d => { const i = createItem(d, true); i.el.style.zIndex = d.z || 1; i.locked = d.locked; if (i.locked) i.el.classList.add('locked'); map[d.id] = i; });
         data.connections.forEach(d => { if (map[d.from] && map[d.to]) { const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true); c.dir = d.dir || 'none'; updateConnectionArrow(c); } });
@@ -271,6 +519,10 @@ async function deleteCanvas(id) {
     if (idx > -1) {
         canvases.splice(idx, 1);
         localStorage.removeItem('knotpad-data-' + id);
+        // Also delete from file system
+        if (fsDirectoryHandle) {
+            await deleteCanvasFromFileSystem(id);
+        }
         saveCanvasesList();
         if (currentCanvasId === id) await switchCanvas(canvases[0].id);
         else renderCanvasList();
@@ -724,7 +976,15 @@ function deselectAll() {
 function deleteSelectedItems() { if (!selectedItems.size) return; saveState(); selectedItems.forEach(item => deleteItem(item, false)); selectedItems.clear(); throttledMinimap(); triggerAutoSave(); }
 function deleteItem(item, update = true) {
     connections.filter(c => c.from === item || c.to === item).forEach(c => deleteConnection(c, false));
-    if ((item.type === 'image' || item.type === 'video') && item.content?.startsWith('media_')) { deleteMedia(item.content); const url = blobURLCache.get(item.content); if (url) { URL.revokeObjectURL(url); blobURLCache.delete(item.content); } }
+    if ((item.type === 'image' || item.type === 'video') && item.content?.startsWith('media_')) {
+        deleteMedia(item.content);
+        // Also delete from file system
+        if (fsDirectoryHandle) {
+            deleteMediaFromFileSystem(item.content);
+        }
+        const url = blobURLCache.get(item.content);
+        if (url) { URL.revokeObjectURL(url); blobURLCache.delete(item.content); }
+    }
     const i = items.indexOf(item); if (i > -1) { items.splice(i, 1); item.el.remove(); }
     if (update) { saveState(); throttledMinimap(); triggerAutoSave(); }
 }
@@ -912,16 +1172,40 @@ $('linkSubmit').addEventListener('click', () => {
     if (url) { if (!url.startsWith('http')) url = 'https://' + url; const x = (innerWidth / 2 - offsetX) / scale - 130, y = (innerHeight / 2 - offsetY) / scale - 50; addLink(url, $('linkTitle').value.trim(), x, y); saveState(); closeLinkModal(); }
 });
 
-// Export directly
+// Export with save dialog
 $('exportBtn').addEventListener('click', async () => {
+    const canvasName = canvases.find(c => c.id === currentCanvasId)?.name || 'canvas';
     const data = {
         items: items.map(i => ({ id: i.id, type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, content: i.content, color: i.color, fontSize: i.fontSize, locked: i.locked })),
         connections: connections.map(c => ({ from: c.from.id, fh: c.fh, to: c.to.id, th: c.th, dir: c.dir })),
-        name: canvases.find(c => c.id === currentCanvasId)?.name || 'canvas'
+        name: canvasName
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+    // Use File System Access API if available
+    if ('showSaveFilePicker' in window) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: `${canvasName}.json`,
+                types: [{
+                    description: 'JSON Files',
+                    accept: { 'application/json': ['.json'] }
+                }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            showToast('Exported');
+            return;
+        } catch (e) {
+            if (e.name === 'AbortError') return; // User cancelled
+            console.error('Save dialog failed, falling back:', e);
+        }
+    }
+
+    // Fallback for browsers without File System Access API
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${data.name}.json`; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `${canvasName}.json`; a.click();
     URL.revokeObjectURL(url);
     showToast('Exported');
 });
@@ -1005,12 +1289,22 @@ async function handleFile(file, x, y) {
             let w = img.width, h = img.height;
             if (w > 400) { h = 400 / w * h; w = 400; } if (h > 300) { w = 300 / h * w; h = 300; }
             URL.revokeObjectURL(url);
-            await saveMedia(mediaId, file); blobURLCache.set(mediaId, URL.createObjectURL(file));
+            // Save to both IndexedDB and file system
+            await saveMedia(mediaId, file);
+            if (fsDirectoryHandle) {
+                await saveMediaToFileSystem(mediaId, file);
+            }
+            blobURLCache.set(mediaId, URL.createObjectURL(file));
             createItem({ type: 'image', x, y, w, h, content: mediaId }); saveState(); triggerAutoSave();
         };
         img.src = url;
     } else if (file.type.startsWith('video/')) {
-        await saveMedia(mediaId, file); blobURLCache.set(mediaId, URL.createObjectURL(file));
+        // Save to both IndexedDB and file system
+        await saveMedia(mediaId, file);
+        if (fsDirectoryHandle) {
+            await saveMediaToFileSystem(mediaId, file);
+        }
+        blobURLCache.set(mediaId, URL.createObjectURL(file));
         createItem({ type: 'video', x, y, w: 400, h: 225, content: mediaId }); saveState(); triggerAutoSave();
     }
 }
@@ -1082,10 +1376,63 @@ function updateMinimap() {
     minimapContent.innerHTML = html;
 }
 
+// Storage Modal
+const storageModal = $('storageModal');
+function openStorageModal() {
+    if (storageModal) {
+        updateStorageModalState();
+        storageModal.classList.add('active');
+    }
+}
+function closeStorageModal() {
+    if (storageModal) storageModal.classList.remove('active');
+}
+function updateStorageModalState() {
+    const connected = !!fsDirectoryHandle;
+    const connectBtn = $('storageConnectBtn');
+    const disconnectBtn = $('storageDisconnectBtn');
+    const statusEl = $('storageModalStatus');
+    if (connectBtn) connectBtn.style.display = connected ? 'none' : 'block';
+    if (disconnectBtn) disconnectBtn.style.display = connected ? 'block' : 'none';
+    if (statusEl) {
+        statusEl.innerHTML = connected
+            ? '<span class="storage-status-dot connected"></span> File storage connected'
+            : '<span class="storage-status-dot"></span> Using browser storage (data may be lost if browser data is cleared)';
+    }
+}
+
+// Storage indicator and modal events
+const storageIndicator = $('storageIndicator');
+if (storageIndicator) {
+    storageIndicator.addEventListener('click', openStorageModal);
+}
+if (storageModal) {
+    storageModal.addEventListener('click', e => { if (e.target === storageModal) closeStorageModal(); });
+    const closeBtn = storageModal.querySelector('[data-close]');
+    if (closeBtn) closeBtn.addEventListener('click', closeStorageModal);
+}
+const connectBtn = $('storageConnectBtn');
+const disconnectBtn = $('storageDisconnectBtn');
+if (connectBtn) {
+    connectBtn.addEventListener('click', async () => {
+        const success = await selectStorageFolder();
+        if (success) {
+            updateStorageModalState();
+        }
+    });
+}
+if (disconnectBtn) {
+    disconnectBtn.addEventListener('click', async () => {
+        await disconnectStorageFolder();
+        updateStorageModalState();
+    });
+}
+
 // Init
 loadTheme();
 updateTransform();
 updateUndoRedoButtons();
+updateStorageIndicator(localStorage.getItem(FS_STORAGE_KEY) === 'true');
 initMediaDB().then(() => loadCanvases()).catch(e => { console.error(e); loadCanvases(); });
 
 // Register Service Worker
