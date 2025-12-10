@@ -214,16 +214,48 @@
             <div class="settings-content">
                 <!-- Storage Tab -->
                 <div class="settings-panel active" data-panel="storage">
-                    <div class="settings-section">
-                        <h4>Storage Location</h4>
-                        <div class="storage-modal-status" id="storageModalStatus">
-                            <span class="storage-status-dot"></span> Using browser storage
+                    <div class="storage-cards">
+                        <div class="storage-card active" id="browserStorageCard" data-storage="browser">
+                            <div class="storage-card-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                                </svg>
+                            </div>
+                            <div class="storage-card-content">
+                                <div class="storage-card-title">Browser Storage</div>
+                                <div class="storage-card-desc">Data stored in browser's local storage</div>
+                            </div>
                         </div>
-                        <div class="storage-modal-info">
-                            <p><strong>Browser Storage:</strong> Data is stored in your browser's local storage. This data may be lost if you clear browser data.</p>
-                            <p><strong>File Storage:</strong> Data is saved as files in a folder you choose on your computer. More reliable and persistent.</p>
+                        <div class="storage-card" id="fileStorageCard" data-storage="file">
+                            <div class="storage-card-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                                </svg>
+                            </div>
+                            <div class="storage-card-content">
+                                <div class="storage-card-title">File Storage</div>
+                                <div class="storage-card-desc">Save files to your computer</div>
+                                <div class="storage-card-badge disconnected" id="fileStorageBadge">Not Connected</div>
+                            </div>
                         </div>
-                        <div class="storage-modal-actions">
+                    </div>
+
+                    <div class="storage-path-section" id="storagePathSection">
+                        <div class="storage-path-header">
+                            <span class="storage-path-label">Storage Folder</span>
+                            <div class="storage-path-status" id="storagePathStatus">
+                                <span class="status-dot"></span>
+                                <span>Not connected</span>
+                            </div>
+                        </div>
+                        <div class="storage-path-display" id="storagePathDisplay">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                            </svg>
+                            <span>No folder selected</span>
+                        </div>
+                        <div class="storage-path-actions">
                             <button class="modal-btn modal-btn-submit" id="storageConnectBtn">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
                                 Select Folder
@@ -233,11 +265,19 @@
                                 Disconnect
                             </button>
                         </div>
-                        <p class="storage-modal-note">Note: File System Access API is only supported in Chrome, Edge, and Opera.</p>
                     </div>
-                    <div class="settings-section">
+
+                    <div class="storage-info-note">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 16v-4M12 8h.01"/>
+                        </svg>
+                        <p>File Storage requires Chrome, Edge, or Opera. Data is saved directly to your chosen folder, making it more reliable and portable.</p>
+                    </div>
+
+                    <div class="storage-export-section">
                         <h4>Export All Data</h4>
-                        <p class="settings-description">Export all canvases as a single JSON file for backup or transfer.</p>
+                        <p class="settings-description">Export all canvases as a single JSON file for backup.</p>
                         <button class="modal-btn modal-btn-submit" id="exportAllBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
                             Export All Canvases
@@ -276,7 +316,7 @@
 
                 <!-- Shortcuts Tab -->
                 <div class="settings-panel" data-panel="shortcuts">
-                    <div class="settings-section shortcuts-section">
+                    <div class="settings-section shortcuts-section flex-grow">
                         <h4>Keyboard Shortcuts</h4>
                         <div class="shortcuts-list">
                             <div class="shortcut-item">

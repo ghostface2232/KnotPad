@@ -762,14 +762,56 @@ function updateStorageModalState() {
     const connected = !!fsDirectoryHandle;
     const connectBtn = $('storageConnectBtn');
     const disconnectBtn = $('storageDisconnectBtn');
-    const statusEl = $('storageModalStatus');
+    const browserCard = $('browserStorageCard');
+    const fileCard = $('fileStorageCard');
+    const pathSection = $('storagePathSection');
+    const pathStatus = $('storagePathStatus');
+    const pathDisplay = $('storagePathDisplay');
+    const fileStorageBadge = $('fileStorageBadge');
 
+    // Update cards active state
+    if (browserCard && fileCard) {
+        if (connected) {
+            browserCard.classList.remove('active');
+            fileCard.classList.add('active');
+        } else {
+            browserCard.classList.add('active');
+            fileCard.classList.remove('active');
+        }
+    }
+
+    // Show/hide path section
+    if (pathSection) {
+        pathSection.classList.toggle('active', fileCard?.classList.contains('active'));
+    }
+
+    // Update connect/disconnect buttons
     if (connectBtn) connectBtn.style.display = connected ? 'none' : 'flex';
     if (disconnectBtn) disconnectBtn.style.display = connected ? 'flex' : 'none';
-    if (statusEl) {
-        statusEl.innerHTML = connected
-            ? '<span class="storage-status-dot connected"></span> File storage connected'
-            : '<span class="storage-status-dot"></span> Using browser storage';
+
+    // Update path status
+    if (pathStatus) {
+        pathStatus.classList.toggle('connected', connected);
+        pathStatus.innerHTML = connected
+            ? '<span class="status-dot"></span><span>Connected</span>'
+            : '<span class="status-dot"></span><span>Not connected</span>';
+    }
+
+    // Update path display
+    if (pathDisplay) {
+        const folderName = fsDirectoryHandle?.name || 'No folder selected';
+        pathDisplay.querySelector('span').textContent = connected ? folderName : 'No folder selected';
+    }
+
+    // Update badge
+    if (fileStorageBadge) {
+        if (connected) {
+            fileStorageBadge.textContent = 'Connected';
+            fileStorageBadge.classList.remove('disconnected');
+        } else {
+            fileStorageBadge.textContent = 'Not Connected';
+            fileStorageBadge.classList.add('disconnected');
+        }
     }
 }
 
@@ -809,6 +851,31 @@ export function setupSettingsModal() {
                 const panel = settingsModal.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`);
                 if (panel) panel.classList.add('active');
             });
+        });
+    }
+
+    // Storage card selection
+    const browserCard = $('browserStorageCard');
+    const fileCard = $('fileStorageCard');
+    const pathSection = $('storagePathSection');
+
+    if (browserCard) {
+        browserCard.addEventListener('click', async () => {
+            if (fsDirectoryHandle) {
+                await disconnectStorageFolder();
+                updateStorageModalState();
+            }
+            browserCard.classList.add('active');
+            fileCard?.classList.remove('active');
+            pathSection?.classList.remove('active');
+        });
+    }
+
+    if (fileCard) {
+        fileCard.addEventListener('click', () => {
+            browserCard?.classList.remove('active');
+            fileCard.classList.add('active');
+            pathSection?.classList.add('active');
         });
     }
 
