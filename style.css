@@ -275,7 +275,7 @@ input, textarea, button { font-family: inherit; }
 .filter-dropdown, .color-dropdown {
     position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm); padding: 8px;
+    border-radius: 9999px; padding: 10px 14px;
     display: none; gap: 6px; box-shadow: var(--shadow-md); z-index: 101;
 }
 .filter-dropdown.active, .color-dropdown.active { display: flex; }
@@ -349,11 +349,11 @@ input, textarea, button { font-family: inherit; }
 .modal-btn-submit:hover { filter: brightness(1.1); }
 
 .search-bar {
-    position: fixed; top: 68px; left: 50%;
+    position: fixed; top: 80px; left: 50%;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md); padding: 8px 16px;
+    border-radius: 9999px; padding: 10px 20px;
     display: flex; align-items: center; gap: 12px;
-    box-shadow: var(--shadow-lg); z-index: 150; min-width: 320px;
+    box-shadow: var(--shadow-lg); z-index: 150; min-width: 340px;
     opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.98);
     pointer-events: none; visibility: hidden;
     transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
@@ -371,12 +371,12 @@ input, textarea, button { font-family: inherit; }
 .search-nav span { font-size: 12px; color: var(--text-secondary); min-width: 50px; text-align: center; }
 .search-nav button {
     width: 28px; height: 28px; border: none; background: var(--bg-card);
-    color: var(--text-secondary); border-radius: 4px; cursor: pointer;
+    color: var(--text-secondary); border-radius: 50%; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
 }
 .search-nav button:hover { background: var(--bg-hover); color: var(--text-primary); }
-.search-close { width: 28px; height: 28px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.search-close:hover { color: var(--text-primary); }
+.search-close { width: 28px; height: 28px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.search-close:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 .minimap {
     position: fixed; bottom: 16px; right: 16px;
@@ -412,10 +412,11 @@ input, textarea, button { font-family: inherit; }
 .sidebar.open { transform: translateX(0); }
 .sidebar-toggle {
     position: fixed; top: 16px; left: 16px;
-    width: 40px; height: 40px;
+    width: 48px; height: 48px;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm); color: var(--text-secondary);
+    border-radius: var(--radius-md); color: var(--text-secondary);
     cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 201;
+    box-shadow: var(--shadow-md);
 }
 .sidebar-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
 .sidebar.open ~ .sidebar-toggle { left: 256px; }

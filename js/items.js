@@ -315,17 +315,21 @@ export function autoResizeItem(item) {
 
     let extraH;
     if (item.type === 'note') {
-        const baseTitleH = Math.round(24 * fontMultiplier);
-        extraH = baseTitleH + 6 + 28 + 5;
+        // Note layout: padding(14*2=28) + gap(6) + title input height
+        // Measure actual title input height for accuracy
+        const titleEl = item.el.querySelector('.note-title');
+        const titleH = titleEl ? titleEl.offsetHeight : Math.round(20 * fontMultiplier);
+        extraH = 28 + 6 + titleH;
     } else {
-        extraH = 24 + 5;
+        // Memo layout: padding(12*2=24)
+        extraH = 24;
     }
 
     const minH = Math.round((item.type === 'note' ? 100 : 80) * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
     const newH = Math.min(Math.max(scrollH + extraH, minH), maxH);
 
-    if (Math.abs(newH - item.h) > 8) {
+    if (Math.abs(newH - item.h) > 4) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
         updateAllConnectionsFn();
