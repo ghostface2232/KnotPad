@@ -10,6 +10,15 @@ const zoomDisplay = $('zoomDisplay');
 export function updateTransform() {
     canvas.style.transform = `translate(${state.offsetX}px,${state.offsetY}px) scale(${state.scale})`;
     zoomDisplay.textContent = Math.round(state.scale * 100) + '%';
+
+    // Set CSS variable for counter-scaling hover UI elements when zoomed out
+    // This ensures minimum usability at low zoom levels
+    const minScale = 0.5; // Below this scale, apply counter-scaling
+    const counterScale = state.scale < minScale ? minScale / state.scale : 1;
+    document.documentElement.style.setProperty('--counter-scale', counterScale);
+
+    // Toggle low-zoom class for CSS targeting
+    canvas.classList.toggle('low-zoom', state.scale < minScale);
 }
 
 // Set zoom level with optional center point and animation
