@@ -85,7 +85,7 @@ export function createItem(cfg, loading = false) {
         ? `<button class="font-size-btn" title="Font Size"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>`
         : '';
 
-    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn">×</button>${fontSizeBtn}<button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
+    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn">×</button>${fontSizeBtn}<button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="2" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r="2" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
 
     canvas.appendChild(el);
 
@@ -426,17 +426,30 @@ export function duplicateItem(item) {
     triggerAutoSaveFn();
 }
 
+// Calculate default height based on font size for notes/memos
+function getDefaultHeight(type, fontSize) {
+    let fontMultiplier = 1;
+    if (fontSize === 'medium') fontMultiplier = 1.1;
+    else if (fontSize === 'large') fontMultiplier = 1.25;
+    else if (fontSize === 'xlarge') fontMultiplier = 1.4;
+
+    // Base minimum height that fits one line of text without shrinking
+    const baseHeight = type === 'note' ? 100 : 80;
+    return Math.round(baseHeight * fontMultiplier);
+}
+
 // Add note
 export function addNote(title = '', body = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
     // Apply default font size setting
     const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
+    const defaultH = getDefaultHeight('note', fontSize);
     const item = createItem({
         type: 'note',
         x: pos.x,
         y: pos.y,
         w: 220,
-        h: 140,
+        h: defaultH,
         content: { title, body },
         color,
         fontSize
@@ -450,12 +463,13 @@ export function addMemo(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
     // Apply default font size setting
     const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
+    const defaultH = getDefaultHeight('memo', fontSize);
     const item = createItem({
         type: 'memo',
         x: pos.x,
         y: pos.y,
         w: 180,
-        h: 100,
+        h: defaultH,
         content: text,
         color,
         fontSize
