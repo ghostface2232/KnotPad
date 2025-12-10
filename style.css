@@ -128,7 +128,7 @@ input, textarea, button { font-family: inherit; }
     position: absolute; top: 18px; right: 18px;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm); padding: 6px;
-    display: none; gap: 4px; flex-wrap: wrap; width: 76px;
+    display: none; gap: 4px; flex-wrap: wrap; width: 56px;
     box-shadow: var(--shadow-md); z-index: 100;
     transform: scale(var(--counter-scale, 1));
     transform-origin: top right;
