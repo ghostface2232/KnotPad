@@ -815,6 +815,13 @@ function updateStorageModalState() {
     }
 }
 
+function updateFontSizePreview(size) {
+    const previewText = $('previewText');
+    if (previewText) {
+        previewText.className = 'preview-text size-' + size;
+    }
+}
+
 function updateSettingsUI() {
     // Update font size buttons
     const fontSizeGroup = $('defaultFontSize');
@@ -823,6 +830,9 @@ function updateSettingsUI() {
             btn.classList.toggle('active', btn.dataset.value === state.defaultFontSize);
         });
     }
+
+    // Update font size preview
+    updateFontSizePreview(state.defaultFontSize);
 
     // Update invert wheel zoom toggle
     const invertWheelZoomCheckbox = $('invertWheelZoom');
@@ -913,6 +923,7 @@ export function setupSettingsModal() {
                 fontSizeGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 state.setDefaultFontSize(btn.dataset.value);
+                updateFontSizePreview(btn.dataset.value);
             });
         });
     }
