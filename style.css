@@ -610,7 +610,7 @@ input, textarea, button { font-family: inherit; }
     gap: 10px;
     padding: 10px 12px;
     background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
+    border: 1px solid transparent;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     cursor: pointer;
@@ -707,6 +707,8 @@ input, textarea, button { font-family: inherit; }
     overflow-y: auto;
     padding: 24px;
 }
+.settings-content::-webkit-scrollbar { width: 4px; }
+.settings-content::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
 .settings-panel {
     display: none;
     height: 100%;
@@ -832,6 +834,8 @@ input, textarea, button { font-family: inherit; }
     flex: 1;
     overflow-y: auto;
 }
+.shortcuts-list::-webkit-scrollbar { width: 4px; }
+.shortcuts-list::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
 .shortcut-item {
     display: flex;
     align-items: center;
