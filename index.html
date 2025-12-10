@@ -29,6 +29,12 @@
             </div>
         </div>
         <div class="canvas-list" id="canvasList"></div>
+        <div class="sidebar-footer">
+            <button class="sidebar-settings-btn" id="settingsBtn" title="Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                <span>Settings</span>
+            </button>
+        </div>
         <div class="canvas-icon-picker" id="canvasIconPicker">
             <div class="icon-opt none" data-icon="" title="Text">Aa</div>
             <div class="icon-opt" data-icon="canvas" title="Canvas"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h6"/></svg></div>
@@ -166,11 +172,6 @@
             <button class="topbar-btn" id="importBtn" title="Import"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M12 15l-4-4M12 15l4-4"/><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/></svg></button>
             <button class="topbar-btn" id="exportBtn" title="Export"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17V5M12 5l-4 4M12 5l4 4"/><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/></svg></button>
             <div class="topbar-sep"></div>
-            <button class="topbar-btn storage-indicator" id="storageIndicator" title="Storage settings">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                <span class="storage-status-text" id="storageStatusText">Browser Storage</span>
-            </button>
-            <div class="topbar-sep"></div>
             <button class="topbar-btn" id="themeToggle" title="Theme">
                 <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
                 <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
@@ -184,31 +185,155 @@
     <div class="minimap" id="minimap"><div class="minimap-content" id="minimapContent"></div></div>
     <div class="toast" id="toast"></div>
 
-    <div class="modal" id="storageModal">
-        <div class="modal-box storage-modal-box">
-            <h3>Storage Settings</h3>
-            <div class="storage-modal-content">
-                <div class="storage-modal-status" id="storageModalStatus">
-                    <span class="storage-status-dot"></span> Using browser storage
-                </div>
-                <div class="storage-modal-info">
-                    <p><strong>Browser Storage:</strong> Data is stored in your browser's local storage. This data may be lost if you clear browser data or cookies.</p>
-                    <p><strong>File Storage:</strong> Data is saved as files in a folder you choose on your computer. This is more reliable and persistent.</p>
-                </div>
-                <div class="storage-modal-actions">
-                    <button class="modal-btn modal-btn-submit" id="storageConnectBtn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                        Select Folder
-                    </button>
-                    <button class="modal-btn modal-btn-danger" id="storageDisconnectBtn" style="display:none">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                        Disconnect
-                    </button>
-                </div>
-                <p class="storage-modal-note">Note: File System Access API is only supported in Chrome, Edge, and Opera. Other browsers will use browser storage.</p>
+    <div class="modal" id="settingsModal">
+        <div class="modal-box settings-modal-box">
+            <div class="settings-header">
+                <h3>Settings</h3>
+                <button class="settings-close-btn" data-close>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
             </div>
-            <div class="modal-actions">
-                <button class="modal-btn modal-btn-cancel" data-close>Close</button>
+            <div class="settings-tabs">
+                <button class="settings-tab active" data-tab="storage">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    Storage
+                </button>
+                <button class="settings-tab" data-tab="nodeStyle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+                    Node Style
+                </button>
+                <button class="settings-tab" data-tab="controls">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                    Controls
+                </button>
+                <button class="settings-tab" data-tab="shortcuts">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h12"/></svg>
+                    Shortcuts
+                </button>
+            </div>
+            <div class="settings-content">
+                <!-- Storage Tab -->
+                <div class="settings-panel active" data-panel="storage">
+                    <div class="settings-section">
+                        <h4>Storage Location</h4>
+                        <div class="storage-modal-status" id="storageModalStatus">
+                            <span class="storage-status-dot"></span> Using browser storage
+                        </div>
+                        <div class="storage-modal-info">
+                            <p><strong>Browser Storage:</strong> Data is stored in your browser's local storage. This data may be lost if you clear browser data.</p>
+                            <p><strong>File Storage:</strong> Data is saved as files in a folder you choose on your computer. More reliable and persistent.</p>
+                        </div>
+                        <div class="storage-modal-actions">
+                            <button class="modal-btn modal-btn-submit" id="storageConnectBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                                Select Folder
+                            </button>
+                            <button class="modal-btn modal-btn-danger" id="storageDisconnectBtn" style="display:none">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                Disconnect
+                            </button>
+                        </div>
+                        <p class="storage-modal-note">Note: File System Access API is only supported in Chrome, Edge, and Opera.</p>
+                    </div>
+                    <div class="settings-section">
+                        <h4>Export All Data</h4>
+                        <p class="settings-description">Export all canvases as a single JSON file for backup or transfer.</p>
+                        <button class="modal-btn modal-btn-submit" id="exportAllBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                            Export All Canvases
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Node Style Tab -->
+                <div class="settings-panel" data-panel="nodeStyle">
+                    <div class="settings-section">
+                        <h4>Default Font Size</h4>
+                        <p class="settings-description">Set the default font size for new notes and memos.</p>
+                        <div class="settings-option-group" id="defaultFontSize">
+                            <button class="settings-option-btn active" data-value="small">Small</button>
+                            <button class="settings-option-btn" data-value="medium">Medium</button>
+                            <button class="settings-option-btn" data-value="large">Large</button>
+                            <button class="settings-option-btn" data-value="xlarge">X-Large</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls Tab -->
+                <div class="settings-panel" data-panel="controls">
+                    <div class="settings-section">
+                        <h4>Wheel Zoom Direction</h4>
+                        <p class="settings-description">Invert the zoom direction when using the mouse wheel.</p>
+                        <div class="settings-toggle-row">
+                            <span>Invert wheel zoom</span>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="invertWheelZoom">
+                                <span class="settings-toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shortcuts Tab -->
+                <div class="settings-panel" data-panel="shortcuts">
+                    <div class="settings-section shortcuts-section">
+                        <h4>Keyboard Shortcuts</h4>
+                        <div class="shortcuts-list">
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></span>
+                                <span class="shortcut-desc">Undo</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Y</kbd></span>
+                                <span class="shortcut-desc">Redo</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>F</kbd></span>
+                                <span class="shortcut-desc">Search nodes</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>S</kbd></span>
+                                <span class="shortcut-desc">Save (auto-saved)</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Delete</kbd> / <kbd>Backspace</kbd></span>
+                                <span class="shortcut-desc">Delete selected items</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Escape</kbd></span>
+                                <span class="shortcut-desc">Deselect / Cancel action</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Space</kbd> + <kbd>Drag</kbd></span>
+                                <span class="shortcut-desc">Pan canvas</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Middle Click</kbd> + <kbd>Drag</kbd></span>
+                                <span class="shortcut-desc">Pan canvas</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Scroll Wheel</kbd></span>
+                                <span class="shortcut-desc">Zoom in/out</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Double Click</kbd></span>
+                                <span class="shortcut-desc">Create new node</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Shift</kbd> + <kbd>Click</kbd></span>
+                                <span class="shortcut-desc">Add to selection</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Click</kbd> + <kbd>Drag</kbd> (on canvas)</span>
+                                <span class="shortcut-desc">Box select</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Right Click</kbd></span>
+                                <span class="shortcut-desc">Context menu</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

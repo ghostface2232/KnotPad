@@ -29,7 +29,7 @@ const searchBar = $('searchBar');
 const searchInput = $('searchInput');
 const minimapContent = $('minimapContent');
 const linkModal = $('linkModal');
-const storageModal = $('storageModal');
+const settingsModal = $('settingsModal');
 const contextMenu = $('contextMenu');
 const childTypePicker = $('childTypePicker');
 const newNodePicker = $('newNodePicker');
@@ -744,17 +744,18 @@ export function setupLinkModal() {
     });
 }
 
-// ============ Storage Modal ============
+// ============ Settings Modal ============
 
-export function openStorageModal() {
-    if (storageModal) {
+export function openSettingsModal() {
+    if (settingsModal) {
         updateStorageModalState();
-        storageModal.classList.add('active');
+        updateSettingsUI();
+        settingsModal.classList.add('active');
     }
 }
 
-export function closeStorageModal() {
-    if (storageModal) storageModal.classList.remove('active');
+export function closeSettingsModal() {
+    if (settingsModal) settingsModal.classList.remove('active');
 }
 
 function updateStorageModalState() {
@@ -763,27 +764,55 @@ function updateStorageModalState() {
     const disconnectBtn = $('storageDisconnectBtn');
     const statusEl = $('storageModalStatus');
 
-    if (connectBtn) connectBtn.style.display = connected ? 'none' : 'block';
-    if (disconnectBtn) disconnectBtn.style.display = connected ? 'block' : 'none';
+    if (connectBtn) connectBtn.style.display = connected ? 'none' : 'flex';
+    if (disconnectBtn) disconnectBtn.style.display = connected ? 'flex' : 'none';
     if (statusEl) {
         statusEl.innerHTML = connected
             ? '<span class="storage-status-dot connected"></span> File storage connected'
-            : '<span class="storage-status-dot"></span> Using browser storage (data may be lost if browser data is cleared)';
+            : '<span class="storage-status-dot"></span> Using browser storage';
     }
 }
 
-export function setupStorageModal() {
-    const storageIndicator = $('storageIndicator');
-    if (storageIndicator) {
-        storageIndicator.addEventListener('click', openStorageModal);
+function updateSettingsUI() {
+    // Update font size buttons
+    const fontSizeGroup = $('defaultFontSize');
+    if (fontSizeGroup) {
+        fontSizeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === state.defaultFontSize);
+        });
     }
 
-    if (storageModal) {
-        storageModal.addEventListener('click', e => { if (e.target === storageModal) closeStorageModal(); });
-        const closeBtn = storageModal.querySelector('[data-close]');
-        if (closeBtn) closeBtn.addEventListener('click', closeStorageModal);
+    // Update invert wheel zoom toggle
+    const invertWheelZoomCheckbox = $('invertWheelZoom');
+    if (invertWheelZoomCheckbox) {
+        invertWheelZoomCheckbox.checked = state.invertWheelZoom;
+    }
+}
+
+export function setupSettingsModal() {
+    const settingsBtn = $('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', openSettingsModal);
     }
 
+    if (settingsModal) {
+        settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettingsModal(); });
+        const closeBtn = settingsModal.querySelector('[data-close]');
+        if (closeBtn) closeBtn.addEventListener('click', closeSettingsModal);
+
+        // Tab switching
+        settingsModal.querySelectorAll('.settings-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                settingsModal.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+                settingsModal.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                const panel = settingsModal.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`);
+                if (panel) panel.classList.add('active');
+            });
+        });
+    }
+
+    // Storage buttons
     const connectBtn = $('storageConnectBtn');
     const disconnectBtn = $('storageDisconnectBtn');
 
@@ -801,6 +830,66 @@ export function setupStorageModal() {
             await disconnectStorageFolder();
             updateStorageModalState();
         });
+    }
+
+    // Export all canvases
+    const exportAllBtn = $('exportAllBtn');
+    if (exportAllBtn) {
+        exportAllBtn.addEventListener('click', exportAllCanvases);
+    }
+
+    // Default font size
+    const fontSizeGroup = $('defaultFontSize');
+    if (fontSizeGroup) {
+        fontSizeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                fontSizeGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.setDefaultFontSize(btn.dataset.value);
+            });
+        });
+    }
+
+    // Invert wheel zoom
+    const invertWheelZoomCheckbox = $('invertWheelZoom');
+    if (invertWheelZoomCheckbox) {
+        invertWheelZoomCheckbox.addEventListener('change', () => {
+            state.setInvertWheelZoom(invertWheelZoomCheckbox.checked);
+        });
+    }
+}
+
+async function exportAllCanvases() {
+    try {
+        // Save current canvas first
+        await saveCurrentCanvas();
+
+        const allData = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            canvases: state.canvases.map(c => ({ ...c })),
+            data: {}
+        };
+
+        // Collect all canvas data
+        for (const canvas of state.canvases) {
+            const savedData = localStorage.getItem('knotpad-data-' + canvas.id);
+            if (savedData) {
+                allData.data[canvas.id] = JSON.parse(savedData);
+            }
+        }
+
+        const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `knotpad-all-canvases-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('All canvases exported successfully');
+    } catch (e) {
+        console.error('Export failed:', e);
+        showToast('Export failed', 'error');
     }
 }
 
