@@ -99,6 +99,18 @@ export function setExternalFunctions({
 
 // Create an item on the canvas
 export function createItem(cfg, loading = false) {
+    // Migrate legacy 'note' type to 'memo'
+    if (cfg.type === 'note') {
+        cfg.type = 'memo';
+        // Convert note content {title, body} to memo content (string)
+        // Title becomes a markdown heading
+        if (cfg.content && typeof cfg.content === 'object') {
+            const title = cfg.content.title || '';
+            const body = cfg.content.body || '';
+            cfg.content = title ? ('# ' + title + '\n' + body).trim() : body;
+        }
+    }
+
     const el = document.createElement('div');
     el.className = 'canvas-item' + (loading ? '' : ' new');
     el.style.cssText = `left:${cfg.x}px;top:${cfg.y}px;width:${cfg.w}px;height:${cfg.h}px;z-index:${state.incrementHighestZ()}`;
