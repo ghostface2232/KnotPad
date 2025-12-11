@@ -253,12 +253,12 @@ export function setupKeyboardEvents() {
             closeSearch();
             deselectAll();
         }
-        if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input,textarea')) {
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input,textarea,[contenteditable="true"]')) {
             if (state.selectedItems.size > 0) deleteSelectedItems();
             else if (state.selectedConn) deleteConnection(state.selectedConn);
         }
         // Space for pan mode
-        if (e.code === 'Space' && !e.target.matches('input,textarea') && !state.isSpacePressed) {
+        if (e.code === 'Space' && !e.target.matches('input,textarea,[contenteditable="true"]') && !state.isSpacePressed) {
             e.preventDefault();
             state.setIsSpacePressed(true);
             app.classList.add('space-pan-mode');

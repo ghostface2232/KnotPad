@@ -118,7 +118,7 @@ export function createItem(cfg, loading = false) {
             html = `<video class="item-video" src="${mediaSrc}" controls></video>`;
             break;
         case 'memo':
-            html = `<div class="item-memo"><div class="memo-body" contenteditable="true" data-placeholder="Write something...">${parseMarkdown(cfg.content || '')}</div><div class="memo-toolbar"><button class="md-btn" data-md="heading" title="Heading"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6v12M20 6v12M4 12h16"/></svg></button><button class="md-btn" data-md="bold" title="Bold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 110 8H6zM6 12h9a4 4 0 110 8H6z"/></svg></button><button class="md-btn" data-md="strike" title="Strikethrough"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.3 4.9c-1.2-1.2-3.1-1.9-5.3-1.9-3.3 0-6 1.8-6 4.5 0 1.3.7 2.5 1.8 3.4M3 12h18M6.7 19.1c1.2 1.2 3.1 1.9 5.3 1.9 3.3 0 6-1.8 6-4.5 0-1.1-.5-2.1-1.3-2.9"/></svg></button><button class="md-btn" data-md="underline" title="Underline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6a6 6 0 1012 0V4M4 20h16"/></svg></button></div></div>`;
+            html = `<div class="item-memo"><div class="memo-body" contenteditable="true" data-placeholder="Write something...">${parseMarkdown(cfg.content || '')}</div><div class="memo-toolbar"><button class="md-btn" data-md="heading" title="Heading"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h12M6 4v16M18 4v16"/></svg></button><button class="md-btn" data-md="bold" title="Bold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5h6a3.5 3.5 0 010 7H7z"/><path d="M7 12h7a3.5 3.5 0 010 7H7z"/><path d="M7 5v14"/></svg></button><button class="md-btn" data-md="strike" title="Strikethrough"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/><path d="M4 12h16"/></svg></button><button class="md-btn" data-md="underline" title="Underline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6a6 6 0 0012 0V4"/><path d="M4 20h16"/></svg></button></div></div>`;
             break;
         case 'link':
             html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`;
@@ -176,11 +176,13 @@ function setupItemEvents(item) {
 
     el.addEventListener('mousedown', e => {
         const t = e.target;
+        // Skip drag for interactive elements and contenteditable
         if (t.classList.contains('delete-btn') || t.classList.contains('resize-handle') ||
             t.classList.contains('connection-handle') || t.classList.contains('add-child-btn') ||
             t.classList.contains('color-btn') || t.classList.contains('font-size-btn') ||
             t.classList.contains('color-opt') || t.closest('.color-picker') ||
-            t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') {
+            t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
+            t.closest('[contenteditable="true"]') || t.classList.contains('memo-body')) {
             return;
         }
         if (item.locked) return;
@@ -462,7 +464,7 @@ export function setItemFontSize(item) {
     triggerAutoSaveFn();
 }
 
-// Auto-resize item based on content
+// Auto-resize item based on content (only grows, never shrinks)
 export function autoResizeItem(item) {
     if (item.type !== 'memo') return;
     const memoBody = item.el.querySelector('.memo-body');
@@ -476,14 +478,14 @@ export function autoResizeItem(item) {
     // Measure content height
     const scrollH = memoBody.scrollHeight;
 
-    // Memo layout: padding(12*2=24) + toolbar(32)
-    const extraH = 24 + 32;
+    // Memo layout: padding(12*2=24) + toolbar(~38) + buffer(3)
+    const extraH = 24 + 38 + 3;
 
-    const minH = Math.round(80 * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
-    const newH = Math.min(Math.max(scrollH + extraH, minH), maxH);
+    const newH = Math.min(scrollH + extraH, maxH);
 
-    if (Math.abs(newH - item.h) > 4) {
+    // Only grow, never shrink - prevents jitter when editing
+    if (newH > item.h) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
         updateAllConnectionsFn();
