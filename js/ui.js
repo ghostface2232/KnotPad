@@ -8,6 +8,7 @@ import { createItem, addNote, addMemo, addLink, setFilter, deleteSelectedItems, 
 import { addConnection, updateConnectionArrow, updateAllConnections } from './connections.js';
 import {
     fsDirectoryHandle,
+    isFileSystemSupported,
     saveCanvasesListToFileSystem,
     saveCanvasToFileSystem,
     loadCanvasFromFileSystem,
@@ -869,6 +870,14 @@ export function setupSettingsModal() {
     const fileCard = $('fileStorageCard');
     const pathSection = $('storagePathSection');
 
+    // Disable File Storage card if File System API is not supported
+    if (fileCard && !isFileSystemSupported()) {
+        fileCard.classList.add('disabled');
+        fileCard.title = 'File System API is not supported in this browser. Use Chrome, Edge, or Opera.';
+        const desc = fileCard.querySelector('.storage-card-desc');
+        if (desc) desc.textContent = 'Not supported in this browser';
+    }
+
     if (browserCard) {
         browserCard.addEventListener('click', async () => {
             if (fsDirectoryHandle) {
@@ -883,6 +892,8 @@ export function setupSettingsModal() {
 
     if (fileCard) {
         fileCard.addEventListener('click', () => {
+            // Don't allow selection if disabled (API not supported)
+            if (fileCard.classList.contains('disabled')) return;
             browserCard?.classList.remove('active');
             fileCard.classList.add('active');
             pathSection?.classList.add('active');
