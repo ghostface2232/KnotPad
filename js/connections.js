@@ -4,7 +4,7 @@ import { COLOR_MAP } from './constants.js';
 import { $, curvePath, getHandlePos } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap } from './viewport.js';
-import { addNote, addMemo, deselectAll } from './items.js';
+import { addMemo, deselectAll } from './items.js';
 
 const canvas = $('canvas');
 const connectionsSvg = $('connectionsSvg');
@@ -288,10 +288,10 @@ export function setupConnDirectionPicker() {
 }
 
 // Add child node connected to parent
-export function addChildNode(parent, dir, type = 'note') {
+export function addChildNode(parent, dir, type = 'memo') {
     const gap = 72;
-    const cw = type === 'note' ? 220 : 180;
-    const ch = type === 'note' ? 140 : 100;
+    const cw = 180;
+    const ch = 100;
     let x, y, fh, th;
 
     switch (dir) {
@@ -321,7 +321,7 @@ export function addChildNode(parent, dir, type = 'note') {
             break;
     }
 
-    const child = type === 'memo' ? addMemo('', x, y, parent.color) : addNote('', '', x, y, parent.color);
+    const child = addMemo('', x, y, parent.color);
     addConnection(parent, fh, child, th);
     saveStateFn();
     return child;
