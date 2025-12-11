@@ -32,8 +32,6 @@ const minimapContent = $('minimapContent');
 const linkModal = $('linkModal');
 const settingsModal = $('settingsModal');
 const contextMenu = $('contextMenu');
-const childTypePicker = $('childTypePicker');
-const newNodePicker = $('newNodePicker');
 
 // External function references
 let saveStateFn = () => {};
@@ -668,50 +666,27 @@ export function setupContextMenu() {
     });
 }
 
-// ============ Child Type Picker ============
+// ============ Child Type Picker (Direct Memo Creation) ============
 
 export function showChildTypePicker(parentItem, direction, e) {
-    state.setChildPickerData({ parent: parentItem, dir: direction });
-    childTypePicker.style.left = e.clientX + 'px';
-    childTypePicker.style.top = e.clientY + 'px';
-    childTypePicker.classList.add('active');
+    // Create memo directly without popup
+    addChildNodeFn(parentItem, direction, 'memo');
 }
 
 export function setupChildTypePicker() {
-    childTypePicker.querySelectorAll('button').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (!state.childPickerData) return;
-            addChildNodeFn(state.childPickerData.parent, state.childPickerData.dir, btn.dataset.type);
-            childTypePicker.classList.remove('active');
-            state.setChildPickerData(null);
-        });
-    });
+    // No longer needed - memo is created directly
 }
 
-// ============ New Node Picker ============
+// ============ New Node Picker (Direct Memo Creation) ============
 
 export function showNewNodePicker(clientX, clientY, canvasX, canvasY) {
-    state.setNewNodePickerData({ x: canvasX, y: canvasY });
-    newNodePicker.style.left = clientX + 'px';
-    newNodePicker.style.top = clientY + 'px';
-    newNodePicker.classList.add('active');
+    // Create memo directly without popup
+    addMemo('', canvasX, canvasY);
+    saveStateFn();
 }
 
 export function setupNewNodePicker() {
-    newNodePicker.querySelectorAll('button').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (!state.newNodePickerData) return;
-            const { x, y } = state.newNodePickerData;
-            if (btn.dataset.type === 'memo') {
-                addMemo('', x, y);
-                saveStateFn();
-            } else if (btn.dataset.type === 'link') {
-                openLinkModal();
-            }
-            newNodePicker.classList.remove('active');
-            state.setNewNodePickerData(null);
-        });
-    });
+    // No longer needed - memo is created directly
 }
 
 // ============ Link Modal ============

@@ -930,10 +930,7 @@ function hideMenus() {
     $('filterDropdown').classList.remove('active');
     $('colorDropdown').classList.remove('active');
     $('connDirectionPicker').classList.remove('active');
-    $('childTypePicker').classList.remove('active');
     $('canvasIconPicker').classList.remove('active');
-    $('newNodePicker').classList.remove('active');
-    state.setNewNodePickerData(null);
 }
 
 export { hideMenus };
@@ -1001,7 +998,7 @@ function getDefaultHeight(fontSize) {
     else if (fontSize === 'large') fontMultiplier = 1.25;
     else if (fontSize === 'xlarge') fontMultiplier = 1.4;
 
-    return Math.round(80 * fontMultiplier);
+    return Math.round(120 * fontMultiplier);
 }
 
 // Add memo
