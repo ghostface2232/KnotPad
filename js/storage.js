@@ -1,6 +1,6 @@
 // KnotPad - Storage Module (IndexedDB + File System API)
 
-import { DB_NAME, DB_VERSION, MEDIA_STORE, CANVASES_DIR, MEDIA_DIR, FS_STORAGE_KEY, MEDIA_EXTENSIONS } from './constants.js';
+import { DB_NAME, DB_VERSION, MEDIA_STORE, FS_HANDLE_STORE, FS_HANDLE_KEY, CANVASES_DIR, MEDIA_DIR, FS_STORAGE_KEY, MEDIA_EXTENSIONS } from './constants.js';
 import { showToast, $, getExtensionFromMimeType } from './utils.js';
 import * as state from './state.js';
 
@@ -21,8 +21,13 @@ export function initMediaDB() {
             resolve();
         };
         req.onupgradeneeded = e => {
-            if (!e.target.result.objectStoreNames.contains(MEDIA_STORE)) {
-                e.target.result.createObjectStore(MEDIA_STORE, { keyPath: 'id' });
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(MEDIA_STORE)) {
+                db.createObjectStore(MEDIA_STORE, { keyPath: 'id' });
+            }
+            // Add store for File System handle (persistent across sessions)
+            if (!db.objectStoreNames.contains(FS_HANDLE_STORE)) {
+                db.createObjectStore(FS_HANDLE_STORE, { keyPath: 'id' });
             }
         };
     });
@@ -54,6 +59,138 @@ export function deleteMedia(id) {
     tx.objectStore(MEDIA_STORE).delete(id);
 }
 
+// ============ Persistent Storage Functions ============
+
+// Request persistent storage to prevent browser from clearing data
+export async function requestPersistentStorage() {
+    if (!navigator.storage || !navigator.storage.persist) {
+        console.log('Storage persistence API not supported');
+        return false;
+    }
+    try {
+        const isPersisted = await navigator.storage.persisted();
+        if (isPersisted) {
+            console.log('Storage is already persistent');
+            return true;
+        }
+        const granted = await navigator.storage.persist();
+        console.log(`Persistent storage ${granted ? 'granted' : 'denied'}`);
+        return granted;
+    } catch (e) {
+        console.error('Failed to request persistent storage:', e);
+        return false;
+    }
+}
+
+// Save directory handle to IndexedDB (survives browser restart)
+export function saveFsHandleToIndexedDB(handle) {
+    return new Promise((resolve, reject) => {
+        if (!mediaDB) { reject(new Error('DB not initialized')); return; }
+        try {
+            const tx = mediaDB.transaction(FS_HANDLE_STORE, 'readwrite');
+            tx.objectStore(FS_HANDLE_STORE).put({ id: FS_HANDLE_KEY, handle });
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+// Load directory handle from IndexedDB
+export function loadFsHandleFromIndexedDB() {
+    return new Promise((resolve) => {
+        if (!mediaDB) { resolve(null); return; }
+        try {
+            const tx = mediaDB.transaction(FS_HANDLE_STORE, 'readonly');
+            const req = tx.objectStore(FS_HANDLE_STORE).get(FS_HANDLE_KEY);
+            req.onsuccess = () => resolve(req.result?.handle || null);
+            req.onerror = () => resolve(null);
+        } catch (e) {
+            resolve(null);
+        }
+    });
+}
+
+// Remove directory handle from IndexedDB
+export function removeFsHandleFromIndexedDB() {
+    return new Promise((resolve) => {
+        if (!mediaDB) { resolve(); return; }
+        try {
+            const tx = mediaDB.transaction(FS_HANDLE_STORE, 'readwrite');
+            tx.objectStore(FS_HANDLE_STORE).delete(FS_HANDLE_KEY);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        } catch (e) {
+            resolve();
+        }
+    });
+}
+
+// Try to restore file system connection from saved handle
+export async function tryRestoreFsConnection() {
+    // Check localStorage flag first (quick check)
+    const wasConnected = localStorage.getItem(FS_STORAGE_KEY) === 'true';
+    if (!wasConnected) return false;
+
+    // Try to load handle from IndexedDB
+    const savedHandle = await loadFsHandleFromIndexedDB();
+    if (!savedHandle) {
+        // Handle not found in IndexedDB, clear the flag
+        localStorage.removeItem(FS_STORAGE_KEY);
+        updateStorageIndicator(false);
+        return false;
+    }
+
+    // Verify permission
+    try {
+        const permission = await savedHandle.queryPermission({ mode: 'readwrite' });
+        if (permission === 'granted') {
+            // Permission already granted, restore connection
+            fsDirectoryHandle = savedHandle;
+            updateStorageIndicator(true);
+            console.log('File system connection restored automatically');
+            return true;
+        } else {
+            // Need to request permission - show indicator that reconnection is possible
+            fsDirectoryHandle = savedHandle;
+            updateStorageIndicator(false, true); // Show "reconnect" state
+            console.log('File system handle found, permission needed');
+            return 'needs-permission';
+        }
+    } catch (e) {
+        console.error('Failed to verify handle permission:', e);
+        // Handle is invalid, clean up
+        await removeFsHandleFromIndexedDB();
+        localStorage.removeItem(FS_STORAGE_KEY);
+        updateStorageIndicator(false);
+        return false;
+    }
+}
+
+// Re-request permission for saved handle (user interaction required)
+export async function reconnectStorageFolder() {
+    if (!fsDirectoryHandle) {
+        showToast('No saved connection found', 'error');
+        return false;
+    }
+    try {
+        const permission = await fsDirectoryHandle.requestPermission({ mode: 'readwrite' });
+        if (permission === 'granted') {
+            updateStorageIndicator(true);
+            showToast('Storage folder reconnected');
+            return true;
+        } else {
+            showToast('Permission denied', 'error');
+            return false;
+        }
+    } catch (e) {
+        console.error('Failed to reconnect:', e);
+        showToast('Failed to reconnect', 'error');
+        return false;
+    }
+}
+
 // ============ File System API Functions ============
 
 export function isFileSystemSupported() {
@@ -70,7 +207,20 @@ export async function selectStorageFolder() {
         // Create subdirectories
         await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
         await fsDirectoryHandle.getDirectoryHandle(MEDIA_DIR, { create: true });
+
+        // Save handle to IndexedDB for persistence (primary storage)
+        try {
+            await saveFsHandleToIndexedDB(fsDirectoryHandle);
+        } catch (e) {
+            console.error('Failed to save handle to IndexedDB:', e);
+        }
+
+        // Also save flag to localStorage (backup/quick check)
         localStorage.setItem(FS_STORAGE_KEY, 'true');
+
+        // Request persistent storage to prevent browser cleanup
+        await requestPersistentStorage();
+
         updateStorageIndicator(true);
         showToast('Storage folder connected');
         return true;
@@ -85,7 +235,9 @@ export async function selectStorageFolder() {
 
 export async function disconnectStorageFolder() {
     fsDirectoryHandle = null;
+    // Remove from both storages
     localStorage.removeItem(FS_STORAGE_KEY);
+    await removeFsHandleFromIndexedDB();
     updateStorageIndicator(false);
     showToast('Storage folder disconnected');
 }
@@ -103,15 +255,28 @@ export async function requestFsPermission() {
     }
 }
 
-export function updateStorageIndicator(connected) {
+export function updateStorageIndicator(connected, needsPermission = false) {
     const indicator = $('storageIndicator');
     const statusText = $('storageStatusText');
     if (indicator) {
         indicator.classList.toggle('connected', connected);
-        indicator.title = connected ? 'File storage connected - Click to manage' : 'Using browser storage - Click to connect folder';
+        indicator.classList.toggle('needs-permission', needsPermission && !connected);
+        if (connected) {
+            indicator.title = 'File storage connected - Click to manage';
+        } else if (needsPermission) {
+            indicator.title = 'Click to reconnect file storage';
+        } else {
+            indicator.title = 'Using browser storage - Click to connect folder';
+        }
     }
     if (statusText) {
-        statusText.textContent = connected ? 'File Storage' : 'Browser Storage';
+        if (connected) {
+            statusText.textContent = 'File Storage';
+        } else if (needsPermission) {
+            statusText.textContent = 'Reconnect';
+        } else {
+            statusText.textContent = 'Browser Storage';
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 
 import { $ } from './utils.js';
 import * as state from './state.js';
-import { initMediaDB } from './storage.js';
+import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
 import { setExternalFunctions as setItemsExternal, createItem, addNote, addMemo, setFilter, setItemColor } from './items.js';
 import {
@@ -326,6 +326,26 @@ async function init() {
         await initMediaDB();
     } catch (e) {
         console.error('IndexedDB init error:', e);
+    }
+
+    // Request persistent storage to prevent data loss
+    await requestPersistentStorage();
+
+    // Try to restore file system connection from saved handle
+    const fsRestoreResult = await tryRestoreFsConnection();
+    if (fsRestoreResult === 'needs-permission') {
+        // Handle exists but needs permission - setup click handler for reconnection
+        const storageIndicator = $('storageIndicator');
+        if (storageIndicator) {
+            const reconnectHandler = async (e) => {
+                e.stopPropagation();
+                const success = await reconnectStorageFolder();
+                if (success) {
+                    storageIndicator.removeEventListener('click', reconnectHandler, true);
+                }
+            };
+            storageIndicator.addEventListener('click', reconnectHandler, true);
+        }
     }
 
     await loadCanvases();
