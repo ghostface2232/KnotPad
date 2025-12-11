@@ -32,6 +32,8 @@ const minimapContent = $('minimapContent');
 const linkModal = $('linkModal');
 const settingsModal = $('settingsModal');
 const contextMenu = $('contextMenu');
+const canvasContextMenu = $('canvasContextMenu');
+const fileInput = $('fileInput');
 
 // External function references
 let saveStateFn = () => {};
@@ -666,6 +668,58 @@ export function setupContextMenu() {
                 }
             }
             hideMenus();
+        });
+    });
+}
+
+// ============ Canvas Context Menu ============
+
+let canvasContextX = 0;
+let canvasContextY = 0;
+
+export function showCanvasContextMenu(clientX, clientY, canvasX, canvasY) {
+    canvasContextX = canvasX;
+    canvasContextY = canvasY;
+
+    // Update check states
+    const gridSnapCheck = $('gridSnapCheck');
+    const invertZoomCheck = $('invertZoomCheck');
+    if (gridSnapCheck) {
+        gridSnapCheck.classList.toggle('checked', state.gridSnap);
+    }
+    if (invertZoomCheck) {
+        invertZoomCheck.classList.toggle('checked', state.invertWheelZoom);
+    }
+
+    canvasContextMenu.style.left = clientX + 'px';
+    canvasContextMenu.style.top = clientY + 'px';
+    canvasContextMenu.classList.add('active');
+}
+
+export function setupCanvasContextMenu() {
+    canvasContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
+        el.addEventListener('click', () => {
+            switch (el.dataset.action) {
+                case 'new-memo':
+                    addMemo('', canvasContextX, canvasContextY);
+                    saveStateFn();
+                    break;
+                case 'new-link':
+                    openLinkModal();
+                    break;
+                case 'new-image':
+                    fileInput.click();
+                    break;
+                case 'grid-snap':
+                    state.setGridSnap(!state.gridSnap);
+                    $('gridSnapCheck').classList.toggle('checked', state.gridSnap);
+                    break;
+                case 'invert-zoom':
+                    state.setInvertWheelZoom(!state.invertWheelZoom);
+                    $('invertZoomCheck').classList.toggle('checked', state.invertWheelZoom);
+                    break;
+            }
+            canvasContextMenu.classList.remove('active');
         });
     });
 }

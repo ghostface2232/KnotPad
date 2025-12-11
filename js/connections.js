@@ -9,6 +9,7 @@ import { addMemo, deselectAll } from './items.js';
 const canvas = $('canvas');
 const connectionsSvg = $('connectionsSvg');
 const connDirectionPicker = $('connDirectionPicker');
+const connectionContextMenu = $('connectionContextMenu');
 
 // External function references
 let saveStateFn = () => {};
@@ -97,6 +98,11 @@ export function addConnection(from, fh, to, th, loading = false) {
         e.stopPropagation();
         selectConnection(conn, e);
     });
+    hitArea.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        showConnectionContextMenu(conn, e);
+    });
 
     // Create visible connection line
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -104,6 +110,11 @@ export function addConnection(from, fh, to, th, loading = false) {
     path.addEventListener('click', e => {
         e.stopPropagation();
         selectConnection(conn, e);
+    });
+    path.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        showConnectionContextMenu(conn, e);
     });
 
     connectionsSvg.appendChild(hitArea);
@@ -201,12 +212,15 @@ export function updateConnectionArrow(c) {
     const fromDot = fromDir.x * dirX + fromDir.y * dirY;
     const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
 
-    const baseHandleLength = Math.max(40, Math.min(dist * 0.35, 100));
-    const fromAlignmentFactor = Math.max(0.4, (1 + fromDot) / 2);
-    const toAlignmentFactor = Math.max(0.4, (1 + toDot) / 2);
+    // Match updated curvePath parameters
+    const minHandleLength = 50;
+    const maxHandleLength = 150;
+    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.4, maxHandleLength));
+    const fromAlignmentFactor = Math.max(0.5, (1 + fromDot) / 2);
+    const toAlignmentFactor = Math.max(0.5, (1 + toDot) / 2);
 
-    const fromHandleLength = baseHandleLength * (0.6 + fromAlignmentFactor * 0.8);
-    const toHandleLength = baseHandleLength * (0.6 + toAlignmentFactor * 0.8);
+    const fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.6);
+    const toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.6);
 
     const p0 = { x: fp.x, y: fp.y };
     const p3 = { x: tp.x, y: tp.y };
@@ -216,16 +230,34 @@ export function updateConnectionArrow(c) {
     let p2 = { x: tp.x + toDir.x * toHandleLength, y: tp.y + toDir.y * toHandleLength };
 
     // Apply the same curve smoothing as curvePath
-    if (fromDot < -0.3) {
-        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3);
+    if (fromDot < 0) {
+        const blendFactor = Math.min(0.35, Math.abs(fromDot) * 0.35);
+        const perpX = -fromDir.y;
+        const perpY = fromDir.x;
+        const perpDot = perpX * dirX + perpY * dirY;
+        const perpSign = perpDot >= 0 ? 1 : -1;
+
         p1.x += dirX * dist * blendFactor;
         p1.y += dirY * dist * blendFactor;
+        if (fromDot < -0.5) {
+            p1.x += perpX * perpSign * dist * 0.1;
+            p1.y += perpY * perpSign * dist * 0.1;
+        }
     }
 
-    if (toDot < -0.3) {
-        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3);
+    if (toDot < 0) {
+        const blendFactor = Math.min(0.35, Math.abs(toDot) * 0.35);
+        const perpX = -toDir.y;
+        const perpY = toDir.x;
+        const perpDot = perpX * (-dirX) + perpY * (-dirY);
+        const perpSign = perpDot >= 0 ? 1 : -1;
+
         p2.x -= dirX * dist * blendFactor;
         p2.y -= dirY * dist * blendFactor;
+        if (toDot < -0.5) {
+            p2.x += perpX * perpSign * dist * 0.1;
+            p2.y += perpY * perpSign * dist * 0.1;
+        }
     }
 
     // Get midpoint on the actual Bezier curve
@@ -330,7 +362,7 @@ function showConnDirectionPicker(x, y, conn) {
 
 // Setup direction picker event handlers
 export function setupConnDirectionPicker() {
-    connDirectionPicker.querySelectorAll('button').forEach(btn => {
+    connDirectionPicker.querySelectorAll('button[data-dir]').forEach(btn => {
         btn.addEventListener('click', e => {
             e.stopPropagation();
             if (state.selectedConn) {
@@ -340,6 +372,42 @@ export function setupConnDirectionPicker() {
                 triggerAutoSaveFn();
             }
             connDirectionPicker.classList.remove('active');
+        });
+    });
+
+    // Delete button handler
+    const deleteBtn = connDirectionPicker.querySelector('.conn-delete-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            if (state.selectedConn) {
+                deleteConnection(state.selectedConn);
+            }
+            connDirectionPicker.classList.remove('active');
+        });
+    }
+}
+
+// Show connection context menu
+function showConnectionContextMenu(conn, e) {
+    deselectAll();
+    state.setSelectedConn(conn);
+    conn.el.classList.add('selected');
+    if (conn.arrow) conn.arrow.classList.add('selected');
+
+    connectionContextMenu.style.left = e.clientX + 'px';
+    connectionContextMenu.style.top = e.clientY + 'px';
+    connectionContextMenu.classList.add('active');
+}
+
+// Setup connection context menu
+export function setupConnectionContextMenu() {
+    connectionContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
+        el.addEventListener('click', () => {
+            if (el.dataset.action === 'delete' && state.selectedConn) {
+                deleteConnection(state.selectedConn);
+            }
+            connectionContextMenu.classList.remove('active');
         });
     });
 }

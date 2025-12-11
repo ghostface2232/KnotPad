@@ -129,6 +129,7 @@
         <button data-dir="forward" title="Forward"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
         <button data-dir="backward" title="Backward"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <button data-dir="both" title="Both ways"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l-5-5 5-5M17 7l5 5-5 5M2 12h20"/></svg></button>
+        <button class="conn-delete-btn" data-action="delete" title="Delete connection"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     </div>
 
 
@@ -138,6 +139,19 @@
         <div class="context-menu-item" data-action="lock"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Lock to Back</div>
         <div class="context-menu-sep"></div>
         <div class="context-menu-item danger" data-action="delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>Delete</div>
+    </div>
+
+    <div class="context-menu" id="connectionContextMenu">
+        <div class="context-menu-item danger" data-action="delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>Delete</div>
+    </div>
+
+    <div class="context-menu" id="canvasContextMenu">
+        <div class="context-menu-item" data-action="new-memo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>New Memo</div>
+        <div class="context-menu-item" data-action="new-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>New Link</div>
+        <div class="context-menu-item" data-action="new-image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>New Image/Video</div>
+        <div class="context-menu-sep"></div>
+        <div class="context-menu-item" data-action="grid-snap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span>Grid Snap</span><span class="context-menu-check" id="gridSnapCheck"></span></div>
+        <div class="context-menu-item" data-action="invert-zoom"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg><span>Invert Wheel Zoom</span><span class="context-menu-check" id="invertZoomCheck"></span></div>
     </div>
 
     <div class="modal" id="linkModal">
@@ -236,7 +250,8 @@
                     <div class="storage-info-note">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 16v-4M12 8h.01"/>
+                            <path d="M12 16v-4"/>
+                            <circle cx="12" cy="8" r="1" fill="currentColor"/>
                         </svg>
                         <p>File Storage requires Chrome, Edge, or Opera. Data is saved directly to your chosen folder, making it more reliable and portable.</p>
                     </div>

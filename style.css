@@ -216,6 +216,7 @@ input, textarea, button { font-family: inherit; }
 .memo-toolbar { display: flex; gap: 4px; padding: 8px 0; margin-top: auto; opacity: 0; transition: opacity 0.15s; border-top: 1px solid transparent; }
 .memo-toolbar.active, .canvas-item:hover .memo-toolbar { opacity: 1; border-top-color: var(--border-subtle); }
 .md-btn { width: 28px; height: 28px; border: none; background: var(--bg-hover); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.md-btn svg { transform: scale(0.8); }
 .md-btn:hover { background: var(--accent-glow); color: var(--accent); }
 .md-btn:active { transform: scale(0.95); }
 
@@ -293,6 +294,8 @@ input, textarea, button { font-family: inherit; }
 }
 .conn-direction-picker button:hover { background: var(--accent); color: white; }
 .conn-direction-picker button.active { background: var(--accent); color: white; }
+.conn-direction-picker .conn-delete-btn { background: var(--danger); color: white; }
+.conn-direction-picker .conn-delete-btn:hover { background: #dc2626; }
 
 .context-menu {
     position: fixed; background: var(--bg-secondary);
@@ -308,6 +311,8 @@ input, textarea, button { font-family: inherit; }
 .context-menu-item:hover { background: var(--bg-hover); }
 .context-menu-item.danger { color: var(--danger); }
 .context-menu-sep { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+.context-menu-check { margin-left: auto; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+.context-menu-check.checked::before { content: '✓'; color: var(--accent); font-weight: 600; font-size: 12px; }
 
 .modal {
     position: fixed; inset: 0; background: rgba(9, 9, 11, 0.88);
