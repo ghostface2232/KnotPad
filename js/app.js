@@ -8,6 +8,7 @@ import { setExternalFunctions as setItemsExternal, createItem, addMemo, setFilte
 import {
     setExternalFunctions as setConnectionsExternal,
     setupConnDirectionPicker,
+    setupConnectionContextMenu,
     addChildNode,
     startConnection,
     completeConnection,
@@ -39,6 +40,7 @@ import {
     setupNewNodePicker,
     setupLinkModal,
     setupSettingsModal,
+    setupCanvasContextMenu,
     handleFile
 } from './ui.js';
 import {
@@ -305,8 +307,10 @@ async function init() {
     setupSearchEvents();
     setupCanvasIconPicker();
     setupConnDirectionPicker();
+    setupConnectionContextMenu();
     setupMinimapClick();
     setupContextMenu();
+    setupCanvasContextMenu();
     setupChildTypePicker();
     setupNewNodePicker();
     setupLinkModal();

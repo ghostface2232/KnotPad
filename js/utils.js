@@ -47,42 +47,62 @@ export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
     const toDir = handleDirs[toHandle] || { x: -Math.sign(dx || 1), y: 0 };
 
     // Calculate dot product to detect opposing directions
-    // This tells us if the handle direction opposes the target direction
     const fromDot = fromDir.x * dirX + fromDir.y * dirY;
     const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
 
-    // Base handle length scales with distance
-    const baseHandleLength = Math.max(40, Math.min(dist * 0.35, 100));
+    // Base handle length - longer for more pronounced direction, scales with distance
+    const minHandleLength = 50;
+    const maxHandleLength = 150;
+    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.4, maxHandleLength));
 
-    // Adjust handle length based on alignment with target direction
-    // If handle direction opposes target, use shorter handle with curve adjustment
-    // This prevents sharp bends when nodes are positioned opposite to handle direction
-    const fromAlignmentFactor = Math.max(0.4, (1 + fromDot) / 2);
-    const toAlignmentFactor = Math.max(0.4, (1 + toDot) / 2);
+    // Calculate alignment factors - when handles align with direction, use longer handles
+    // When opposing, handles need to curve more dramatically
+    const fromAlignmentFactor = Math.max(0.5, (1 + fromDot) / 2);
+    const toAlignmentFactor = Math.max(0.5, (1 + toDot) / 2);
 
-    const fromHandleLength = baseHandleLength * (0.6 + fromAlignmentFactor * 0.8);
-    const toHandleLength = baseHandleLength * (0.6 + toAlignmentFactor * 0.8);
+    // Handle lengths - make departing direction more pronounced
+    const fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.6);
+    const toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.6);
 
-    // Calculate control points
-    // When handle direction opposes target, blend in some perpendicular movement
-    // to create smoother S-curves instead of sharp bends
+    // Start with control points in handle direction
     let cp1x = x1 + fromDir.x * fromHandleLength;
     let cp1y = y1 + fromDir.y * fromHandleLength;
     let cp2x = x2 + toDir.x * toHandleLength;
     let cp2y = y2 + toDir.y * toHandleLength;
 
-    // For opposing directions, add a subtle curve towards the target
-    // This creates smoother transitions when handles point away from target
-    if (fromDot < -0.3) {
-        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3);
+    // For opposing directions, create smooth S-curves by blending towards target
+    // Use progressive blending to ensure curves remain smooth without sharp bends
+    if (fromDot < 0) {
+        // Handle points away from target - need to curve around
+        const blendFactor = Math.min(0.35, Math.abs(fromDot) * 0.35);
+        // Add perpendicular component for smoother curves
+        const perpX = -fromDir.y;
+        const perpY = fromDir.x;
+        const perpDot = perpX * dirX + perpY * dirY;
+        const perpSign = perpDot >= 0 ? 1 : -1;
+
         cp1x += dirX * dist * blendFactor;
         cp1y += dirY * dist * blendFactor;
+        // Add slight perpendicular movement for smoother S-curves
+        if (fromDot < -0.5) {
+            cp1x += perpX * perpSign * dist * 0.1;
+            cp1y += perpY * perpSign * dist * 0.1;
+        }
     }
 
-    if (toDot < -0.3) {
-        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3);
+    if (toDot < 0) {
+        const blendFactor = Math.min(0.35, Math.abs(toDot) * 0.35);
+        const perpX = -toDir.y;
+        const perpY = toDir.x;
+        const perpDot = perpX * (-dirX) + perpY * (-dirY);
+        const perpSign = perpDot >= 0 ? 1 : -1;
+
         cp2x -= dirX * dist * blendFactor;
         cp2y -= dirY * dist * blendFactor;
+        if (toDot < -0.5) {
+            cp2x += perpX * perpSign * dist * 0.1;
+            cp2y += perpY * perpSign * dist * 0.1;
+        }
     }
 
     return `M${x1} ${y1} C${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;

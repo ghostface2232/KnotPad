@@ -654,6 +654,60 @@ export function sortByColor() {
         }
     });
 
+    // Sort items within each color group by connection proximity
+    // Connected items should be placed closer together
+    Object.keys(groups).forEach(key => {
+        const items = groups[key];
+        if (items.length <= 1) return;
+
+        // Build connection map for items in this group
+        const connectionMap = new Map();
+        items.forEach(item => connectionMap.set(item, new Set()));
+
+        state.connections.forEach(conn => {
+            const fromInGroup = items.includes(conn.from);
+            const toInGroup = items.includes(conn.to);
+            if (fromInGroup && toInGroup) {
+                connectionMap.get(conn.from).add(conn.to);
+                connectionMap.get(conn.to).add(conn.from);
+            }
+        });
+
+        // Sort items to group connected items together
+        const sorted = [];
+        const visited = new Set();
+
+        // DFS to group connected items
+        function addWithConnections(item) {
+            if (visited.has(item)) return;
+            visited.add(item);
+            sorted.push(item);
+            // Add connected items next
+            const connected = connectionMap.get(item);
+            connected.forEach(connectedItem => {
+                if (!visited.has(connectedItem)) {
+                    addWithConnections(connectedItem);
+                }
+            });
+        }
+
+        // Start with items that have connections
+        items.forEach(item => {
+            if (connectionMap.get(item).size > 0 && !visited.has(item)) {
+                addWithConnections(item);
+            }
+        });
+
+        // Add remaining items without connections
+        items.forEach(item => {
+            if (!visited.has(item)) {
+                sorted.push(item);
+            }
+        });
+
+        groups[key] = sorted;
+    });
+
     // Calculate layout parameters
     const horizontalGap = 48; // Horizontal spacing between columns
     const verticalGap = 24;   // Vertical spacing between items (smaller since same color)
@@ -681,20 +735,24 @@ export function sortByColor() {
     }, 0);
     const maxColumnHeight = Math.max(...columnData.map(col => col.totalHeight));
 
-    // Find the visible area center
+    // Find the visible area center (don't change viewport, just calculate center point)
     const viewCenterX = (innerWidth / 2 - state.offsetX) / state.scale;
     const viewCenterY = (innerHeight / 2 - state.offsetY) / state.scale;
 
-    // Calculate start position to center the grid
+    // Calculate start position to center the grid horizontally
     const startX = viewCenterX - totalWidth / 2;
-    const startY = viewCenterY - maxColumnHeight / 2;
 
-    // Place items in columns by color
+    // Place items in columns by color with vertical center alignment
     let currentX = startX;
     columnData.forEach(col => {
-        let currentY = startY;
+        // Calculate vertical offset to center this column
+        const columnTopY = viewCenterY - col.totalHeight / 2;
+        let currentY = columnTopY;
+
         col.items.forEach(item => {
-            item.x = currentX;
+            // Center each item horizontally within the column
+            const itemOffsetX = (col.maxWidth - item.w) / 2;
+            item.x = currentX + itemOffsetX;
             item.y = currentY;
             item.el.style.left = item.x + 'px';
             item.el.style.top = item.y + 'px';

@@ -8,7 +8,7 @@ import { updateAllConnections, cancelConnection, deleteConnection, updateTempLin
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
-    saveCurrentCanvas
+    saveCurrentCanvas, showCanvasContextMenu
 } from './ui.js';
 
 const app = $('app');
@@ -73,6 +73,17 @@ export function setupMouseEvents() {
             const canvasX = (e.clientX - rect.left - state.offsetX) / state.scale - 100;
             const canvasY = (e.clientY - rect.top - state.offsetY) / state.scale - 70;
             showNewNodePicker(e.clientX, e.clientY, canvasX, canvasY);
+        }
+    });
+
+    // Right-click on canvas to show context menu
+    app.addEventListener('contextmenu', e => {
+        if (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app) {
+            e.preventDefault();
+            const rect = app.getBoundingClientRect();
+            const canvasX = (e.clientX - rect.left - state.offsetX) / state.scale - 90;
+            const canvasY = (e.clientY - rect.top - state.offsetY) / state.scale - 60;
+            showCanvasContextMenu(e.clientX, e.clientY, canvasX, canvasY);
         }
     });
 
@@ -374,6 +385,8 @@ export function setupDocumentClickHandler() {
         }
         if (!e.target.closest('.context-menu')) {
             $('contextMenu').classList.remove('active');
+            $('connectionContextMenu').classList.remove('active');
+            $('canvasContextMenu').classList.remove('active');
         }
         if (!e.target.closest('.conn-direction-picker') && !e.target.closest('.connection-line')) {
             $('connDirectionPicker').classList.remove('active');
