@@ -50,6 +50,319 @@ function parseMarkdown(text) {
     return html;
 }
 
+// Real-time markdown conversion (Notion-style)
+// Converts markdown syntax as you type
+function applyRealtimeMarkdown(el, item) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return false;
+
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return false;
+
+    // Get the current text node and its content
+    let node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return false;
+
+    const text = node.textContent;
+    const cursorPos = range.startOffset;
+
+    // Check for inline patterns ending at cursor
+    // Bold: **text**
+    const boldMatch = text.slice(0, cursorPos).match(/\*\*(.+?)\*\*$/);
+    if (boldMatch) {
+        const fullMatch = boldMatch[0];
+        const content = boldMatch[1];
+        const startPos = cursorPos - fullMatch.length;
+
+        // Create the replacement
+        const before = text.slice(0, startPos);
+        const after = text.slice(cursorPos);
+
+        const strong = document.createElement('strong');
+        strong.textContent = content;
+
+        // Replace the text
+        const beforeNode = document.createTextNode(before);
+        const afterNode = document.createTextNode(after || '\u200B'); // Zero-width space if empty
+
+        const parent = node.parentNode;
+        parent.insertBefore(beforeNode, node);
+        parent.insertBefore(strong, node);
+        parent.insertBefore(afterNode, node);
+        parent.removeChild(node);
+
+        // Set cursor after the strong element
+        const newRange = document.createRange();
+        newRange.setStart(afterNode, afterNode.textContent === '\u200B' ? 1 : 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+
+        return true;
+    }
+
+    // Strikethrough: ~~text~~
+    const strikeMatch = text.slice(0, cursorPos).match(/~~(.+?)~~$/);
+    if (strikeMatch) {
+        const fullMatch = strikeMatch[0];
+        const content = strikeMatch[1];
+        const startPos = cursorPos - fullMatch.length;
+
+        const before = text.slice(0, startPos);
+        const after = text.slice(cursorPos);
+
+        const del = document.createElement('del');
+        del.textContent = content;
+
+        const beforeNode = document.createTextNode(before);
+        const afterNode = document.createTextNode(after || '\u200B');
+
+        const parent = node.parentNode;
+        parent.insertBefore(beforeNode, node);
+        parent.insertBefore(del, node);
+        parent.insertBefore(afterNode, node);
+        parent.removeChild(node);
+
+        const newRange = document.createRange();
+        newRange.setStart(afterNode, afterNode.textContent === '\u200B' ? 1 : 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+
+        return true;
+    }
+
+    // Underline: __text__
+    const underlineMatch = text.slice(0, cursorPos).match(/__(.+?)__$/);
+    if (underlineMatch) {
+        const fullMatch = underlineMatch[0];
+        const content = underlineMatch[1];
+        const startPos = cursorPos - fullMatch.length;
+
+        const before = text.slice(0, startPos);
+        const after = text.slice(cursorPos);
+
+        const u = document.createElement('u');
+        u.textContent = content;
+
+        const beforeNode = document.createTextNode(before);
+        const afterNode = document.createTextNode(after || '\u200B');
+
+        const parent = node.parentNode;
+        parent.insertBefore(beforeNode, node);
+        parent.insertBefore(u, node);
+        parent.insertBefore(afterNode, node);
+        parent.removeChild(node);
+
+        const newRange = document.createRange();
+        newRange.setStart(afterNode, afterNode.textContent === '\u200B' ? 1 : 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+
+        return true;
+    }
+
+    return false;
+}
+
+// Check and apply block-level markdown (headings, lists, etc.) on Enter
+function applyBlockMarkdown(el, item) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return false;
+
+    const range = sel.getRangeAt(0);
+
+    // Find the current block/line
+    let blockNode = range.startContainer;
+    while (blockNode && blockNode !== el && !['DIV', 'P', 'H1', 'H2', 'H3', 'LI', 'BLOCKQUOTE'].includes(blockNode.nodeName)) {
+        blockNode = blockNode.parentNode;
+    }
+
+    if (!blockNode || blockNode === el) {
+        // We're at root level, check text directly
+        blockNode = range.startContainer;
+        if (blockNode.nodeType !== Node.TEXT_NODE) return false;
+    }
+
+    const text = blockNode.textContent;
+
+    // Heading: # text, ## text, ### text (at start of line)
+    const h3Match = text.match(/^### (.+)$/);
+    if (h3Match) {
+        const h3 = document.createElement('h3');
+        h3.textContent = h3Match[1];
+        blockNode.parentNode.replaceChild(h3, blockNode);
+        placeCaretAtEnd(h3);
+        return true;
+    }
+
+    const h2Match = text.match(/^## (.+)$/);
+    if (h2Match) {
+        const h2 = document.createElement('h2');
+        h2.textContent = h2Match[1];
+        blockNode.parentNode.replaceChild(h2, blockNode);
+        placeCaretAtEnd(h2);
+        return true;
+    }
+
+    const h1Match = text.match(/^# (.+)$/);
+    if (h1Match) {
+        const h1 = document.createElement('h1');
+        h1.textContent = h1Match[1];
+        blockNode.parentNode.replaceChild(h1, blockNode);
+        placeCaretAtEnd(h1);
+        return true;
+    }
+
+    // Blockquote: > text
+    const bqMatch = text.match(/^> (.+)$/);
+    if (bqMatch) {
+        const bq = document.createElement('blockquote');
+        bq.textContent = bqMatch[1];
+        blockNode.parentNode.replaceChild(bq, blockNode);
+        placeCaretAtEnd(bq);
+        return true;
+    }
+
+    // Unordered list: - text
+    const ulMatch = text.match(/^- (.+)$/);
+    if (ulMatch) {
+        const ul = document.createElement('ul');
+        const li = document.createElement('li');
+        li.textContent = ulMatch[1];
+        ul.appendChild(li);
+        blockNode.parentNode.replaceChild(ul, blockNode);
+        placeCaretAtEnd(li);
+        return true;
+    }
+
+    // Ordered list: 1. text
+    const olMatch = text.match(/^\d+\. (.+)$/);
+    if (olMatch) {
+        const ol = document.createElement('ol');
+        const li = document.createElement('li');
+        li.textContent = olMatch[1];
+        ol.appendChild(li);
+        blockNode.parentNode.replaceChild(ol, blockNode);
+        placeCaretAtEnd(li);
+        return true;
+    }
+
+    // Horizontal rule: ---
+    if (text.trim() === '---') {
+        const hr = document.createElement('hr');
+        const br = document.createElement('br');
+        blockNode.parentNode.replaceChild(hr, blockNode);
+        hr.parentNode.insertBefore(br, hr.nextSibling);
+        return true;
+    }
+
+    return false;
+}
+
+// Helper to place caret at end of element
+function placeCaretAtEnd(el) {
+    const range = document.createRange();
+    const sel = window.getSelection();
+    if (el.lastChild) {
+        if (el.lastChild.nodeType === Node.TEXT_NODE) {
+            range.setStart(el.lastChild, el.lastChild.length);
+        } else {
+            range.selectNodeContents(el);
+            range.collapse(false);
+        }
+    } else {
+        range.selectNodeContents(el);
+        range.collapse(false);
+    }
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+}
+
+// Get content as markdown from HTML (for storage)
+function getMarkdownFromHtml(el) {
+    let result = '';
+
+    function processNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            // Clean up zero-width spaces
+            result += node.textContent.replace(/\u200B/g, '');
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const tag = node.tagName;
+
+            switch (tag) {
+                case 'H1':
+                    result += '# ' + node.textContent;
+                    break;
+                case 'H2':
+                    result += '## ' + node.textContent;
+                    break;
+                case 'H3':
+                    result += '### ' + node.textContent;
+                    break;
+                case 'STRONG':
+                case 'B':
+                    result += '**' + node.textContent + '**';
+                    break;
+                case 'DEL':
+                case 'S':
+                    result += '~~' + node.textContent + '~~';
+                    break;
+                case 'U':
+                    result += '__' + node.textContent + '__';
+                    break;
+                case 'BLOCKQUOTE':
+                    result += '> ' + node.textContent;
+                    break;
+                case 'LI':
+                    const parent = node.parentNode;
+                    if (parent && parent.tagName === 'OL') {
+                        const index = Array.from(parent.children).indexOf(node) + 1;
+                        result += index + '. ' + node.textContent;
+                    } else {
+                        result += '- ' + node.textContent;
+                    }
+                    break;
+                case 'HR':
+                    result += '---';
+                    break;
+                case 'BR':
+                    result += '\n';
+                    break;
+                case 'UL':
+                case 'OL':
+                    node.childNodes.forEach(child => {
+                        processNode(child);
+                        if (child !== node.lastChild) result += '\n';
+                    });
+                    break;
+                case 'DIV':
+                case 'P':
+                    if (result && !result.endsWith('\n')) result += '\n';
+                    node.childNodes.forEach(processNode);
+                    break;
+                default:
+                    node.childNodes.forEach(processNode);
+            }
+        }
+    }
+
+    el.childNodes.forEach((node, i) => {
+        processNode(node);
+        // Add newline between block elements
+        if (i < el.childNodes.length - 1 && node.nodeType === Node.ELEMENT_NODE) {
+            const tag = node.tagName;
+            if (['H1', 'H2', 'H3', 'BLOCKQUOTE', 'HR', 'UL', 'OL', 'DIV', 'P'].includes(tag)) {
+                if (!result.endsWith('\n')) result += '\n';
+            }
+        }
+    });
+
+    return result.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function getPlainText(el) {
     // Get plain text from contenteditable, preserving line breaks
     const clone = el.cloneNode(true);
@@ -284,19 +597,36 @@ function setupItemEvents(item) {
         const mb = el.querySelector('.memo-body');
         const toolbar = el.querySelector('.memo-toolbar');
 
-        // Handle input - store plain text, render markdown
+        // Handle input - real-time markdown conversion
         mb.addEventListener('input', () => {
-            item.content = getPlainText(mb);
+            // Try to apply real-time inline markdown (bold, strike, underline)
+            applyRealtimeMarkdown(mb, item);
+
+            // Save content as markdown
+            item.content = getMarkdownFromHtml(mb);
             autoResizeItem(item);
             triggerAutoSaveFn();
         });
 
-        // Handle blur - re-render markdown
+        // Handle keydown for block-level markdown (Enter key)
+        mb.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                // Check if current line has block markdown syntax
+                const applied = applyBlockMarkdown(mb, item);
+                if (applied) {
+                    e.preventDefault();
+                    item.content = getMarkdownFromHtml(mb);
+                    autoResizeItem(item);
+                    triggerAutoSaveFn();
+                }
+            }
+        });
+
+        // Handle blur - just hide toolbar, keep rendered state
         mb.addEventListener('blur', () => {
-            const pos = saveCaretPosition(mb);
-            mb.innerHTML = parseMarkdown(item.content || '');
-            if (document.activeElement === mb) restoreCaretPosition(mb, pos);
             toolbar.classList.remove('active');
+            // Clean up any zero-width spaces
+            mb.innerHTML = mb.innerHTML.replace(/\u200B/g, '');
         });
 
         // Show toolbar on focus
@@ -348,56 +678,122 @@ function restoreCaretPosition(el, pos) {
     }
 }
 
-// Apply markdown formatting
+// Apply markdown formatting via toolbar buttons
 function applyMarkdown(el, type, item) {
     const sel = window.getSelection();
     if (sel.rangeCount === 0) return;
 
-    const text = item.content || '';
-    const lines = text.split('\n');
-
-    // Get current line
-    const pos = saveCaretPosition(el);
-    let charCount = 0;
-    let lineIndex = 0;
-    for (let i = 0; i < lines.length; i++) {
-        if (charCount + lines[i].length >= pos) {
-            lineIndex = i;
-            break;
-        }
-        charCount += lines[i].length + 1; // +1 for newline
-    }
-
     switch (type) {
         case 'heading':
-            // Cycle through heading levels
-            if (lines[lineIndex].startsWith('### ')) {
-                lines[lineIndex] = lines[lineIndex].slice(4);
-            } else if (lines[lineIndex].startsWith('## ')) {
-                lines[lineIndex] = '### ' + lines[lineIndex].slice(3);
-            } else if (lines[lineIndex].startsWith('# ')) {
-                lines[lineIndex] = '## ' + lines[lineIndex].slice(2);
-            } else {
-                lines[lineIndex] = '# ' + lines[lineIndex];
-            }
+            applyHeadingFromToolbar(el, item);
             break;
         case 'bold':
-            wrapSelection(el, '**', '**');
-            return;
+            wrapSelectionWithTag(el, 'strong');
+            break;
         case 'strike':
-            wrapSelection(el, '~~', '~~');
-            return;
+            wrapSelectionWithTag(el, 'del');
+            break;
         case 'underline':
-            wrapSelection(el, '__', '__');
-            return;
+            wrapSelectionWithTag(el, 'u');
+            break;
     }
 
-    item.content = lines.join('\n');
-    el.innerHTML = parseMarkdown(item.content);
+    item.content = getMarkdownFromHtml(el);
+    autoResizeItem(item);
     triggerAutoSaveFn();
 }
 
-// Wrap selection with markers
+// Apply heading from toolbar button
+function applyHeadingFromToolbar(el, item) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+
+    const range = sel.getRangeAt(0);
+    let node = range.startContainer;
+
+    // Find the current block element
+    while (node && node !== el && !['H1', 'H2', 'H3', 'DIV', 'P'].includes(node.nodeName)) {
+        node = node.parentNode;
+    }
+
+    if (!node || node === el) {
+        // Text at root level - wrap in h1
+        const text = range.startContainer.textContent || '';
+        const h1 = document.createElement('h1');
+        h1.textContent = text;
+        if (range.startContainer.nodeType === Node.TEXT_NODE) {
+            range.startContainer.parentNode.replaceChild(h1, range.startContainer);
+        }
+        placeCaretAtEnd(h1);
+        return;
+    }
+
+    // Cycle through heading levels
+    const tag = node.nodeName;
+    let newEl;
+
+    if (tag === 'H3') {
+        // H3 -> plain text (DIV)
+        newEl = document.createElement('div');
+    } else if (tag === 'H2') {
+        newEl = document.createElement('h3');
+    } else if (tag === 'H1') {
+        newEl = document.createElement('h2');
+    } else {
+        // DIV/P -> H1
+        newEl = document.createElement('h1');
+    }
+
+    newEl.innerHTML = node.innerHTML;
+    node.parentNode.replaceChild(newEl, node);
+    placeCaretAtEnd(newEl);
+}
+
+// Wrap selection with HTML tag
+function wrapSelectionWithTag(el, tagName) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+
+    const range = sel.getRangeAt(0);
+    const text = range.toString();
+
+    if (text) {
+        // Check if already wrapped with this tag - if so, unwrap
+        const parent = range.commonAncestorContainer.parentElement;
+        if (parent && parent.tagName === tagName.toUpperCase()) {
+            // Unwrap - replace the tag with its text content
+            const textNode = document.createTextNode(parent.textContent);
+            parent.parentNode.replaceChild(textNode, parent);
+            // Select the text node
+            const newRange = document.createRange();
+            newRange.selectNodeContents(textNode);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        } else {
+            // Wrap selection with the tag
+            const wrapper = document.createElement(tagName);
+            range.surroundContents(wrapper);
+            // Place cursor after
+            const newRange = document.createRange();
+            newRange.setStartAfter(wrapper);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        }
+    } else {
+        // No selection - insert empty tag and place cursor inside
+        const wrapper = document.createElement(tagName);
+        wrapper.textContent = '\u200B'; // Zero-width space
+        range.insertNode(wrapper);
+        const newRange = document.createRange();
+        newRange.setStart(wrapper.firstChild, 1);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+    }
+}
+
+// Wrap selection with markers (legacy - kept for compatibility)
 function wrapSelection(el, before, after) {
     const sel = window.getSelection();
     if (sel.rangeCount === 0) return;
@@ -464,7 +860,7 @@ export function setItemFontSize(item) {
     triggerAutoSaveFn();
 }
 
-// Auto-resize item based on content (only grows, never shrinks)
+// Auto-resize item based on content - fit to content height
 export function autoResizeItem(item) {
     if (item.type !== 'memo') return;
     const memoBody = item.el.querySelector('.memo-body');
@@ -475,17 +871,29 @@ export function autoResizeItem(item) {
     else if (item.fontSize === 'large') fontMultiplier = 1.25;
     else if (item.fontSize === 'xlarge') fontMultiplier = 1.4;
 
-    // Measure content height
-    const scrollH = memoBody.scrollHeight;
-
-    // Memo layout: padding(12*2=24) + toolbar(~38) + buffer(3)
-    const extraH = 24 + 38 + 3;
-
+    // Get minimum and maximum height based on font size
+    const minH = Math.round(80 * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
-    const newH = Math.min(scrollH + extraH, maxH);
 
-    // Only grow, never shrink - prevents jitter when editing
-    if (newH > item.h) {
+    // Temporarily reset height to measure true content height
+    const originalHeight = memoBody.style.height;
+    memoBody.style.height = 'auto';
+
+    // Measure actual content height
+    const contentH = memoBody.scrollHeight;
+
+    // Restore height
+    memoBody.style.height = originalHeight;
+
+    // Memo layout: padding(12*2=24) + toolbar(~38)
+    const extraH = 24 + 38;
+
+    // Calculate new height - fit to content within min/max bounds
+    const targetH = contentH + extraH;
+    const newH = Math.max(minH, Math.min(targetH, maxH));
+
+    // Only update if there's a meaningful change (avoid micro-adjustments)
+    if (Math.abs(newH - item.h) > 2) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
         updateAllConnectionsFn();
