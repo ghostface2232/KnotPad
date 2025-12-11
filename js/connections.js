@@ -85,10 +85,20 @@ export function addConnection(from, fh, to, th, loading = false) {
         to,
         th,
         el: null,
+        hitArea: null,
         arrow: null,
         dir: 'none'
     };
 
+    // Create invisible hit area for easier clicking (wider stroke)
+    const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hitArea.classList.add('connection-hit-area');
+    hitArea.addEventListener('click', e => {
+        e.stopPropagation();
+        selectConnection(conn, e);
+    });
+
+    // Create visible connection line
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.classList.add('connection-line');
     path.addEventListener('click', e => {
@@ -96,7 +106,9 @@ export function addConnection(from, fh, to, th, loading = false) {
         selectConnection(conn, e);
     });
 
+    connectionsSvg.appendChild(hitArea);
     connectionsSvg.appendChild(path);
+    conn.hitArea = hitArea;
     conn.el = path;
     state.connections.push(conn);
     updateConnection(conn);
@@ -113,7 +125,13 @@ export function addConnection(from, fh, to, th, loading = false) {
 export function updateConnection(c) {
     const fp = getHandlePos(c.from, c.fh);
     const tp = getHandlePos(c.to, c.th);
-    c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y, c.fh, c.th));
+    const pathData = curvePath(fp.x, fp.y, tp.x, tp.y, c.fh, c.th);
+    c.el.setAttribute('d', pathData);
+
+    // Update hit area with same path
+    if (c.hitArea) {
+        c.hitArea.setAttribute('d', pathData);
+    }
 
     // Apply color from source node
     if (c.from.color && COLOR_MAP[c.from.color]) {
@@ -165,29 +183,49 @@ export function updateConnectionArrow(c) {
     const dx = tp.x - fp.x;
     const dy = tp.y - fp.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const handleLength = Math.max(40, Math.min(dist * 0.4, 120));
+
+    // Handle direction vectors
+    const handleDirs = {
+        top: { x: 0, y: -1 },
+        bottom: { x: 0, y: 1 },
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 }
+    };
+
+    const dirX = dist > 0 ? dx / dist : 1;
+    const dirY = dist > 0 ? dy / dist : 0;
+
+    const fromDir = handleDirs[c.fh] || { x: Math.sign(dx || 1), y: 0 };
+    const toDir = handleDirs[c.th] || { x: -Math.sign(dx || 1), y: 0 };
+
+    const fromDot = fromDir.x * dirX + fromDir.y * dirY;
+    const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
+
+    const baseHandleLength = Math.max(40, Math.min(dist * 0.35, 100));
+    const fromAlignmentFactor = Math.max(0.4, (1 + fromDot) / 2);
+    const toAlignmentFactor = Math.max(0.4, (1 + toDot) / 2);
+
+    const fromHandleLength = baseHandleLength * (0.6 + fromAlignmentFactor * 0.8);
+    const toHandleLength = baseHandleLength * (0.6 + toAlignmentFactor * 0.8);
 
     const p0 = { x: fp.x, y: fp.y };
     const p3 = { x: tp.x, y: tp.y };
 
     // Calculate p1 based on fromHandle direction
-    let p1 = { x: fp.x, y: fp.y };
-    switch (c.fh) {
-        case 'top': p1.y = fp.y - handleLength; break;
-        case 'bottom': p1.y = fp.y + handleLength; break;
-        case 'left': p1.x = fp.x - handleLength; break;
-        case 'right': p1.x = fp.x + handleLength; break;
-        default: p1.x = fp.x + handleLength * Math.sign(dx || 1);
+    let p1 = { x: fp.x + fromDir.x * fromHandleLength, y: fp.y + fromDir.y * fromHandleLength };
+    let p2 = { x: tp.x + toDir.x * toHandleLength, y: tp.y + toDir.y * toHandleLength };
+
+    // Apply the same curve smoothing as curvePath
+    if (fromDot < -0.3) {
+        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3);
+        p1.x += dirX * dist * blendFactor;
+        p1.y += dirY * dist * blendFactor;
     }
 
-    // Calculate p2 based on toHandle direction
-    let p2 = { x: tp.x, y: tp.y };
-    switch (c.th) {
-        case 'top': p2.y = tp.y - handleLength; break;
-        case 'bottom': p2.y = tp.y + handleLength; break;
-        case 'left': p2.x = tp.x - handleLength; break;
-        case 'right': p2.x = tp.x + handleLength; break;
-        default: p2.x = tp.x - handleLength * Math.sign(dx || 1);
+    if (toDot < -0.3) {
+        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3);
+        p2.x -= dirX * dist * blendFactor;
+        p2.y -= dirY * dist * blendFactor;
     }
 
     // Get midpoint on the actual Bezier curve
@@ -209,7 +247,7 @@ export function updateConnectionArrow(c) {
     if (c.dir === 'forward' || c.dir === 'both') {
         const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         // Arrow pointing in direction of curve
-        const offset = 8;
+        const offset = c.dir === 'both' ? 14 : 0;
         const ax = mid.x + offset * Math.cos(angle);
         const ay = mid.y + offset * Math.sin(angle);
         // Calculate arrow vertices
@@ -228,7 +266,7 @@ export function updateConnectionArrow(c) {
     if (c.dir === 'backward' || c.dir === 'both') {
         const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         // Arrow pointing opposite to direction of curve
-        const offset = -8;
+        const offset = c.dir === 'both' ? -14 : 0;
         const ax = mid.x + offset * Math.cos(angle);
         const ay = mid.y + offset * Math.sin(angle);
         const reverseAngle = angle + Math.PI;
@@ -269,6 +307,7 @@ export function deleteConnection(c, save = true) {
     if (i > -1) {
         state.connections.splice(i, 1);
         c.el.remove();
+        if (c.hitArea) c.hitArea.remove();
         if (c.arrow) c.arrow.remove();
         state.setSelectedConn(null);
         if (save) {

@@ -29,48 +29,60 @@ export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const handleLength = Math.max(40, Math.min(dist * 0.4, 120));
 
-    // Calculate control point offsets based on handle direction
-    let cp1x = x1, cp1y = y1;
-    let cp2x = x2, cp2y = y2;
+    // Get handle directions as unit vectors
+    const handleDirs = {
+        top: { x: 0, y: -1 },
+        bottom: { x: 0, y: 1 },
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 }
+    };
 
-    // First control point - direction from source handle
-    switch (fromHandle) {
-        case 'top':
-            cp1y = y1 - handleLength;
-            break;
-        case 'bottom':
-            cp1y = y1 + handleLength;
-            break;
-        case 'left':
-            cp1x = x1 - handleLength;
-            break;
-        case 'right':
-            cp1x = x1 + handleLength;
-            break;
-        default:
-            // Fallback: horizontal direction based on dx
-            cp1x = x1 + handleLength * Math.sign(dx || 1);
+    // Direction from start to end
+    const dirX = dist > 0 ? dx / dist : 1;
+    const dirY = dist > 0 ? dy / dist : 0;
+
+    // Get handle direction vectors
+    const fromDir = handleDirs[fromHandle] || { x: Math.sign(dx || 1), y: 0 };
+    const toDir = handleDirs[toHandle] || { x: -Math.sign(dx || 1), y: 0 };
+
+    // Calculate dot product to detect opposing directions
+    // This tells us if the handle direction opposes the target direction
+    const fromDot = fromDir.x * dirX + fromDir.y * dirY;
+    const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
+
+    // Base handle length scales with distance
+    const baseHandleLength = Math.max(40, Math.min(dist * 0.35, 100));
+
+    // Adjust handle length based on alignment with target direction
+    // If handle direction opposes target, use shorter handle with curve adjustment
+    // This prevents sharp bends when nodes are positioned opposite to handle direction
+    const fromAlignmentFactor = Math.max(0.4, (1 + fromDot) / 2);
+    const toAlignmentFactor = Math.max(0.4, (1 + toDot) / 2);
+
+    const fromHandleLength = baseHandleLength * (0.6 + fromAlignmentFactor * 0.8);
+    const toHandleLength = baseHandleLength * (0.6 + toAlignmentFactor * 0.8);
+
+    // Calculate control points
+    // When handle direction opposes target, blend in some perpendicular movement
+    // to create smoother S-curves instead of sharp bends
+    let cp1x = x1 + fromDir.x * fromHandleLength;
+    let cp1y = y1 + fromDir.y * fromHandleLength;
+    let cp2x = x2 + toDir.x * toHandleLength;
+    let cp2y = y2 + toDir.y * toHandleLength;
+
+    // For opposing directions, add a subtle curve towards the target
+    // This creates smoother transitions when handles point away from target
+    if (fromDot < -0.3) {
+        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3);
+        cp1x += dirX * dist * blendFactor;
+        cp1y += dirY * dist * blendFactor;
     }
 
-    // Second control point - direction into target handle
-    switch (toHandle) {
-        case 'top':
-            cp2y = y2 - handleLength;
-            break;
-        case 'bottom':
-            cp2y = y2 + handleLength;
-            break;
-        case 'left':
-            cp2x = x2 - handleLength;
-            break;
-        case 'right':
-            cp2x = x2 + handleLength;
-            break;
-        default:
-            // Fallback: horizontal direction based on dx
-            cp2x = x2 - handleLength * Math.sign(dx || 1);
+    if (toDot < -0.3) {
+        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3);
+        cp2x -= dirX * dist * blendFactor;
+        cp2y -= dirY * dist * blendFactor;
     }
 
     return `M${x1} ${y1} C${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
