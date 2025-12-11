@@ -8,6 +8,62 @@ import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle } from './sto
 
 const canvas = $('canvas');
 
+// ============ Markdown Parser ============
+
+function parseMarkdown(text) {
+    if (!text) return '';
+    let html = esc(text);
+
+    // Headings: # ## ###
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // Horizontal rule: ---
+    html = html.replace(/^---$/gm, '<hr>');
+
+    // Blockquote: > text
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // Bold: **text**
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Strikethrough: ~~text~~
+    html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+    // Underline: __text__
+    html = html.replace(/__(.+?)__/g, '<u>$1</u>');
+
+    // Unordered list: - item
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+    // Ordered list: 1. item
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+
+    // Clean up consecutive blockquotes
+    html = html.replace(/<\/blockquote><br><blockquote>/g, '</blockquote><blockquote>');
+
+    return html;
+}
+
+function getPlainText(el) {
+    // Get plain text from contenteditable, preserving line breaks
+    const clone = el.cloneNode(true);
+    // Replace block elements with newlines
+    clone.querySelectorAll('h1, h2, h3, p, div, li, blockquote, hr').forEach(block => {
+        block.insertAdjacentText('beforebegin', '\n');
+    });
+    clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+    let text = clone.textContent || '';
+    // Clean up multiple newlines
+    text = text.replace(/\n{3,}/g, '\n\n').trim();
+    return text;
+}
+
 // External function references (set by other modules)
 let updateAllConnectionsFn = () => {};
 let updateConnectionFn = () => {};
@@ -62,7 +118,7 @@ export function createItem(cfg, loading = false) {
             html = `<video class="item-video" src="${mediaSrc}" controls></video>`;
             break;
         case 'memo':
-            html = `<div class="item-memo"><textarea class="memo-body" placeholder="Quick memo...">${esc(cfg.content)}</textarea></div>`;
+            html = `<div class="item-memo"><div class="memo-body" contenteditable="true" data-placeholder="Write something...">${parseMarkdown(cfg.content || '')}</div><div class="memo-toolbar"><button class="md-btn" data-md="heading" title="Heading"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M4 6h16"/></svg></button><button class="md-btn" data-md="bold" title="Bold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6zM6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"/></svg></button><button class="md-btn" data-md="strike" title="Strikethrough"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4H9a3 3 0 000 6h6a3 3 0 010 6H8M4 12h16"/></svg></button><button class="md-btn" data-md="underline" title="Underline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4v6a6 6 0 0012 0V4M4 20h16"/></svg></button></div></div>`;
             break;
         case 'link':
             html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`;
@@ -224,11 +280,142 @@ function setupItemEvents(item) {
 
     if (item.type === 'memo') {
         const mb = el.querySelector('.memo-body');
+        const toolbar = el.querySelector('.memo-toolbar');
+
+        // Handle input - store plain text, render markdown
         mb.addEventListener('input', () => {
-            item.content = mb.value;
+            item.content = getPlainText(mb);
             autoResizeItem(item);
             triggerAutoSaveFn();
         });
+
+        // Handle blur - re-render markdown
+        mb.addEventListener('blur', () => {
+            const pos = saveCaretPosition(mb);
+            mb.innerHTML = parseMarkdown(item.content || '');
+            if (document.activeElement === mb) restoreCaretPosition(mb, pos);
+            toolbar.classList.remove('active');
+        });
+
+        // Show toolbar on focus
+        mb.addEventListener('focus', () => {
+            toolbar.classList.add('active');
+        });
+
+        // Markdown toolbar buttons
+        toolbar.querySelectorAll('.md-btn').forEach(btn => {
+            btn.addEventListener('mousedown', e => {
+                e.preventDefault(); // Prevent blur
+            });
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const md = btn.dataset.md;
+                applyMarkdown(mb, md, item);
+            });
+        });
+    }
+}
+
+// Save caret position
+function saveCaretPosition(el) {
+    const sel = window.getSelection();
+    if (sel.rangeCount === 0) return 0;
+    const range = sel.getRangeAt(0);
+    const preRange = range.cloneRange();
+    preRange.selectNodeContents(el);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    return preRange.toString().length;
+}
+
+// Restore caret position
+function restoreCaretPosition(el, pos) {
+    const sel = window.getSelection();
+    const range = document.createRange();
+    let currentPos = 0;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+        if (currentPos + node.length >= pos) {
+            range.setStart(node, pos - currentPos);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return;
+        }
+        currentPos += node.length;
+    }
+}
+
+// Apply markdown formatting
+function applyMarkdown(el, type, item) {
+    const sel = window.getSelection();
+    if (sel.rangeCount === 0) return;
+
+    const text = item.content || '';
+    const lines = text.split('\n');
+
+    // Get current line
+    const pos = saveCaretPosition(el);
+    let charCount = 0;
+    let lineIndex = 0;
+    for (let i = 0; i < lines.length; i++) {
+        if (charCount + lines[i].length >= pos) {
+            lineIndex = i;
+            break;
+        }
+        charCount += lines[i].length + 1; // +1 for newline
+    }
+
+    switch (type) {
+        case 'heading':
+            // Cycle through heading levels
+            if (lines[lineIndex].startsWith('### ')) {
+                lines[lineIndex] = lines[lineIndex].slice(4);
+            } else if (lines[lineIndex].startsWith('## ')) {
+                lines[lineIndex] = '### ' + lines[lineIndex].slice(3);
+            } else if (lines[lineIndex].startsWith('# ')) {
+                lines[lineIndex] = '## ' + lines[lineIndex].slice(2);
+            } else {
+                lines[lineIndex] = '# ' + lines[lineIndex];
+            }
+            break;
+        case 'bold':
+            wrapSelection(el, '**', '**');
+            return;
+        case 'strike':
+            wrapSelection(el, '~~', '~~');
+            return;
+        case 'underline':
+            wrapSelection(el, '__', '__');
+            return;
+    }
+
+    item.content = lines.join('\n');
+    el.innerHTML = parseMarkdown(item.content);
+    triggerAutoSaveFn();
+}
+
+// Wrap selection with markers
+function wrapSelection(el, before, after) {
+    const sel = window.getSelection();
+    if (sel.rangeCount === 0) return;
+
+    const range = sel.getRangeAt(0);
+    const text = range.toString();
+
+    if (text) {
+        document.execCommand('insertText', false, before + text + after);
+    } else {
+        document.execCommand('insertText', false, before + after);
+        // Move cursor between markers
+        const newRange = document.createRange();
+        const textNode = sel.focusNode;
+        if (textNode) {
+            newRange.setStart(textNode, sel.focusOffset - after.length);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        }
     }
 }
 
@@ -278,25 +465,19 @@ export function setItemFontSize(item) {
 // Auto-resize item based on content
 export function autoResizeItem(item) {
     if (item.type !== 'memo') return;
-    const textarea = item.el.querySelector('.memo-body');
-    if (!textarea) return;
+    const memoBody = item.el.querySelector('.memo-body');
+    if (!memoBody) return;
 
     let fontMultiplier = 1;
     if (item.fontSize === 'medium') fontMultiplier = 1.1;
     else if (item.fontSize === 'large') fontMultiplier = 1.25;
     else if (item.fontSize === 'xlarge') fontMultiplier = 1.4;
 
-    // Temporarily remove flex to measure true content height
-    const origFlex = textarea.style.flex;
-    const origH = textarea.style.height;
-    textarea.style.flex = 'none';
-    textarea.style.height = '0px';
-    const scrollH = textarea.scrollHeight;
-    textarea.style.height = origH;
-    textarea.style.flex = origFlex;
+    // Measure content height
+    const scrollH = memoBody.scrollHeight;
 
-    // Memo layout: padding(12*2=24)
-    const extraH = 24;
+    // Memo layout: padding(12*2=24) + toolbar(32)
+    const extraH = 24 + 32;
 
     const minH = Math.round(80 * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
