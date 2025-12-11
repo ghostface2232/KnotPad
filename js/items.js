@@ -655,41 +655,52 @@ export function sortByColor() {
     });
 
     // Calculate layout parameters
-    const horizontalGap = 64; // Horizontal spacing between columns
+    const horizontalGap = 48; // Horizontal spacing between columns
     const verticalGap = 24;   // Vertical spacing between items (smaller since same color)
-    const itemWidth = 180;    // Standard item width
 
-    // Find the visible area center
-    const viewCenterX = (innerWidth / 2 - state.offsetX) / state.scale;
-    const viewCenterY = (innerHeight / 2 - state.offsetY) / state.scale;
-
-    // Calculate total columns needed (one per color that has items)
+    // Get active colors (colors that have items)
     const activeColors = colorOrder.filter(c => {
         const key = c === null ? 'none' : c;
         return groups[key].length > 0;
     });
 
-    // Calculate total width based on item width + horizontal gap
-    const columnWidth = itemWidth + horizontalGap;
-    const totalWidth = activeColors.length * columnWidth - horizontalGap; // No gap after last column
-    const startX = viewCenterX - totalWidth / 2;
-
-    // Place items in columns by color
-    let colIndex = 0;
-    activeColors.forEach(color => {
+    // Calculate max width and total height for each column
+    const columnData = activeColors.map(color => {
         const key = color === null ? 'none' : color;
         const items = groups[key];
+        const maxWidth = Math.max(...items.map(item => item.w));
+        const totalHeight = items.reduce((sum, item, idx) => {
+            return sum + item.h + (idx < items.length - 1 ? verticalGap : 0);
+        }, 0);
+        return { color, key, items, maxWidth, totalHeight };
+    });
 
-        let currentY = viewCenterY - 100;
-        items.forEach((item, rowIndex) => {
-            item.x = startX + colIndex * columnWidth;
+    // Calculate total width and max column height
+    const totalWidth = columnData.reduce((sum, col, idx) => {
+        return sum + col.maxWidth + (idx < columnData.length - 1 ? horizontalGap : 0);
+    }, 0);
+    const maxColumnHeight = Math.max(...columnData.map(col => col.totalHeight));
+
+    // Find the visible area center
+    const viewCenterX = (innerWidth / 2 - state.offsetX) / state.scale;
+    const viewCenterY = (innerHeight / 2 - state.offsetY) / state.scale;
+
+    // Calculate start position to center the grid
+    const startX = viewCenterX - totalWidth / 2;
+    const startY = viewCenterY - maxColumnHeight / 2;
+
+    // Place items in columns by color
+    let currentX = startX;
+    columnData.forEach(col => {
+        let currentY = startY;
+        col.items.forEach(item => {
+            item.x = currentX;
             item.y = currentY;
             item.el.style.left = item.x + 'px';
             item.el.style.top = item.y + 'px';
             currentY += item.h + verticalGap;
         });
-
-        colIndex++;
+        currentX += col.maxWidth + horizontalGap;
     });
 
     updateAllConnectionsFn();

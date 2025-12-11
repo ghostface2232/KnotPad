@@ -42,7 +42,7 @@ export function startConnection(item, handle) {
 export function updateTempLine(ex, ey) {
     if (!state.tempLine || !state.connectSource) return;
     const sp = getHandlePos(state.connectSource, state.connectHandle);
-    state.tempLine.setAttribute('d', curvePath(sp.x, sp.y, ex, ey));
+    state.tempLine.setAttribute('d', curvePath(sp.x, sp.y, ex, ey, state.connectHandle, null));
 }
 
 // Complete a connection
@@ -113,7 +113,7 @@ export function addConnection(from, fh, to, th, loading = false) {
 export function updateConnection(c) {
     const fp = getHandlePos(c.from, c.fh);
     const tp = getHandlePos(c.to, c.th);
-    c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y));
+    c.el.setAttribute('d', curvePath(fp.x, fp.y, tp.x, tp.y, c.fh, c.th));
 
     // Apply color from source node
     if (c.from.color && COLOR_MAP[c.from.color]) {
@@ -165,12 +165,30 @@ export function updateConnectionArrow(c) {
     const dx = tp.x - fp.x;
     const dy = tp.y - fp.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const curve = Math.min(dist * 0.3, 80);
+    const handleLength = Math.max(40, Math.min(dist * 0.4, 120));
 
     const p0 = { x: fp.x, y: fp.y };
-    const p1 = { x: fp.x + curve * Math.sign(dx || 1), y: fp.y };
-    const p2 = { x: tp.x - curve * Math.sign(dx || 1), y: tp.y };
     const p3 = { x: tp.x, y: tp.y };
+
+    // Calculate p1 based on fromHandle direction
+    let p1 = { x: fp.x, y: fp.y };
+    switch (c.fh) {
+        case 'top': p1.y = fp.y - handleLength; break;
+        case 'bottom': p1.y = fp.y + handleLength; break;
+        case 'left': p1.x = fp.x - handleLength; break;
+        case 'right': p1.x = fp.x + handleLength; break;
+        default: p1.x = fp.x + handleLength * Math.sign(dx || 1);
+    }
+
+    // Calculate p2 based on toHandle direction
+    let p2 = { x: tp.x, y: tp.y };
+    switch (c.th) {
+        case 'top': p2.y = tp.y - handleLength; break;
+        case 'bottom': p2.y = tp.y + handleLength; break;
+        case 'left': p2.x = tp.x - handleLength; break;
+        case 'right': p2.x = tp.x + handleLength; break;
+        default: p2.x = tp.x - handleLength * Math.sign(dx || 1);
+    }
 
     // Get midpoint on the actual Bezier curve
     const mid = bezierPoint(p0, p1, p2, p3, 0.5);

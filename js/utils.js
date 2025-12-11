@@ -24,13 +24,56 @@ export function showToast(msg, type = 'success') {
     setTimeout(() => toast.classList.remove('show'), 2000);
 }
 
-// Calculate curved path for connections
-export function curvePath(x1, y1, x2, y2) {
+// Calculate curved path for connections with directional handles
+export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const curve = Math.min(dist * 0.3, 80);
-    return `M${x1} ${y1} C${x1 + curve * Math.sign(dx || 1)} ${y1}, ${x2 - curve * Math.sign(dx || 1)} ${y2}, ${x2} ${y2}`;
+    const handleLength = Math.max(40, Math.min(dist * 0.4, 120));
+
+    // Calculate control point offsets based on handle direction
+    let cp1x = x1, cp1y = y1;
+    let cp2x = x2, cp2y = y2;
+
+    // First control point - direction from source handle
+    switch (fromHandle) {
+        case 'top':
+            cp1y = y1 - handleLength;
+            break;
+        case 'bottom':
+            cp1y = y1 + handleLength;
+            break;
+        case 'left':
+            cp1x = x1 - handleLength;
+            break;
+        case 'right':
+            cp1x = x1 + handleLength;
+            break;
+        default:
+            // Fallback: horizontal direction based on dx
+            cp1x = x1 + handleLength * Math.sign(dx || 1);
+    }
+
+    // Second control point - direction into target handle
+    switch (toHandle) {
+        case 'top':
+            cp2y = y2 - handleLength;
+            break;
+        case 'bottom':
+            cp2y = y2 + handleLength;
+            break;
+        case 'left':
+            cp2x = x2 - handleLength;
+            break;
+        case 'right':
+            cp2x = x2 + handleLength;
+            break;
+        default:
+            // Fallback: horizontal direction based on dx
+            cp2x = x2 - handleLength * Math.sign(dx || 1);
+    }
+
+    return `M${x1} ${y1} C${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
 }
 
 // Find free position for new items (avoid overlap)
