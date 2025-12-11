@@ -16,6 +16,7 @@ export let isSpacePanning = false;
 export let isSelecting = false;
 export let selStartX = 0;
 export let selStartY = 0;
+export let isSelectingText = false;
 
 // Items and connections
 export let items = [];
@@ -91,6 +92,7 @@ export function setIsSpacePanning(val) { isSpacePanning = val; }
 export function setIsSelecting(val) { isSelecting = val; }
 export function setSelStartX(val) { selStartX = val; }
 export function setSelStartY(val) { selStartY = val; }
+export function setIsSelectingText(val) { isSelectingText = val; }
 export function setSelectedConn(val) { selectedConn = val; }
 export function setHighestZ(val) { highestZ = val; }
 export function incrementHighestZ() { return ++highestZ; }

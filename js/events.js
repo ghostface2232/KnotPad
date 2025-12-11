@@ -54,6 +54,8 @@ export function setupMouseEvents() {
         }
 
         if (e.button === 0 && (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app)) {
+            // Don't start box selection if text is being selected in a memo
+            if (state.isSelectingText) return;
             if (!e.shiftKey) deselectAll();
             state.setIsSelecting(true);
             state.setSelStartX(e.clientX);
@@ -97,7 +99,7 @@ export function setupMouseEvents() {
             return;
         }
 
-        if (state.isSelecting) {
+        if (state.isSelecting && !state.isSelectingText) {
             const minX = Math.min(state.selStartX, e.clientX);
             const maxX = Math.max(state.selStartX, e.clientX);
             const minY = Math.min(state.selStartY, e.clientY);
