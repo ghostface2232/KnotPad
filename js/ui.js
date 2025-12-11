@@ -215,7 +215,7 @@ export function redo() {
 }
 
 function restoreState(stateData) {
-    state.connections.forEach(c => c.el.remove());
+    state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); });
     state.connections.length = 0;
     state.items.forEach(i => i.el.remove());
     state.items.length = 0;
@@ -383,7 +383,7 @@ async function loadCanvasData(id) {
 export async function switchCanvas(id) {
     state.blobURLCache.forEach(url => URL.revokeObjectURL(url));
     state.blobURLCache.clear();
-    state.connections.forEach(c => { c.el.remove(); if (c.arrow) c.arrow.remove(); });
+    state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); });
     state.connections.length = 0;
     state.items.forEach(i => i.el.remove());
     state.items.length = 0;
@@ -739,13 +739,8 @@ export function closeSettingsModal() {
 
 function updateStorageModalState() {
     const connected = !!fsDirectoryHandle;
-    const connectBtn = $('storageConnectBtn');
-    const disconnectBtn = $('storageDisconnectBtn');
     const browserCard = $('browserStorageCard');
     const fileCard = $('fileStorageCard');
-    const pathSection = $('storagePathSection');
-    const pathStatus = $('storagePathStatus');
-    const pathDisplay = $('storagePathDisplay');
     const fileStorageBadge = $('fileStorageBadge');
 
     // Update cards active state
@@ -759,33 +754,11 @@ function updateStorageModalState() {
         }
     }
 
-    // Show/hide path section
-    if (pathSection) {
-        pathSection.classList.toggle('active', fileCard?.classList.contains('active'));
-    }
-
-    // Update connect/disconnect buttons
-    if (connectBtn) connectBtn.style.display = connected ? 'none' : 'flex';
-    if (disconnectBtn) disconnectBtn.style.display = connected ? 'flex' : 'none';
-
-    // Update path status
-    if (pathStatus) {
-        pathStatus.classList.toggle('connected', connected);
-        pathStatus.innerHTML = connected
-            ? '<span class="status-dot"></span><span>Connected</span>'
-            : '<span class="status-dot"></span><span>Not connected</span>';
-    }
-
-    // Update path display
-    if (pathDisplay) {
-        const folderName = fsDirectoryHandle?.name || 'No folder selected';
-        pathDisplay.querySelector('span').textContent = connected ? folderName : 'No folder selected';
-    }
-
-    // Update badge
+    // Update badge with folder name
     if (fileStorageBadge) {
         if (connected) {
-            fileStorageBadge.textContent = 'Connected';
+            const folderName = fsDirectoryHandle?.name || 'Connected';
+            fileStorageBadge.textContent = folderName;
             fileStorageBadge.classList.remove('disconnected');
         } else {
             fileStorageBadge.textContent = 'Not Connected';
@@ -852,7 +825,6 @@ export function setupSettingsModal() {
     // Storage card selection
     const browserCard = $('browserStorageCard');
     const fileCard = $('fileStorageCard');
-    const pathSection = $('storagePathSection');
 
     // Disable File Storage card if File System API is not supported
     if (fileCard && !isFileSystemSupported()) {
@@ -868,39 +840,18 @@ export function setupSettingsModal() {
                 await disconnectStorageFolder();
                 updateStorageModalState();
             }
-            browserCard.classList.add('active');
-            fileCard?.classList.remove('active');
-            pathSection?.classList.remove('active');
         });
     }
 
     if (fileCard) {
-        fileCard.addEventListener('click', () => {
+        fileCard.addEventListener('click', async () => {
             // Don't allow selection if disabled (API not supported)
             if (fileCard.classList.contains('disabled')) return;
-            browserCard?.classList.remove('active');
-            fileCard.classList.add('active');
-            pathSection?.classList.add('active');
-        });
-    }
-
-    // Storage buttons
-    const connectBtn = $('storageConnectBtn');
-    const disconnectBtn = $('storageDisconnectBtn');
-
-    if (connectBtn) {
-        connectBtn.addEventListener('click', async () => {
+            // Immediately open folder picker
             const success = await selectStorageFolder();
             if (success) {
                 updateStorageModalState();
             }
-        });
-    }
-
-    if (disconnectBtn) {
-        disconnectBtn.addEventListener('click', async () => {
-            await disconnectStorageFolder();
-            updateStorageModalState();
         });
     }
 

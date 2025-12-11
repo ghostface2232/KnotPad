@@ -68,8 +68,9 @@ input, textarea, button { font-family: inherit; }
 
 #connectionsSvg { position: absolute; inset: -10000px; width: 20000px; height: 20000px; pointer-events: none; overflow: visible; }
 
+.connection-hit-area { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
 .connection-line { fill: none; stroke: var(--conn-default); stroke-width: 2; pointer-events: stroke; cursor: pointer; }
-.connection-line:hover { stroke: var(--conn-hover); stroke-width: 3; }
+.connection-hit-area:hover + .connection-line, .connection-line:hover { stroke: var(--conn-hover); stroke-width: 3; }
 .connection-line.selected { stroke: var(--accent); stroke-width: 3; }
 .connection-line.temp { stroke: var(--accent-dim); stroke-dasharray: 6 4; opacity: 0.7; }
 
