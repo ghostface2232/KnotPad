@@ -118,7 +118,7 @@ export function createItem(cfg, loading = false) {
             html = `<video class="item-video" src="${mediaSrc}" controls></video>`;
             break;
         case 'memo':
-            html = `<div class="item-memo"><div class="memo-body" contenteditable="true" data-placeholder="Write something...">${parseMarkdown(cfg.content || '')}</div><div class="memo-toolbar"><button class="md-btn" data-md="heading" title="Heading"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h12M6 4v16M18 4v16"/></svg></button><button class="md-btn" data-md="bold" title="Bold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5h6a3.5 3.5 0 010 7H7z"/><path d="M7 12h7a3.5 3.5 0 010 7H7z"/><path d="M7 5v14"/></svg></button><button class="md-btn" data-md="strike" title="Strikethrough"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/><path d="M4 12h16"/></svg></button><button class="md-btn" data-md="underline" title="Underline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6a6 6 0 0012 0V4"/><path d="M4 20h16"/></svg></button></div></div>`;
+            html = `<div class="item-memo"><div class="memo-body" contenteditable="true" data-placeholder="Write something...">${parseMarkdown(cfg.content || '')}</div></div>`;
             break;
         case 'link':
             html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`;
@@ -138,7 +138,11 @@ export function createItem(cfg, loading = false) {
         ? `<button class="font-size-btn" title="Font Size"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>`
         : '';
 
-    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn">×</button>${fontSizeBtn}<button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="2" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r="2" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
+    const memoToolbar = cfg.type === 'memo'
+        ? `<div class="memo-toolbar-popup"><button class="md-btn" data-md="heading" title="Heading"><svg width="14" height="17" viewBox="0 0 27 34" fill="currentColor"><path d="M2.07 33.82c-1.26 0-2.07-.83-2.07-2.14V2.14C0 .83.8 0 2.07 0c1.26 0 2.07.83 2.07 2.14v12.53h18.2V2.14c0-1.31.81-2.14 2.07-2.14 1.27 0 2.07.83 2.07 2.14v29.54c0 1.31-.8 2.14-2.07 2.14-1.26 0-2.07-.83-2.07-2.14V18.39H4.14v13.29c0 1.31-.81 2.14-2.07 2.14z"/></svg></button><button class="md-btn" data-md="bold" title="Bold"><svg width="13" height="17" viewBox="0 0 25 33" fill="currentColor"><path d="M2.9 32.49C1.1 32.49 0 31.37 0 29.48V3.02C0 1.13 1.1 0 2.9 0h10.59c5.9 0 9.7 3.18 9.7 8.11 0 3.49-2.59 6.53-5.92 7.07v.18c4.41.43 7.5 3.6 7.5 7.9 0 5.72-4.21 9.23-11.15 9.23H2.9zM5.81 13.69h5.31c4.05 0 6.33-1.71 6.33-4.73 0-2.84-1.96-4.44-5.43-4.44H5.81v9.17zm0 14.28h6.49c4.28 0 6.55-1.78 6.55-5.11 0-3.31-2.34-5.05-6.8-5.05H5.81v10.16z"/></svg></button><button class="md-btn" data-md="strike" title="Strikethrough"><svg width="18" height="18" viewBox="0 0 35 35" fill="currentColor"><path d="M17.5 0c5.65 0 10.2 2.84 11.42 7.41.07.26.12.61.12 1.05 0 1.15-.8 1.9-1.92 1.9-1.08 0-1.74-.56-2.11-1.64-1.17-3.42-3.96-4.92-7.62-4.92-4.22 0-7.48 2.06-7.48 5.51 0 2.67 1.81 4.5 6.42 5.51l3.75.82c.13.03.26.06.39.09h12.76a1.75 1.75 0 110 3.5h-5.35c1.41 1.46 2.07 3.28 2.07 5.55 0 6.26-4.92 10.17-12.5 10.17-6.35 0-10.87-2.86-12.14-6.94-.14-.47-.23-.98-.23-1.48 0-1.34.75-2.18 1.95-2.18 1.05 0 1.71.54 2.04 1.67 1.03 3.49 4.36 5.13 8.62 5.13 4.59 0 7.92-2.41 7.92-5.74 0-2.84-1.87-4.71-6.56-5.74l-2.02-.44H1.75a1.75 1.75 0 110-3.5h6.47c-1.81-1.6-2.64-3.67-2.64-6.23 0-5.58 4.92-9.49 12.01-9.49z"/></svg></button><button class="md-btn" data-md="underline" title="Underline"><svg width="16" height="19" viewBox="0 0 31 36" fill="currentColor"><path d="M15.18 30.71C6.79 30.71 1.75 25.51 1.75 18.29V2.18C1.75.84 2.57 0 3.86 0s2.11.84 2.11 2.18v15.83c0 5.11 3.35 8.81 9.21 8.81s9.21-3.7 9.21-8.81V2.18C24.39.84 25.21 0 26.5 0s2.11.84 2.11 2.18v16.11c0 7.22-5.04 12.42-13.43 12.42z"/><path d="M28.61 32.4a1.75 1.75 0 110 3.5H1.75a1.75 1.75 0 110-3.5h26.86z"/></svg></button></div>`
+        : '';
+
+    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn">×</button>${fontSizeBtn}<button class="color-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="2" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r="2" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div>${memoToolbar}<div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>`;
 
     canvas.appendChild(el);
 
@@ -162,8 +166,14 @@ export function createItem(cfg, loading = false) {
 
     if (!loading) {
         throttledMinimap();
-        if (state.activeFilter !== 'all' && item.color !== state.activeFilter) {
-            item.el.classList.add('filtered-out');
+        if (state.activeFilter !== 'all') {
+            if (state.activeFilter === 'none') {
+                if (item.color !== null) {
+                    item.el.classList.add('filtered-out');
+                }
+            } else if (item.color !== state.activeFilter) {
+                item.el.classList.add('filtered-out');
+            }
         }
     }
 
@@ -283,7 +293,7 @@ function setupItemEvents(item) {
 
     if (item.type === 'memo') {
         const mb = el.querySelector('.memo-body');
-        const toolbar = el.querySelector('.memo-toolbar');
+        const toolbar = el.querySelector('.memo-toolbar-popup');
 
         // Handle input - save content and auto-resize
         mb.addEventListener('input', () => {
@@ -292,9 +302,13 @@ function setupItemEvents(item) {
             triggerAutoSaveFn();
         });
 
-        // Handle blur - hide toolbar
+        // Handle blur - hide toolbar after small delay (allow button clicks)
         mb.addEventListener('blur', () => {
-            toolbar.classList.remove('active');
+            setTimeout(() => {
+                if (!el.matches(':hover')) {
+                    toolbar.classList.remove('active');
+                }
+            }, 150);
         });
 
         // Show toolbar on focus
@@ -389,7 +403,11 @@ export function setItemColor(targetItem, color) {
             o.classList.toggle('selected', o.dataset.color === (color || ''))
         );
         if (state.activeFilter !== 'all') {
-            item.el.classList.toggle('filtered-out', item.color !== state.activeFilter);
+            if (state.activeFilter === 'none') {
+                item.el.classList.toggle('filtered-out', item.color !== null);
+            } else {
+                item.el.classList.toggle('filtered-out', item.color !== state.activeFilter);
+            }
         }
         // Update connections from this node
         state.connections.filter(c => c.from === item).forEach(updateConnectionFn);
@@ -431,7 +449,7 @@ export function autoResizeItem(item) {
     else if (item.fontSize === 'xlarge') fontMultiplier = 1.4;
 
     // Get minimum and maximum height based on font size
-    const minH = Math.round(120 * fontMultiplier);
+    const minH = Math.round(80 * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
 
     // Get line height for line-based change detection
@@ -441,8 +459,8 @@ export function autoResizeItem(item) {
     // Use scrollHeight to measure actual content including word-wrap
     const contentH = memoBody.scrollHeight;
 
-    // Memo layout: padding(12*2=24) + toolbar(~38) + buffer(3)
-    const extraH = 24 + 38 + 3;
+    // Memo layout: padding(12*2=24) + buffer(3)
+    const extraH = 24 + 3;
 
     // Calculate new height - fit to content within min/max bounds
     const targetH = contentH + extraH;
@@ -554,7 +572,7 @@ function getDefaultHeight(fontSize) {
     else if (fontSize === 'large') fontMultiplier = 1.25;
     else if (fontSize === 'xlarge') fontMultiplier = 1.4;
 
-    return Math.round(120 * fontMultiplier);
+    return Math.round(100 * fontMultiplier);
 }
 
 // Add memo
@@ -603,8 +621,78 @@ export function setFilter(color) {
         o.classList.toggle('selected', o.dataset.color === color)
     );
     $('filterBtn').classList.toggle('filter-active', color !== 'all');
-    state.items.forEach(item =>
-        item.el.classList.toggle('filtered-out', color !== 'all' && item.color !== color)
-    );
+
+    state.items.forEach(item => {
+        let isFilteredOut = false;
+        if (color === 'all') {
+            isFilteredOut = false;
+        } else if (color === 'none') {
+            // Show only items without a color
+            isFilteredOut = item.color !== null;
+        } else {
+            // Show only items with the specified color
+            isFilteredOut = item.color !== color;
+        }
+        item.el.classList.toggle('filtered-out', isFilteredOut);
+    });
     throttledMinimap();
+}
+
+// Sort items by color tag and arrange in grid
+export function sortByColor() {
+    if (state.items.length === 0) return;
+
+    // Color order: red, orange, yellow, green, blue, purple, pink, then no color (null)
+    const colorOrder = [...COLORS, null];
+
+    // Group items by color
+    const groups = {};
+    colorOrder.forEach(c => groups[c === null ? 'none' : c] = []);
+
+    state.items.forEach(item => {
+        const key = item.color || 'none';
+        if (groups[key]) {
+            groups[key].push(item);
+        } else {
+            groups['none'].push(item);
+        }
+    });
+
+    // Calculate layout parameters
+    const padding = 48; // Spacing between items
+    const columnWidth = 200; // Width per column including padding
+
+    // Find the visible area center
+    const viewCenterX = (innerWidth / 2 - state.offsetX) / state.scale;
+    const viewCenterY = (innerHeight / 2 - state.offsetY) / state.scale;
+
+    // Calculate total columns needed (one per color that has items)
+    const activeColors = colorOrder.filter(c => {
+        const key = c === null ? 'none' : c;
+        return groups[key].length > 0;
+    });
+
+    const totalWidth = activeColors.length * columnWidth;
+    const startX = viewCenterX - totalWidth / 2;
+
+    // Place items in columns by color
+    let colIndex = 0;
+    activeColors.forEach(color => {
+        const key = color === null ? 'none' : color;
+        const items = groups[key];
+
+        items.forEach((item, rowIndex) => {
+            item.x = startX + colIndex * columnWidth;
+            item.y = viewCenterY - 100 + rowIndex * (item.h + padding);
+            item.el.style.left = item.x + 'px';
+            item.el.style.top = item.y + 'px';
+        });
+
+        colIndex++;
+    });
+
+    updateAllConnectionsFn();
+    updateMinimap();
+    saveStateFn();
+    triggerAutoSaveFn();
 }

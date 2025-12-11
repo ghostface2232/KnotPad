@@ -102,8 +102,15 @@ export function setupMouseEvents() {
             const rect = app.getBoundingClientRect();
             const curX = (e.clientX - rect.left - state.offsetX) / state.scale;
             const curY = (e.clientY - rect.top - state.offsetY) / state.scale;
-            const newX = curX - state.draggedItem.ox;
-            const newY = curY - state.draggedItem.oy;
+            let newX = curX - state.draggedItem.ox;
+            let newY = curY - state.draggedItem.oy;
+
+            // Apply grid snap if enabled
+            if (state.gridSnap) {
+                newX = Math.round(newX / state.GRID_SIZE) * state.GRID_SIZE;
+                newY = Math.round(newY / state.GRID_SIZE) * state.GRID_SIZE;
+            }
+
             const dx = newX - state.draggedItem.x;
             const dy = newY - state.draggedItem.y;
 
@@ -119,8 +126,15 @@ export function setupMouseEvents() {
 
         if (state.resizingItem) {
             const rect = app.getBoundingClientRect();
-            const x = (e.clientX - rect.left - state.offsetX) / state.scale;
-            const y = (e.clientY - rect.top - state.offsetY) / state.scale;
+            let x = (e.clientX - rect.left - state.offsetX) / state.scale;
+            let y = (e.clientY - rect.top - state.offsetY) / state.scale;
+
+            // Apply grid snap to the bottom-right corner if enabled
+            if (state.gridSnap) {
+                x = Math.round(x / state.GRID_SIZE) * state.GRID_SIZE;
+                y = Math.round(y / state.GRID_SIZE) * state.GRID_SIZE;
+            }
+
             state.resizingItem.w = Math.max(140, x - state.resizingItem.x);
             state.resizingItem.h = Math.max(80, y - state.resizingItem.y);
             state.resizingItem.el.style.width = state.resizingItem.w + 'px';

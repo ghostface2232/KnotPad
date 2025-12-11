@@ -818,6 +818,12 @@ function updateSettingsUI() {
     if (invertWheelZoomCheckbox) {
         invertWheelZoomCheckbox.checked = state.invertWheelZoom;
     }
+
+    // Update grid snap toggle
+    const gridSnapCheckbox = $('gridSnapToggle');
+    if (gridSnapCheckbox) {
+        gridSnapCheckbox.checked = state.gridSnap;
+    }
 }
 
 export function setupSettingsModal() {
@@ -922,6 +928,14 @@ export function setupSettingsModal() {
     if (invertWheelZoomCheckbox) {
         invertWheelZoomCheckbox.addEventListener('change', () => {
             state.setInvertWheelZoom(invertWheelZoomCheckbox.checked);
+        });
+    }
+
+    // Grid snap
+    const gridSnapCheckbox = $('gridSnapToggle');
+    if (gridSnapCheckbox) {
+        gridSnapCheckbox.addEventListener('change', () => {
+            state.setGridSnap(gridSnapCheckbox.checked);
         });
     }
 }
