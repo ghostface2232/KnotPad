@@ -531,6 +531,8 @@ input, textarea, button { font-family: inherit; }
 .storage-indicator:hover { color: var(--text-primary); }
 .storage-indicator.connected { color: var(--tag-green); }
 .storage-indicator.connected:hover { color: var(--tag-green); background: rgba(34, 197, 94, 0.1); }
+.storage-indicator.needs-permission { color: var(--tag-orange); }
+.storage-indicator.needs-permission:hover { color: var(--tag-orange); background: rgba(249, 115, 22, 0.1); }
 .storage-status-text {
     font-size: 11px;
     white-space: nowrap;
