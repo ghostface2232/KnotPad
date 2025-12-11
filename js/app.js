@@ -4,7 +4,7 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
-import { setExternalFunctions as setItemsExternal, createItem, addNote, addMemo, setFilter, setItemColor } from './items.js';
+import { setExternalFunctions as setItemsExternal, createItem, addMemo, setFilter, setItemColor } from './items.js';
 import {
     setExternalFunctions as setConnectionsExternal,
     setupConnDirectionPicker,
@@ -81,13 +81,6 @@ setUIExternal({
 // ============ Setup Toolbar Events ============
 
 function setupToolbarEvents() {
-    $('addNoteBtn').addEventListener('click', () => {
-        const x = (innerWidth / 2 - state.offsetX) / state.scale - 110;
-        const y = (innerHeight / 2 - state.offsetY) / state.scale - 70;
-        addNote('', '', x, y);
-        saveState();
-    });
-
     $('addMemoBtn').addEventListener('click', () => {
         const x = (innerWidth / 2 - state.offsetX) / state.scale - 90;
         const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;

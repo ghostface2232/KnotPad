@@ -61,9 +61,6 @@ export function createItem(cfg, loading = false) {
         case 'video':
             html = `<video class="item-video" src="${mediaSrc}" controls></video>`;
             break;
-        case 'note':
-            html = `<div class="item-note"><input class="note-title" placeholder="Title..." value="${esc(cfg.content.title)}"><textarea class="note-body" placeholder="Write something...">${esc(cfg.content.body)}</textarea></div>`;
-            break;
         case 'memo':
             html = `<div class="item-memo"><textarea class="memo-body" placeholder="Quick memo...">${esc(cfg.content)}</textarea></div>`;
             break;
@@ -77,11 +74,11 @@ export function createItem(cfg, loading = false) {
         el.classList.add('has-color');
     }
 
-    if (cfg.fontSize && (cfg.type === 'note' || cfg.type === 'memo')) {
+    if (cfg.fontSize && cfg.type === 'memo') {
         el.classList.add('font-size-' + cfg.fontSize);
     }
 
-    const fontSizeBtn = (cfg.type === 'note' || cfg.type === 'memo')
+    const fontSizeBtn = cfg.type === 'memo'
         ? `<button class="font-size-btn" title="Font Size"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>`
         : '';
 
@@ -225,21 +222,6 @@ function setupItemEvents(item) {
         showContextMenuFn(e.clientX, e.clientY, item);
     });
 
-    if (item.type === 'note') {
-        const ti = el.querySelector('.note-title');
-        const tb = el.querySelector('.note-body');
-        ti.addEventListener('input', () => {
-            item.content.title = ti.value;
-            autoResizeItem(item);
-            triggerAutoSaveFn();
-        });
-        tb.addEventListener('input', () => {
-            item.content.body = tb.value;
-            autoResizeItem(item);
-            triggerAutoSaveFn();
-        });
-    }
-
     if (item.type === 'memo') {
         const mb = el.querySelector('.memo-body');
         mb.addEventListener('input', () => {
@@ -278,7 +260,7 @@ export function setItemColor(targetItem, color) {
 
 // Set item font size
 export function setItemFontSize(item) {
-    if (item.type !== 'note' && item.type !== 'memo') return;
+    if (item.type !== 'memo') return;
     const currentIndex = FONT_SIZES.indexOf(item.fontSize);
     const nextIndex = (currentIndex + 1) % FONT_SIZES.length;
     const newSize = FONT_SIZES[nextIndex];
@@ -295,8 +277,8 @@ export function setItemFontSize(item) {
 
 // Auto-resize item based on content
 export function autoResizeItem(item) {
-    if (item.type !== 'note' && item.type !== 'memo') return;
-    const textarea = item.el.querySelector('.note-body, .memo-body');
+    if (item.type !== 'memo') return;
+    const textarea = item.el.querySelector('.memo-body');
     if (!textarea) return;
 
     let fontMultiplier = 1;
@@ -313,19 +295,10 @@ export function autoResizeItem(item) {
     textarea.style.height = origH;
     textarea.style.flex = origFlex;
 
-    let extraH;
-    if (item.type === 'note') {
-        // Note layout: padding(14*2=28) + gap(6) + title input height
-        // Measure actual title input height for accuracy
-        const titleEl = item.el.querySelector('.note-title');
-        const titleH = titleEl ? titleEl.offsetHeight : Math.round(20 * fontMultiplier);
-        extraH = 28 + 6 + titleH;
-    } else {
-        // Memo layout: padding(12*2=24)
-        extraH = 24;
-    }
+    // Memo layout: padding(12*2=24)
+    const extraH = 24;
 
-    const minH = Math.round((item.type === 'note' ? 100 : 80) * fontMultiplier);
+    const minH = Math.round(80 * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
     const newH = Math.min(Math.max(scrollH + extraH, minH), maxH);
 
@@ -430,36 +403,14 @@ export function duplicateItem(item) {
     triggerAutoSaveFn();
 }
 
-// Calculate default height based on font size for notes/memos
-function getDefaultHeight(type, fontSize) {
+// Calculate default height based on font size for memos
+function getDefaultHeight(fontSize) {
     let fontMultiplier = 1;
     if (fontSize === 'medium') fontMultiplier = 1.1;
     else if (fontSize === 'large') fontMultiplier = 1.25;
     else if (fontSize === 'xlarge') fontMultiplier = 1.4;
 
-    // Base minimum height that fits one line of text without shrinking
-    const baseHeight = type === 'note' ? 100 : 80;
-    return Math.round(baseHeight * fontMultiplier);
-}
-
-// Add note
-export function addNote(title = '', body = '', x, y, color = null) {
-    const pos = findFreePosition(x, y, state.items);
-    // Apply default font size setting
-    const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
-    const defaultH = getDefaultHeight('note', fontSize);
-    const item = createItem({
-        type: 'note',
-        x: pos.x,
-        y: pos.y,
-        w: 220,
-        h: defaultH,
-        content: { title, body },
-        color,
-        fontSize
-    });
-    triggerAutoSaveFn();
-    return item;
+    return Math.round(80 * fontMultiplier);
 }
 
 // Add memo
@@ -467,7 +418,7 @@ export function addMemo(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
     // Apply default font size setting
     const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
-    const defaultH = getDefaultHeight('memo', fontSize);
+    const defaultH = getDefaultHeight(fontSize);
     const item = createItem({
         type: 'memo',
         x: pos.x,

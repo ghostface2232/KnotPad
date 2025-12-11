@@ -4,7 +4,7 @@ import { CANVASES_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from '.
 import { $, esc, generateId, showToast } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
-import { createItem, addNote, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus } from './items.js';
+import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus } from './items.js';
 import { addConnection, updateConnectionArrow, updateAllConnections } from './connections.js';
 import {
     fsDirectoryHandle,
@@ -109,8 +109,7 @@ function doSearch() {
     const results = [];
     state.items.forEach(item => {
         let text = '';
-        if (item.type === 'note') text = (item.content.title + ' ' + item.content.body).toLowerCase();
-        else if (item.type === 'memo') text = (item.content || '').toLowerCase();
+        if (item.type === 'memo') text = (item.content || '').toLowerCase();
         else if (item.type === 'link') text = (item.content.title + ' ' + item.content.url).toLowerCase();
         if (text.includes(q)) results.push(item);
     });
@@ -705,10 +704,10 @@ export function setupNewNodePicker() {
             const { x, y } = state.newNodePickerData;
             if (btn.dataset.type === 'memo') {
                 addMemo('', x, y);
-            } else {
-                addNote('', '', x, y);
+                saveStateFn();
+            } else if (btn.dataset.type === 'link') {
+                openLinkModal();
             }
-            saveStateFn();
             newNodePicker.classList.remove('active');
             state.setNewNodePickerData(null);
         });

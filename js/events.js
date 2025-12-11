@@ -3,7 +3,7 @@
 import { $ } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, setZoom, throttledMinimap, startPan, updateMinimap } from './viewport.js';
-import { selectItem, deselectAll, deleteSelectedItems, addNote, addMemo, addLink } from './items.js';
+import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink } from './items.js';
 import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine } from './connections.js';
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
@@ -23,7 +23,7 @@ export function setupMouseEvents() {
     // Wheel - zoom canvas or scroll textarea
     app.addEventListener('wheel', e => {
         const t = e.target;
-        if (t.classList.contains('note-body') || t.classList.contains('memo-body')) {
+        if (t.classList.contains('memo-body')) {
             if (t.scrollHeight > t.clientHeight) return;
         }
         e.preventDefault();
