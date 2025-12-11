@@ -434,24 +434,22 @@ export function autoResizeItem(item) {
     const minH = Math.round(120 * fontMultiplier);
     const maxH = Math.round(500 * fontMultiplier);
 
-    // Get line height for line-based resizing
+    // Get line height for line-based change detection
     const style = window.getComputedStyle(memoBody);
     const lineHeight = parseFloat(style.lineHeight) || 20;
 
-    // Count actual lines of content
-    const text = memoBody.innerText || '';
-    const lines = text.split('\n').length;
-    const contentH = Math.max(lines * lineHeight, 40);
+    // Use scrollHeight to measure actual content including word-wrap
+    const contentH = memoBody.scrollHeight;
 
-    // Memo layout: padding(12*2=24) + toolbar(~38)
-    const extraH = 24 + 38;
+    // Memo layout: padding(12*2=24) + toolbar(~38) + buffer(3)
+    const extraH = 24 + 38 + 3;
 
     // Calculate new height - fit to content within min/max bounds
     const targetH = contentH + extraH;
     const newH = Math.max(minH, Math.min(targetH, maxH));
 
-    // Only update if there's a meaningful change
-    if (Math.abs(newH - item.h) > lineHeight / 2) {
+    // Only update if change is at least half a line (prevents jitter)
+    if (Math.abs(newH - item.h) >= lineHeight / 2) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
         updateAllConnectionsFn();
