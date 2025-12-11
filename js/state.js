@@ -74,6 +74,10 @@ export const blobURLCache = new Map();
 // Settings
 export let defaultFontSize = localStorage.getItem('knotpad-default-font-size') || 'small';
 export let invertWheelZoom = localStorage.getItem('knotpad-invert-wheel-zoom') === 'true';
+export let gridSnap = localStorage.getItem('knotpad-grid-snap') === 'true';
+
+// Grid size constant
+export const GRID_SIZE = 48;
 
 // Setters for state updates
 export function setScale(val) { scale = val; }
@@ -113,6 +117,7 @@ export function setSearchIndex(val) { searchIndex = val; }
 export function setZoomAnimationFrame(val) { zoomAnimationFrame = val; }
 export function setDefaultFontSize(val) { defaultFontSize = val; localStorage.setItem('knotpad-default-font-size', val); }
 export function setInvertWheelZoom(val) { invertWheelZoom = val; localStorage.setItem('knotpad-invert-wheel-zoom', val); }
+export function setGridSnap(val) { gridSnap = val; localStorage.setItem('knotpad-grid-snap', val); }
 
 // Reset viewport state
 export function resetViewport() {

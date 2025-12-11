@@ -4,7 +4,7 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
-import { setExternalFunctions as setItemsExternal, createItem, addMemo, setFilter, setItemColor } from './items.js';
+import { setExternalFunctions as setItemsExternal, createItem, addMemo, setFilter, setItemColor, sortByColor } from './items.js';
 import {
     setExternalFunctions as setConnectionsExternal,
     setupConnDirectionPicker,
@@ -99,6 +99,10 @@ function setupToolbarEvents() {
     $('zoomOutBtn').addEventListener('click', () => setZoom(state.scale / 1.25));
     $('fitViewBtn').addEventListener('click', fitToScreen);
     $('themeToggle').addEventListener('click', toggleTheme);
+
+    $('sortByColorBtn').addEventListener('click', () => {
+        sortByColor();
+    });
 
     $('fileInput').addEventListener('change', e => {
         if (e.target.files.length) {
