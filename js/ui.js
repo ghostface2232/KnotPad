@@ -170,6 +170,7 @@ export function saveState() {
             color: i.color,
             fontSize: i.fontSize,
             locked: i.locked,
+            manuallyResized: i.manuallyResized,
             z: parseInt(i.el.style.zIndex)
         })),
         connections: state.connections.map(c => ({
@@ -227,6 +228,7 @@ function restoreState(stateData) {
         const i = createItem(d, true);
         i.el.style.zIndex = d.z || 1;
         i.locked = d.locked;
+        i.manuallyResized = d.manuallyResized || false;
         if (i.locked) i.el.classList.add('locked');
         map[d.id] = i;
     });
@@ -281,6 +283,7 @@ export async function saveCurrentCanvas() {
             color: i.color,
             fontSize: i.fontSize,
             locked: i.locked,
+            manuallyResized: i.manuallyResized,
             z: parseInt(i.el.style.zIndex)
         })),
         connections: state.connections.map(c => ({
@@ -355,6 +358,7 @@ async function loadCanvasData(id) {
             const i = createItem(d, true);
             i.el.style.zIndex = d.z || 1;
             i.locked = d.locked;
+            i.manuallyResized = d.manuallyResized || false;
             if (i.locked) i.el.classList.add('locked');
             map[d.id] = i;
         });
