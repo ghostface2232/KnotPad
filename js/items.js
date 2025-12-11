@@ -295,6 +295,30 @@ function setupItemEvents(item) {
         const mb = el.querySelector('.memo-body');
         const toolbar = el.querySelector('.memo-toolbar');
 
+        // Handle text selection drag outside memo area
+        mb.addEventListener('mousedown', e => {
+            // Only for left mouse button and when in text editing mode
+            if (e.button === 0 && (e.target === mb || mb.contains(e.target))) {
+                state.setIsSelectingText(true);
+
+                const handleMouseUp = () => {
+                    state.setIsSelectingText(false);
+                    window.removeEventListener('mouseup', handleMouseUp);
+                    window.removeEventListener('mousemove', handleMouseMove);
+                };
+
+                const handleMouseMove = e => {
+                    if (state.isSelectingText) {
+                        // Extend selection even outside memo area
+                        e.stopPropagation();
+                    }
+                };
+
+                window.addEventListener('mouseup', handleMouseUp);
+                window.addEventListener('mousemove', handleMouseMove);
+            }
+        });
+
         // Handle input - save content and auto-resize
         mb.addEventListener('input', () => {
             item.content = getPlainText(mb);
@@ -739,15 +763,14 @@ export function sortByColor() {
     const viewCenterX = (innerWidth / 2 - state.offsetX) / state.scale;
     const viewCenterY = (innerHeight / 2 - state.offsetY) / state.scale;
 
-    // Calculate start position to center the grid horizontally
+    // Calculate start position to center the grid
     const startX = viewCenterX - totalWidth / 2;
+    const startY = viewCenterY - maxColumnHeight / 2;
 
-    // Place items in columns by color with vertical center alignment
+    // Place items in columns by color - columns top-aligned, items horizontally centered
     let currentX = startX;
     columnData.forEach(col => {
-        // Calculate vertical offset to center this column
-        const columnTopY = viewCenterY - col.totalHeight / 2;
-        let currentY = columnTopY;
+        let currentY = startY;
 
         col.items.forEach(item => {
             // Center each item horizontally within the column
