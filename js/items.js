@@ -31,8 +31,8 @@ function parseMarkdown(text) {
     // Italic: *text* (single asterisk, not part of bold)
     html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
-    // Strikethrough: ~~text~~
-    html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    // Strikethrough: ~~text~~ - use <strike> for execCommand compatibility
+    html = html.replace(/~~(.+?)~~/g, '<strike>$1</strike>');
 
     // Underline: __text__
     html = html.replace(/__(.+?)__/g, '<u>$1</u>');
@@ -48,7 +48,7 @@ function parseMarkdown(text) {
     html = html.replace(/\n/g, '<br>');
 
     // Clean up: remove <br> immediately after block elements to prevent line buildup
-    html = html.replace(/<\/(h1|h2|h3|blockquote|hr|ul|ol)><br>/g, '</$1>');
+    html = html.replace(/<\/(h1|h2|h3|blockquote|ul|ol)><br>/g, '</$1>');
     html = html.replace(/<hr><br>/g, '<hr>');
 
     // Clean up consecutive blockquotes
@@ -63,10 +63,15 @@ function parseMarkdown(text) {
 // Convert HTML from contenteditable to Markdown format for storage
 // Uses recursive processing to handle nested formatting correctly
 function htmlToMarkdown(el) {
+    // Track if we're at the start (to avoid leading newlines)
+    let isAtStart = true;
+
     // Recursively convert a node to markdown
     function processNode(node, isFirstChild = false) {
         if (node.nodeType === Node.TEXT_NODE) {
-            return node.textContent;
+            const text = node.textContent;
+            if (text.trim()) isAtStart = false;
+            return text;
         }
 
         if (node.nodeType !== Node.ELEMENT_NODE) {
@@ -88,44 +93,67 @@ function htmlToMarkdown(el) {
             // Inline formatting
             case 'strong':
             case 'b':
+                isAtStart = false;
                 return `**${content}**`;
             case 'em':
             case 'i':
+                isAtStart = false;
                 return `*${content}*`;
             case 'del':
             case 'strike':
             case 's':
+                isAtStart = false;
                 return `~~${content}~~`;
             case 'u':
+                isAtStart = false;
                 return `__${content}__`;
 
-            // Block elements - only add newline before if not first child
-            case 'h1':
-                return `${isFirstChild ? '' : '\n'}# ${content.trim()}`;
-            case 'h2':
-                return `${isFirstChild ? '' : '\n'}## ${content.trim()}`;
-            case 'h3':
-                return `${isFirstChild ? '' : '\n'}### ${content.trim()}`;
-            case 'blockquote':
-                return `${isFirstChild ? '' : '\n'}> ${content.trim()}`;
-            case 'hr':
-                return `${isFirstChild ? '' : '\n'}---`;
+            // Block elements - only add newline before if not at start
+            case 'h1': {
+                const prefix = isAtStart ? '' : '\n';
+                isAtStart = false;
+                return `${prefix}# ${content.trim()}`;
+            }
+            case 'h2': {
+                const prefix = isAtStart ? '' : '\n';
+                isAtStart = false;
+                return `${prefix}## ${content.trim()}`;
+            }
+            case 'h3': {
+                const prefix = isAtStart ? '' : '\n';
+                isAtStart = false;
+                return `${prefix}### ${content.trim()}`;
+            }
+            case 'blockquote': {
+                const prefix = isAtStart ? '' : '\n';
+                isAtStart = false;
+                return `${prefix}> ${content.trim()}`;
+            }
+            case 'hr': {
+                const prefix = isAtStart ? '' : '\n';
+                isAtStart = false;
+                return `${prefix}---`;
+            }
             case 'li':
                 return `\n- ${content.trim()}`;
             case 'br':
                 return '\n';
 
-            // Container elements - only add newline if not first and has content
+            // Container elements - only add newline if not at start and has content
             case 'p':
-            case 'div':
+            case 'div': {
                 if (!content.trim()) return '';
-                return `${isFirstChild ? '' : '\n'}${content}`;
+                const prefix = isAtStart ? '' : '\n';
+                isAtStart = false;
+                return `${prefix}${content}`;
+            }
             case 'ul':
             case 'ol':
                 return content;
 
             // Default: just return content
             default:
+                if (content.trim()) isAtStart = false;
                 return content;
         }
     }
