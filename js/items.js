@@ -47,11 +47,7 @@ function parseMarkdown(text) {
     // Line breaks
     html = html.replace(/\n/g, '<br>');
 
-    // Clean up: remove <br> immediately after block elements to prevent line buildup
-    html = html.replace(/<\/(h1|h2|h3|blockquote|ul|ol)><br>/g, '</$1>');
-    html = html.replace(/<hr><br>/g, '<hr>');
-
-    // Clean up consecutive blockquotes
+    // Clean up consecutive blockquotes (keep them visually connected)
     html = html.replace(/<\/blockquote><br><blockquote>/g, '</blockquote><blockquote>');
 
     // Clean up <br> at the very beginning
@@ -168,8 +164,8 @@ function htmlToMarkdown(el) {
                 lastWasBlock = true;
                 return `\n- ${content.trim()}`;
             case 'br':
-                // br is a line break, but don't set lastWasBlock
-                // so consecutive br's produce multiple newlines
+                // br is a line break - reset lastWasBlock since br already provides the newline
+                lastWasBlock = false;
                 return '\n';
 
             // Container elements - only add newline if not at start and has content
