@@ -65,12 +65,33 @@ function parseMarkdown(text) {
 function htmlToMarkdown(el) {
     // Track if we're at the start (to avoid leading newlines)
     let isAtStart = true;
+    // Track if the last output was a block element (for text nodes after blocks)
+    let lastWasBlock = false;
+
+    // Check if a tag is a block element
+    const blockTags = ['h1', 'h2', 'h3', 'p', 'div', 'blockquote', 'hr', 'ul', 'ol', 'li'];
 
     // Recursively convert a node to markdown
-    function processNode(node, isFirstChild = false) {
+    function processNode(node, previousSibling = null) {
         if (node.nodeType === Node.TEXT_NODE) {
             const text = node.textContent;
-            if (text.trim()) isAtStart = false;
+            if (text.trim()) {
+                // Add newline if previous sibling was a block element (not br, since br already adds \n)
+                let prefix = '';
+                if (previousSibling && previousSibling.nodeType === Node.ELEMENT_NODE) {
+                    const prevTag = previousSibling.tagName.toLowerCase();
+                    if (blockTags.includes(prevTag)) {
+                        prefix = '\n';
+                    }
+                }
+                // Also add newline if last output was a block (for nested structures)
+                if (!prefix && lastWasBlock) {
+                    prefix = '\n';
+                }
+                isAtStart = false;
+                lastWasBlock = false;
+                return prefix + text;
+            }
             return text;
         }
 
@@ -80,10 +101,10 @@ function htmlToMarkdown(el) {
 
         // Get content of children first (recursive)
         let content = '';
-        let firstChild = true;
+        let prevChild = null;
         node.childNodes.forEach(child => {
-            content += processNode(child, firstChild);
-            firstChild = false;
+            content += processNode(child, prevChild);
+            prevChild = child;
         });
 
         const tag = node.tagName.toLowerCase();
@@ -94,75 +115,99 @@ function htmlToMarkdown(el) {
             case 'strong':
             case 'b':
                 isAtStart = false;
+                lastWasBlock = false;
                 return `**${content}**`;
             case 'em':
             case 'i':
                 isAtStart = false;
+                lastWasBlock = false;
                 return `*${content}*`;
             case 'del':
             case 'strike':
             case 's':
                 isAtStart = false;
+                lastWasBlock = false;
                 return `~~${content}~~`;
             case 'u':
                 isAtStart = false;
+                lastWasBlock = false;
                 return `__${content}__`;
 
             // Block elements - only add newline before if not at start
             case 'h1': {
                 const prefix = isAtStart ? '' : '\n';
                 isAtStart = false;
+                lastWasBlock = true;
                 return `${prefix}# ${content.trim()}`;
             }
             case 'h2': {
                 const prefix = isAtStart ? '' : '\n';
                 isAtStart = false;
+                lastWasBlock = true;
                 return `${prefix}## ${content.trim()}`;
             }
             case 'h3': {
                 const prefix = isAtStart ? '' : '\n';
                 isAtStart = false;
+                lastWasBlock = true;
                 return `${prefix}### ${content.trim()}`;
             }
             case 'blockquote': {
                 const prefix = isAtStart ? '' : '\n';
                 isAtStart = false;
+                lastWasBlock = true;
                 return `${prefix}> ${content.trim()}`;
             }
             case 'hr': {
                 const prefix = isAtStart ? '' : '\n';
                 isAtStart = false;
+                lastWasBlock = true;
                 return `${prefix}---`;
             }
             case 'li':
+                lastWasBlock = true;
                 return `\n- ${content.trim()}`;
             case 'br':
+                // br is a line break, but don't set lastWasBlock
+                // so consecutive br's produce multiple newlines
                 return '\n';
 
             // Container elements - only add newline if not at start and has content
             case 'p':
             case 'div': {
-                if (!content.trim()) return '';
+                // Handle empty containers with only br (preserve line breaks)
+                if (!content.trim()) {
+                    // If content has newlines from br tags, preserve them
+                    if (content.includes('\n')) {
+                        return content;
+                    }
+                    return '';
+                }
                 const prefix = isAtStart ? '' : '\n';
                 isAtStart = false;
+                lastWasBlock = true;
                 return `${prefix}${content}`;
             }
             case 'ul':
             case 'ol':
+                lastWasBlock = true;
                 return content;
 
             // Default: just return content
             default:
-                if (content.trim()) isAtStart = false;
+                if (content.trim()) {
+                    isAtStart = false;
+                    lastWasBlock = false;
+                }
                 return content;
         }
     }
 
     let text = '';
-    let firstChild = true;
+    let prevChild = null;
     el.childNodes.forEach(child => {
-        text += processNode(child, firstChild);
-        firstChild = false;
+        text += processNode(child, prevChild);
+        prevChild = child;
     });
 
     // Clean up: remove excessive newlines and trim
