@@ -25,8 +25,11 @@ function parseMarkdown(text) {
     // Blockquote: > text
     html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
 
-    // Bold: **text**
+    // Bold: **text** (must be before italic)
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Italic: *text* (single asterisk, not part of bold)
+    html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
     // Strikethrough: ~~text~~
     html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
@@ -51,68 +54,73 @@ function parseMarkdown(text) {
 }
 
 // Convert HTML from contenteditable to Markdown format for storage
+// Uses recursive processing to handle nested formatting correctly
 function htmlToMarkdown(el) {
-    const clone = el.cloneNode(true);
+    // Recursively convert a node to markdown
+    function processNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return node.textContent;
+        }
 
-    // Process inline formatting elements first (deepest first to handle nesting)
-    // Bold: <strong>, <b>
-    clone.querySelectorAll('strong, b').forEach(node => {
-        const text = node.innerHTML;
-        node.replaceWith(`**${text}**`);
-    });
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            return '';
+        }
 
-    // Strikethrough: <del>, <strike>, <s>
-    clone.querySelectorAll('del, strike, s').forEach(node => {
-        const text = node.innerHTML;
-        node.replaceWith(`~~${text}~~`);
-    });
+        // Get content of children first (recursive)
+        let content = '';
+        node.childNodes.forEach(child => {
+            content += processNode(child);
+        });
 
-    // Underline: <u>
-    clone.querySelectorAll('u').forEach(node => {
-        const text = node.innerHTML;
-        node.replaceWith(`__${text}__`);
-    });
+        const tag = node.tagName.toLowerCase();
 
-    // Headings: must add prefix and newline
-    clone.querySelectorAll('h1').forEach(node => {
-        const text = node.textContent;
-        node.replaceWith(`\n# ${text}\n`);
-    });
-    clone.querySelectorAll('h2').forEach(node => {
-        const text = node.textContent;
-        node.replaceWith(`\n## ${text}\n`);
-    });
-    clone.querySelectorAll('h3').forEach(node => {
-        const text = node.textContent;
-        node.replaceWith(`\n### ${text}\n`);
-    });
+        // Apply formatting based on tag
+        switch (tag) {
+            // Inline formatting
+            case 'strong':
+            case 'b':
+                return `**${content}**`;
+            case 'em':
+            case 'i':
+                return `*${content}*`;
+            case 'del':
+            case 'strike':
+            case 's':
+                return `~~${content}~~`;
+            case 'u':
+                return `__${content}__`;
 
-    // Blockquote
-    clone.querySelectorAll('blockquote').forEach(node => {
-        const text = node.textContent;
-        node.replaceWith(`\n> ${text}\n`);
-    });
+            // Block elements
+            case 'h1':
+                return `\n# ${content}\n`;
+            case 'h2':
+                return `\n## ${content}\n`;
+            case 'h3':
+                return `\n### ${content}\n`;
+            case 'blockquote':
+                return `\n> ${content}\n`;
+            case 'hr':
+                return '\n---\n';
+            case 'li':
+                return `\n- ${content}`;
+            case 'br':
+                return '\n';
 
-    // Horizontal rule
-    clone.querySelectorAll('hr').forEach(node => {
-        node.replaceWith('\n---\n');
-    });
+            // Container elements - just add newlines
+            case 'p':
+            case 'div':
+                return `\n${content}`;
+            case 'ul':
+            case 'ol':
+                return content;
 
-    // List items
-    clone.querySelectorAll('li').forEach(node => {
-        const text = node.textContent;
-        node.replaceWith(`\n- ${text}`);
-    });
+            // Default: just return content
+            default:
+                return content;
+        }
+    }
 
-    // Other block elements just add newlines
-    clone.querySelectorAll('p, div, ul, ol').forEach(block => {
-        block.insertAdjacentText('beforebegin', '\n');
-    });
-
-    // Line breaks
-    clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
-
-    let text = clone.textContent || '';
+    let text = processNode(el);
 
     // Clean up: remove excessive newlines and trim
     text = text.replace(/\n{3,}/g, '\n\n').trim();
