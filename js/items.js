@@ -67,7 +67,7 @@ function htmlToMarkdown(el) {
     let isAtStart = true;
 
     // Recursively convert a node to markdown
-    function processNode(node) {
+    function processNode(node, isFirstChild = false) {
         if (node.nodeType === Node.TEXT_NODE) {
             const text = node.textContent;
             if (text.trim()) isAtStart = false;
@@ -80,8 +80,10 @@ function htmlToMarkdown(el) {
 
         // Get content of children first (recursive)
         let content = '';
+        let firstChild = true;
         node.childNodes.forEach(child => {
-            content += processNode(child);
+            content += processNode(child, firstChild);
+            firstChild = false;
         });
 
         const tag = node.tagName.toLowerCase();
@@ -156,7 +158,12 @@ function htmlToMarkdown(el) {
         }
     }
 
-    let text = processNode(el);
+    let text = '';
+    let firstChild = true;
+    el.childNodes.forEach(child => {
+        text += processNode(child, firstChild);
+        firstChild = false;
+    });
 
     // Clean up: remove excessive newlines and trim
     text = text.replace(/\n{3,}/g, '\n\n').trim();
