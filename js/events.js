@@ -276,6 +276,14 @@ export function setupKeyboardEvents() {
             redo();
             return;
         }
+        // Ctrl+D for strikethrough in contenteditable
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            if (e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]')) {
+                e.preventDefault();
+                document.execCommand('strikeThrough', false, null);
+                return;
+            }
+        }
         if (e.key === 'Escape') {
             cancelConnection();
             closeLinkModal();
@@ -343,7 +351,10 @@ export function setupDragDropEvents() {
 
 export function setupPasteEvents() {
     window.addEventListener('paste', e => {
+        // Allow default paste behavior in input, textarea, and contenteditable elements
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]')) return;
+
         e.preventDefault();
         const cd = e.clipboardData;
         if (!cd) return;
