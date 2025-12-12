@@ -200,6 +200,20 @@ function setupItemEvents(item) {
         if (item.locked) return;
 
         e.stopPropagation();
+
+        // Alt + drag to duplicate item
+        if (e.altKey) {
+            const duplicated = duplicateItemForDrag(item);
+            selectItem(duplicated, false);
+            const rect = duplicated.el.getBoundingClientRect();
+            duplicated.ox = (e.clientX - rect.left) / state.scale;
+            duplicated.oy = (e.clientY - rect.top) / state.scale;
+            state.setDraggedItem(duplicated);
+            duplicated.el.classList.add('dragging');
+            canvas.classList.add('dragging-item');
+            return;
+        }
+
         if (!state.selectedItems.has(item) && !e.shiftKey) {
             selectItem(item, false);
         } else if (e.shiftKey) {
@@ -583,6 +597,20 @@ export function duplicateItem(item) {
     });
     saveStateFn();
     triggerAutoSaveFn();
+}
+
+// Duplicate an item for drag operation (same position, no auto-save)
+function duplicateItemForDrag(item) {
+    return createItem({
+        type: item.type,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+        content: JSON.parse(JSON.stringify(item.content)),
+        color: item.color,
+        fontSize: item.fontSize
+    });
 }
 
 // Calculate default height based on font size for memos
