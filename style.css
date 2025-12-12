@@ -875,6 +875,13 @@ input, textarea, button { font-family: inherit; }
     color: var(--text-secondary);
     text-align: right;
 }
+.shortcuts-subheading {
+    margin-top: 20px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
 
 /* Storage Location Cards */
 .storage-cards {
