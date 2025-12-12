@@ -47,8 +47,15 @@ function parseMarkdown(text) {
     // Line breaks
     html = html.replace(/\n/g, '<br>');
 
+    // Clean up: remove <br> immediately after block elements to prevent line buildup
+    html = html.replace(/<\/(h1|h2|h3|blockquote|hr|ul|ol)><br>/g, '</$1>');
+    html = html.replace(/<hr><br>/g, '<hr>');
+
     // Clean up consecutive blockquotes
     html = html.replace(/<\/blockquote><br><blockquote>/g, '</blockquote><blockquote>');
+
+    // Clean up <br> at the very beginning
+    html = html.replace(/^(<br>)+/, '');
 
     return html;
 }
@@ -57,7 +64,7 @@ function parseMarkdown(text) {
 // Uses recursive processing to handle nested formatting correctly
 function htmlToMarkdown(el) {
     // Recursively convert a node to markdown
-    function processNode(node) {
+    function processNode(node, isFirstChild = false) {
         if (node.nodeType === Node.TEXT_NODE) {
             return node.textContent;
         }
@@ -68,8 +75,10 @@ function htmlToMarkdown(el) {
 
         // Get content of children first (recursive)
         let content = '';
+        let firstChild = true;
         node.childNodes.forEach(child => {
-            content += processNode(child);
+            content += processNode(child, firstChild);
+            firstChild = false;
         });
 
         const tag = node.tagName.toLowerCase();
@@ -90,26 +99,27 @@ function htmlToMarkdown(el) {
             case 'u':
                 return `__${content}__`;
 
-            // Block elements
+            // Block elements - only add newline before if not first child
             case 'h1':
-                return `\n# ${content}\n`;
+                return `${isFirstChild ? '' : '\n'}# ${content.trim()}`;
             case 'h2':
-                return `\n## ${content}\n`;
+                return `${isFirstChild ? '' : '\n'}## ${content.trim()}`;
             case 'h3':
-                return `\n### ${content}\n`;
+                return `${isFirstChild ? '' : '\n'}### ${content.trim()}`;
             case 'blockquote':
-                return `\n> ${content}\n`;
+                return `${isFirstChild ? '' : '\n'}> ${content.trim()}`;
             case 'hr':
-                return '\n---\n';
+                return `${isFirstChild ? '' : '\n'}---`;
             case 'li':
-                return `\n- ${content}`;
+                return `\n- ${content.trim()}`;
             case 'br':
                 return '\n';
 
-            // Container elements - just add newlines
+            // Container elements - only add newline if not first and has content
             case 'p':
             case 'div':
-                return `\n${content}`;
+                if (!content.trim()) return '';
+                return `${isFirstChild ? '' : '\n'}${content}`;
             case 'ul':
             case 'ol':
                 return content;
@@ -120,7 +130,12 @@ function htmlToMarkdown(el) {
         }
     }
 
-    let text = processNode(el);
+    let text = '';
+    let firstChild = true;
+    el.childNodes.forEach(child => {
+        text += processNode(child, firstChild);
+        firstChild = false;
+    });
 
     // Clean up: remove excessive newlines and trim
     text = text.replace(/\n{3,}/g, '\n\n').trim();

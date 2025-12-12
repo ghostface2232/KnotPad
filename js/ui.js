@@ -988,10 +988,69 @@ async function exportAllCanvases() {
 
 // ============ Auto Save ============
 
+// Track if there are pending changes that need to be saved
+let hasPendingChanges = false;
+
 export function triggerAutoSave() {
+    hasPendingChanges = true;
     if (state.autoSaveTimer) clearTimeout(state.autoSaveTimer);
-    state.setAutoSaveTimer(setTimeout(saveCurrentCanvas, 1500));
+    state.setAutoSaveTimer(setTimeout(() => {
+        saveCurrentCanvas();
+        hasPendingChanges = false;
+    }, 1500));
 }
+
+// Save immediately when there are meaningful state changes
+export function saveImmediately() {
+    if (state.autoSaveTimer) clearTimeout(state.autoSaveTimer);
+    saveCurrentCanvas();
+    hasPendingChanges = false;
+}
+
+// Save on page unload to prevent data loss
+window.addEventListener('beforeunload', () => {
+    if (hasPendingChanges) {
+        // Use synchronous save for beforeunload
+        if (state.currentCanvasId) {
+            const data = {
+                items: state.items.map(i => ({
+                    id: i.id,
+                    type: i.type,
+                    x: i.x,
+                    y: i.y,
+                    w: i.w,
+                    h: i.h,
+                    content: i.content,
+                    color: i.color,
+                    fontSize: i.fontSize,
+                    locked: i.locked,
+                    manuallyResized: i.manuallyResized,
+                    z: parseInt(i.el.style.zIndex)
+                })),
+                connections: state.connections.map(c => ({
+                    id: c.id,
+                    from: c.from.id,
+                    fh: c.fh,
+                    to: c.to.id,
+                    th: c.th,
+                    dir: c.dir
+                })),
+                view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
+                itemId: state.itemId,
+                highestZ: state.highestZ
+            };
+            localStorage.setItem('knotpad-data-' + state.currentCanvasId, JSON.stringify(data));
+        }
+    }
+});
+
+// Also save on visibility change (when user switches tabs or minimizes)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && hasPendingChanges) {
+        saveCurrentCanvas();
+        hasPendingChanges = false;
+    }
+});
 
 // ============ Close Sidebar ============
 
