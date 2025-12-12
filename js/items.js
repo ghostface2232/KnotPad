@@ -50,18 +50,79 @@ function parseMarkdown(text) {
     return html;
 }
 
-function getPlainText(el) {
-    // Get plain text from contenteditable, preserving line breaks
+// Convert HTML from contenteditable to Markdown format for storage
+function htmlToMarkdown(el) {
     const clone = el.cloneNode(true);
-    // Replace block elements with newlines
-    clone.querySelectorAll('h1, h2, h3, p, div, li, blockquote, hr').forEach(block => {
+
+    // Process inline formatting elements first (deepest first to handle nesting)
+    // Bold: <strong>, <b>
+    clone.querySelectorAll('strong, b').forEach(node => {
+        const text = node.innerHTML;
+        node.replaceWith(`**${text}**`);
+    });
+
+    // Strikethrough: <del>, <strike>, <s>
+    clone.querySelectorAll('del, strike, s').forEach(node => {
+        const text = node.innerHTML;
+        node.replaceWith(`~~${text}~~`);
+    });
+
+    // Underline: <u>
+    clone.querySelectorAll('u').forEach(node => {
+        const text = node.innerHTML;
+        node.replaceWith(`__${text}__`);
+    });
+
+    // Headings: must add prefix and newline
+    clone.querySelectorAll('h1').forEach(node => {
+        const text = node.textContent;
+        node.replaceWith(`\n# ${text}\n`);
+    });
+    clone.querySelectorAll('h2').forEach(node => {
+        const text = node.textContent;
+        node.replaceWith(`\n## ${text}\n`);
+    });
+    clone.querySelectorAll('h3').forEach(node => {
+        const text = node.textContent;
+        node.replaceWith(`\n### ${text}\n`);
+    });
+
+    // Blockquote
+    clone.querySelectorAll('blockquote').forEach(node => {
+        const text = node.textContent;
+        node.replaceWith(`\n> ${text}\n`);
+    });
+
+    // Horizontal rule
+    clone.querySelectorAll('hr').forEach(node => {
+        node.replaceWith('\n---\n');
+    });
+
+    // List items
+    clone.querySelectorAll('li').forEach(node => {
+        const text = node.textContent;
+        node.replaceWith(`\n- ${text}`);
+    });
+
+    // Other block elements just add newlines
+    clone.querySelectorAll('p, div, ul, ol').forEach(block => {
         block.insertAdjacentText('beforebegin', '\n');
     });
+
+    // Line breaks
     clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+
     let text = clone.textContent || '';
-    // Clean up multiple newlines
+
+    // Clean up: remove excessive newlines and trim
     text = text.replace(/\n{3,}/g, '\n\n').trim();
+
     return text;
+}
+
+function getPlainText(el) {
+    // For backward compatibility - now uses htmlToMarkdown
+    return htmlToMarkdown(el);
 }
 
 // External function references (set by other modules)
@@ -309,6 +370,11 @@ function setupItemEvents(item) {
         const mb = el.querySelector('.memo-body');
         const toolbar = el.querySelector('.memo-toolbar');
 
+        // Track content before editing for undo
+        let contentBeforeEdit = item.content;
+        let hasUnsavedChanges = false;
+        let undoSaveTimer = null;
+
         // Handle text selection drag outside memo area
         mb.addEventListener('mousedown', e => {
             // Only for left mouse button and when in text editing mode
@@ -338,16 +404,41 @@ function setupItemEvents(item) {
             item.content = getPlainText(mb);
             autoResizeItem(item);
             triggerAutoSaveFn();
+            hasUnsavedChanges = true;
+
+            // Debounced save to undo stack (save after 1 second of no typing)
+            if (undoSaveTimer) clearTimeout(undoSaveTimer);
+            undoSaveTimer = setTimeout(() => {
+                if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
+                    saveStateFn();
+                    contentBeforeEdit = item.content;
+                    hasUnsavedChanges = false;
+                }
+            }, 1000);
         });
 
-        // Handle blur - hide toolbar
+        // Handle blur - hide toolbar and save state if changed
         mb.addEventListener('blur', () => {
             toolbar.classList.remove('active');
+            // Clear pending debounce timer
+            if (undoSaveTimer) {
+                clearTimeout(undoSaveTimer);
+                undoSaveTimer = null;
+            }
+            // Save to undo stack if content changed during editing
+            if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
+                saveStateFn();
+                contentBeforeEdit = item.content;
+                hasUnsavedChanges = false;
+            }
         });
 
-        // Show toolbar on focus
+        // Show toolbar on focus and record current state for undo
         mb.addEventListener('focus', () => {
             toolbar.classList.add('active');
+            // Record content before editing starts
+            contentBeforeEdit = item.content;
+            hasUnsavedChanges = false;
         });
 
         // Markdown toolbar buttons - simple toggle with execCommand
@@ -378,6 +469,14 @@ function setupItemEvents(item) {
                 item.content = getPlainText(mb);
                 autoResizeItem(item);
                 triggerAutoSaveFn();
+                hasUnsavedChanges = true;
+
+                // Save to undo stack immediately for formatting changes
+                if (item.content !== contentBeforeEdit) {
+                    saveStateFn();
+                    contentBeforeEdit = item.content;
+                    hasUnsavedChanges = false;
+                }
             });
         });
     }
