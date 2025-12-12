@@ -20,12 +20,31 @@ const fileInput = $('fileInput');
 // ============ Mouse Events ============
 
 export function setupMouseEvents() {
-    // Wheel - zoom canvas or scroll textarea
+    // Wheel - zoom canvas or scroll memo content
     app.addEventListener('wheel', e => {
-        const t = e.target;
-        if (t.classList.contains('memo-body')) {
-            if (t.scrollHeight > t.clientHeight) return;
+        // Check if cursor is over a scrollable memo-body (including child elements)
+        const memoBody = e.target.closest('.memo-body');
+        if (memoBody) {
+            const hasScrollableContent = memoBody.scrollHeight > memoBody.clientHeight;
+            if (hasScrollableContent) {
+                // Check if we're at scroll boundaries
+                const atTop = memoBody.scrollTop <= 0;
+                const atBottom = memoBody.scrollTop + memoBody.clientHeight >= memoBody.scrollHeight - 1;
+                const scrollingUp = e.deltaY < 0;
+                const scrollingDown = e.deltaY > 0;
+
+                // Allow native scroll if not at boundary, or at boundary but scrolling into content
+                if ((!atTop && !atBottom) || (atTop && scrollingDown) || (atBottom && scrollingUp)) {
+                    // Let the memo scroll naturally, don't zoom
+                    return;
+                }
+                // At boundary and trying to scroll past it - still prevent zoom to avoid jarring UX
+                e.preventDefault();
+                return;
+            }
+            // No scrollable content - fall through to zoom
         }
+
         e.preventDefault();
         // Apply invert wheel zoom setting
         let d = e.deltaY > 0 ? 0.9 : 1.1;

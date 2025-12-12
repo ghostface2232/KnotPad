@@ -184,7 +184,14 @@ export function saveState() {
             dir: c.dir
         }))
     };
-    state.pushUndo(JSON.stringify(stateData));
+    const stateString = JSON.stringify(stateData);
+
+    // Prevent duplicate states - don't save if identical to last state
+    if (state.undoStack.length > 0 && state.undoStack[state.undoStack.length - 1] === stateString) {
+        return;
+    }
+
+    state.pushUndo(stateString);
     if (state.undoStack.length > MAX_HISTORY) state.undoStack.shift();
     state.clearRedo();
     updateUndoRedoButtons();
