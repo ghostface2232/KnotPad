@@ -78,7 +78,7 @@ export let invertWheelZoom = localStorage.getItem('knotpad-invert-wheel-zoom') =
 export let gridSnap = localStorage.getItem('knotpad-grid-snap') === 'true';
 
 // Grid size constant
-export const GRID_SIZE = 48;
+export const GRID_SIZE = 16;
 
 // Setters for state updates
 export function setScale(val) { scale = val; }
