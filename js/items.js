@@ -45,6 +45,12 @@ function parseMarkdown(text) {
     html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
 
     // Line breaks
+    // First, remove the newline immediately after block elements
+    // This newline is part of the block syntax, not an additional line break
+    // e.g., "# Heading\ntext" should become "<h1>Heading</h1>text", not "<h1>Heading</h1><br>text"
+    html = html.replace(/(<\/(h1|h2|h3|blockquote)>|<hr>)\n/g, '$1');
+
+    // Then convert remaining newlines to <br>
     html = html.replace(/\n/g, '<br>');
 
     // Clean up consecutive blockquotes (keep them visually connected)
@@ -164,8 +170,10 @@ function htmlToMarkdown(el) {
                 lastWasBlock = true;
                 return `\n- ${content.trim()}`;
             case 'br':
-                // br is a line break - reset lastWasBlock since br already provides the newline
-                lastWasBlock = false;
+                // br is a line break - don't change lastWasBlock state
+                // If br follows a block element, lastWasBlock stays true,
+                // so the following text will get a newline prefix (representing the blank line)
+                // This ensures: <h1>H</h1><br>text → # H\n\ntext (block + br = two newlines)
                 return '\n';
 
             // Container elements - only add newline if not at start and has content
