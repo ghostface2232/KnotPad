@@ -8,9 +8,19 @@ import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle } from './sto
 
 const canvas = $('canvas');
 
-// ============ Markdown Parser ============
+// ============ Content Parser (HTML-only, with legacy markdown migration) ============
 
-function parseMarkdown(text) {
+// Check if content is legacy markdown (no HTML tags)
+function isLegacyMarkdown(text) {
+    if (!text) return false;
+    // If it contains HTML tags, it's already HTML
+    if (/<[a-z][\s\S]*>/i.test(text)) return false;
+    // If it has markdown patterns, it's legacy markdown
+    return /^#{1,3} |^\d+\. |^- |\*\*|\*[^*]+\*|~~|__|\n/.test(text);
+}
+
+// Convert legacy markdown to HTML (for migration only)
+function migrateLegacyMarkdown(text) {
     if (!text) return '';
     let html = esc(text);
 
@@ -25,13 +35,13 @@ function parseMarkdown(text) {
     // Blockquote: > text
     html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
 
-    // Bold: **text** (must be before italic)
+    // Bold: **text**
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
-    // Italic: *text* (single asterisk, not part of bold)
+    // Italic: *text*
     html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
-    // Strikethrough: ~~text~~ - use <strike> for execCommand compatibility
+    // Strikethrough: ~~text~~
     html = html.replace(/~~(.+?)~~/g, '<strike>$1</strike>');
 
     // Underline: __text__
@@ -45,184 +55,26 @@ function parseMarkdown(text) {
     html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
 
     // Line breaks
-    // First, remove the newline immediately after block elements
-    // This newline is part of the block syntax, not an additional line break
-    // e.g., "# Heading\ntext" should become "<h1>Heading</h1>text", not "<h1>Heading</h1><br>text"
     html = html.replace(/(<\/(h1|h2|h3|blockquote)>|<hr>)\n/g, '$1');
-
-    // Then convert remaining newlines to <br>
     html = html.replace(/\n/g, '<br>');
-
-    // Clean up consecutive blockquotes (keep them visually connected)
     html = html.replace(/<\/blockquote><br><blockquote>/g, '</blockquote><blockquote>');
-
-    // Clean up <br> at the very beginning
     html = html.replace(/^(<br>)+/, '');
 
     return html;
 }
 
-// Convert HTML from contenteditable to Markdown format for storage
-// Uses recursive processing to handle nested formatting correctly
-function htmlToMarkdown(el) {
-    // Track if we're at the start (to avoid leading newlines)
-    let isAtStart = true;
-    // Track if the last output was a block element (for text nodes after blocks)
-    let lastWasBlock = false;
-
-    // Check if a tag is a block element
-    const blockTags = ['h1', 'h2', 'h3', 'p', 'div', 'blockquote', 'hr', 'ul', 'ol', 'li'];
-
-    // Recursively convert a node to markdown
-    function processNode(node, previousSibling = null) {
-        if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent;
-            if (text.trim()) {
-                // Add newline if previous sibling was a block element (not br, since br already adds \n)
-                let prefix = '';
-                if (previousSibling && previousSibling.nodeType === Node.ELEMENT_NODE) {
-                    const prevTag = previousSibling.tagName.toLowerCase();
-                    if (blockTags.includes(prevTag)) {
-                        prefix = '\n';
-                    }
-                }
-                // Also add newline if last output was a block (for nested structures)
-                if (!prefix && lastWasBlock) {
-                    prefix = '\n';
-                }
-                isAtStart = false;
-                lastWasBlock = false;
-                return prefix + text;
-            }
-            return text;
-        }
-
-        if (node.nodeType !== Node.ELEMENT_NODE) {
-            return '';
-        }
-
-        // Get content of children first (recursive)
-        let content = '';
-        let prevChild = null;
-        node.childNodes.forEach(child => {
-            content += processNode(child, prevChild);
-            prevChild = child;
-        });
-
-        const tag = node.tagName.toLowerCase();
-
-        // Apply formatting based on tag
-        switch (tag) {
-            // Inline formatting
-            case 'strong':
-            case 'b':
-                isAtStart = false;
-                lastWasBlock = false;
-                return `**${content}**`;
-            case 'em':
-            case 'i':
-                isAtStart = false;
-                lastWasBlock = false;
-                return `*${content}*`;
-            case 'del':
-            case 'strike':
-            case 's':
-                isAtStart = false;
-                lastWasBlock = false;
-                return `~~${content}~~`;
-            case 'u':
-                isAtStart = false;
-                lastWasBlock = false;
-                return `__${content}__`;
-
-            // Block elements - only add newline before if not at start
-            case 'h1': {
-                const prefix = isAtStart ? '' : '\n';
-                isAtStart = false;
-                lastWasBlock = true;
-                return `${prefix}# ${content.trim()}`;
-            }
-            case 'h2': {
-                const prefix = isAtStart ? '' : '\n';
-                isAtStart = false;
-                lastWasBlock = true;
-                return `${prefix}## ${content.trim()}`;
-            }
-            case 'h3': {
-                const prefix = isAtStart ? '' : '\n';
-                isAtStart = false;
-                lastWasBlock = true;
-                return `${prefix}### ${content.trim()}`;
-            }
-            case 'blockquote': {
-                const prefix = isAtStart ? '' : '\n';
-                isAtStart = false;
-                lastWasBlock = true;
-                return `${prefix}> ${content.trim()}`;
-            }
-            case 'hr': {
-                const prefix = isAtStart ? '' : '\n';
-                isAtStart = false;
-                lastWasBlock = true;
-                return `${prefix}---`;
-            }
-            case 'li':
-                lastWasBlock = true;
-                return `\n- ${content.trim()}`;
-            case 'br':
-                // br is a line break - don't change lastWasBlock state
-                // If br follows a block element, lastWasBlock stays true,
-                // so the following text will get a newline prefix (representing the blank line)
-                // This ensures: <h1>H</h1><br>text → # H\n\ntext (block + br = two newlines)
-                return '\n';
-
-            // Container elements - only add newline if not at start and has content
-            case 'p':
-            case 'div': {
-                // Handle empty containers with only br (preserve line breaks)
-                if (!content.trim()) {
-                    // If content has newlines from br tags, preserve them
-                    if (content.includes('\n')) {
-                        return content;
-                    }
-                    return '';
-                }
-                const prefix = isAtStart ? '' : '\n';
-                isAtStart = false;
-                lastWasBlock = true;
-                return `${prefix}${content}`;
-            }
-            case 'ul':
-            case 'ol':
-                lastWasBlock = true;
-                return content;
-
-            // Default: just return content
-            default:
-                if (content.trim()) {
-                    isAtStart = false;
-                    lastWasBlock = false;
-                }
-                return content;
-        }
+// Parse content - migrate legacy markdown or return HTML as-is
+function parseContent(content) {
+    if (!content) return '';
+    if (isLegacyMarkdown(content)) {
+        return migrateLegacyMarkdown(content);
     }
-
-    let text = '';
-    let prevChild = null;
-    el.childNodes.forEach(child => {
-        text += processNode(child, prevChild);
-        prevChild = child;
-    });
-
-    // Clean up: remove excessive newlines and trim
-    text = text.replace(/\n{3,}/g, '\n\n').trim();
-
-    return text;
+    return content; // Already HTML, return as-is
 }
 
-function getPlainText(el) {
-    // For backward compatibility - now uses htmlToMarkdown
-    return htmlToMarkdown(el);
+// Get HTML content from contenteditable element (direct storage, no conversion)
+function getHtmlContent(el) {
+    return el.innerHTML;
 }
 
 // External function references (set by other modules)
@@ -279,7 +131,7 @@ export function createItem(cfg, loading = false) {
             html = `<video class="item-video" src="${mediaSrc}" controls></video>`;
             break;
         case 'memo':
-            html = `<div class="item-memo"><div class="memo-body" contenteditable="true" data-placeholder="Write something...">${parseMarkdown(cfg.content || '')}</div><div class="memo-toolbar"><button class="md-btn" data-md="heading" title="Heading"><svg width="14" height="17" viewBox="0 0 27 34" fill="currentColor"><path d="M2.07 33.82c-1.26 0-2.07-.83-2.07-2.14V2.14C0 .83.8 0 2.07 0c1.26 0 2.07.83 2.07 2.14v12.53h18.2V2.14c0-1.31.81-2.14 2.07-2.14 1.27 0 2.07.83 2.07 2.14v29.54c0 1.31-.8 2.14-2.07 2.14-1.26 0-2.07-.83-2.07-2.14V18.39H4.14v13.29c0 1.31-.81 2.14-2.07 2.14z"/></svg></button><button class="md-btn" data-md="bold" title="Bold"><svg width="13" height="17" viewBox="0 0 25 33" fill="currentColor"><path d="M2.9 32.49C1.1 32.49 0 31.37 0 29.48V3.02C0 1.13 1.1 0 2.9 0h10.59c5.9 0 9.7 3.18 9.7 8.11 0 3.49-2.59 6.53-5.92 7.07v.18c4.41.43 7.5 3.6 7.5 7.9 0 5.72-4.21 9.23-11.15 9.23H2.9zM5.81 13.69h5.31c4.05 0 6.33-1.71 6.33-4.73 0-2.84-1.96-4.44-5.43-4.44H5.81v9.17zm0 14.28h6.49c4.28 0 6.55-1.78 6.55-5.11 0-3.31-2.34-5.05-6.8-5.05H5.81v10.16z"/></svg></button><button class="md-btn" data-md="strike" title="Strikethrough"><svg width="18" height="18" viewBox="0 0 35 35" fill="currentColor"><path d="M17.5 0c5.65 0 10.2 2.84 11.42 7.41.07.26.12.61.12 1.05 0 1.15-.8 1.9-1.92 1.9-1.08 0-1.74-.56-2.11-1.64-1.17-3.42-3.96-4.92-7.62-4.92-4.22 0-7.48 2.06-7.48 5.51 0 2.67 1.81 4.5 6.42 5.51l3.75.82c.13.03.26.06.39.09h12.76a1.75 1.75 0 110 3.5h-5.35c1.41 1.46 2.07 3.28 2.07 5.55 0 6.26-4.92 10.17-12.5 10.17-6.35 0-10.87-2.86-12.14-6.94-.14-.47-.23-.98-.23-1.48 0-1.34.75-2.18 1.95-2.18 1.05 0 1.71.54 2.04 1.67 1.03 3.49 4.36 5.13 8.62 5.13 4.59 0 7.92-2.41 7.92-5.74 0-2.84-1.87-4.71-6.56-5.74l-2.02-.44H1.75a1.75 1.75 0 110-3.5h6.47c-1.81-1.6-2.64-3.67-2.64-6.23 0-5.58 4.92-9.49 12.01-9.49z"/></svg></button><button class="md-btn" data-md="underline" title="Underline"><svg width="16" height="19" viewBox="0 0 31 36" fill="currentColor"><path d="M15.18 30.71C6.79 30.71 1.75 25.51 1.75 18.29V2.18C1.75.84 2.57 0 3.86 0s2.11.84 2.11 2.18v15.83c0 5.11 3.35 8.81 9.21 8.81s9.21-3.7 9.21-8.81V2.18C24.39.84 25.21 0 26.5 0s2.11.84 2.11 2.18v16.11c0 7.22-5.04 12.42-13.43 12.42z"/><path d="M28.61 32.4a1.75 1.75 0 110 3.5H1.75a1.75 1.75 0 110-3.5h26.86z"/></svg></button></div></div>`;
+            html = `<div class="item-memo"><div class="memo-body" contenteditable="true" data-placeholder="Write something...">${parseContent(cfg.content || '')}</div><div class="memo-toolbar"><button class="md-btn" data-md="heading" title="Heading"><svg width="14" height="17" viewBox="0 0 27 34" fill="currentColor"><path d="M2.07 33.82c-1.26 0-2.07-.83-2.07-2.14V2.14C0 .83.8 0 2.07 0c1.26 0 2.07.83 2.07 2.14v12.53h18.2V2.14c0-1.31.81-2.14 2.07-2.14 1.27 0 2.07.83 2.07 2.14v29.54c0 1.31-.8 2.14-2.07 2.14-1.26 0-2.07-.83-2.07-2.14V18.39H4.14v13.29c0 1.31-.81 2.14-2.07 2.14z"/></svg></button><button class="md-btn" data-md="bold" title="Bold"><svg width="13" height="17" viewBox="0 0 25 33" fill="currentColor"><path d="M2.9 32.49C1.1 32.49 0 31.37 0 29.48V3.02C0 1.13 1.1 0 2.9 0h10.59c5.9 0 9.7 3.18 9.7 8.11 0 3.49-2.59 6.53-5.92 7.07v.18c4.41.43 7.5 3.6 7.5 7.9 0 5.72-4.21 9.23-11.15 9.23H2.9zM5.81 13.69h5.31c4.05 0 6.33-1.71 6.33-4.73 0-2.84-1.96-4.44-5.43-4.44H5.81v9.17zm0 14.28h6.49c4.28 0 6.55-1.78 6.55-5.11 0-3.31-2.34-5.05-6.8-5.05H5.81v10.16z"/></svg></button><button class="md-btn" data-md="italic" title="Italic"><svg width="10" height="17" viewBox="0 0 20 33" fill="currentColor"><path d="M7.73 33c-1.27 0-2.1-.86-2.1-2.2 0-1.33.83-2.2 2.1-2.2h2.11l4.83-24.2H12.2c-1.27 0-2.1-.86-2.1-2.2S10.93 0 12.2 0h7.7c1.27 0 2.1.86 2.1 2.2 0 1.33-.83 2.2-2.1 2.2h-2.11l-4.83 24.2h2.47c1.27 0 2.1.86 2.1 2.2 0 1.33-.83 2.2-2.1 2.2H7.73z"/></svg></button><button class="md-btn" data-md="strike" title="Strikethrough"><svg width="18" height="18" viewBox="0 0 35 35" fill="currentColor"><path d="M17.5 0c5.65 0 10.2 2.84 11.42 7.41.07.26.12.61.12 1.05 0 1.15-.8 1.9-1.92 1.9-1.08 0-1.74-.56-2.11-1.64-1.17-3.42-3.96-4.92-7.62-4.92-4.22 0-7.48 2.06-7.48 5.51 0 2.67 1.81 4.5 6.42 5.51l3.75.82c.13.03.26.06.39.09h12.76a1.75 1.75 0 110 3.5h-5.35c1.41 1.46 2.07 3.28 2.07 5.55 0 6.26-4.92 10.17-12.5 10.17-6.35 0-10.87-2.86-12.14-6.94-.14-.47-.23-.98-.23-1.48 0-1.34.75-2.18 1.95-2.18 1.05 0 1.71.54 2.04 1.67 1.03 3.49 4.36 5.13 8.62 5.13 4.59 0 7.92-2.41 7.92-5.74 0-2.84-1.87-4.71-6.56-5.74l-2.02-.44H1.75a1.75 1.75 0 110-3.5h6.47c-1.81-1.6-2.64-3.67-2.64-6.23 0-5.58 4.92-9.49 12.01-9.49z"/></svg></button><button class="md-btn" data-md="underline" title="Underline"><svg width="16" height="19" viewBox="0 0 31 36" fill="currentColor"><path d="M15.18 30.71C6.79 30.71 1.75 25.51 1.75 18.29V2.18C1.75.84 2.57 0 3.86 0s2.11.84 2.11 2.18v15.83c0 5.11 3.35 8.81 9.21 8.81s9.21-3.7 9.21-8.81V2.18C24.39.84 25.21 0 26.5 0s2.11.84 2.11 2.18v16.11c0 7.22-5.04 12.42-13.43 12.42z"/><path d="M28.61 32.4a1.75 1.75 0 110 3.5H1.75a1.75 1.75 0 110-3.5h26.86z"/></svg></button></div></div>`;
             break;
         case 'link':
             html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`;
@@ -501,7 +353,7 @@ function setupItemEvents(item) {
 
         // Handle input - save content and auto-resize
         mb.addEventListener('input', () => {
-            item.content = getPlainText(mb);
+            item.content = getHtmlContent(mb);
             autoResizeItem(item);
             triggerAutoSaveFn();
             hasUnsavedChanges = true;
@@ -555,6 +407,9 @@ function setupItemEvents(item) {
                     case 'bold':
                         document.execCommand('bold', false, null);
                         break;
+                    case 'italic':
+                        document.execCommand('italic', false, null);
+                        break;
                     case 'strike':
                         document.execCommand('strikeThrough', false, null);
                         break;
@@ -566,7 +421,7 @@ function setupItemEvents(item) {
                         break;
                 }
 
-                item.content = getPlainText(mb);
+                item.content = getHtmlContent(mb);
                 autoResizeItem(item);
                 triggerAutoSaveFn();
                 hasUnsavedChanges = true;
