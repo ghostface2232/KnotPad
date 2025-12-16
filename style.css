@@ -121,6 +121,7 @@ input, textarea, button { font-family: inherit; }
 .canvas-item .delete-btn { right: -10px; }
 .canvas-item .font-size-btn { right: 18px; }
 .canvas-item .color-btn { right: 46px; }
+.canvas-item.no-font-btn .color-btn { right: 18px; }
 .canvas-item:hover .delete-btn, .canvas-item:hover .color-btn, .canvas-item:hover .font-size-btn { opacity: 1; }
 .canvas-item .delete-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
 .canvas-item .color-btn:hover, .canvas-item .font-size-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -221,9 +222,9 @@ input, textarea, button { font-family: inherit; }
 .md-btn:active { transform: scale(0.95); }
 
 /* Font size variants */
-.canvas-item.font-size-medium .memo-body { font-size: 14px; }
-.canvas-item.font-size-large .memo-body { font-size: 15px; }
-.canvas-item.font-size-xlarge .memo-body { font-size: 16px; }
+.canvas-item.font-size-medium .memo-body { font-size: 15px; }
+.canvas-item.font-size-large .memo-body { font-size: 18px; }
+.canvas-item.font-size-xlarge .memo-body { font-size: 22px; }
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
 .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); }
