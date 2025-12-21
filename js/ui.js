@@ -1,6 +1,6 @@
 // KnotPad - UI Module (Toolbar, Menus, Modals, Minimap, Search, Canvas Management)
 
-import { CANVASES_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
+import { CANVASES_KEY, CANVAS_GROUPS_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
 import { $, esc, generateId, showToast } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
@@ -26,6 +26,7 @@ import {
 const sidebar = $('sidebar');
 const canvasList = $('canvasList');
 const canvasIconPicker = $('canvasIconPicker');
+const canvasGroupPicker = $('canvasGroupPicker');
 const searchBar = $('searchBar');
 const searchInput = $('searchInput');
 const minimapContent = $('minimapContent');
@@ -262,6 +263,7 @@ export async function loadCanvases() {
             state.setCanvases([{ id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 }]);
         }
         saveCanvasesList();
+        loadCanvasGroups();
         const lastId = localStorage.getItem('knotpad-active-canvas');
         const target = state.canvases.find(c => c.id === lastId) || state.canvases[0];
         if (target) await switchCanvas(target.id);
@@ -271,11 +273,24 @@ export async function loadCanvases() {
     }
 }
 
+export function loadCanvasGroups() {
+    try {
+        state.setCanvasGroups(JSON.parse(localStorage.getItem(CANVAS_GROUPS_KEY) || '[]'));
+    } catch (e) {
+        console.error(e);
+        state.setCanvasGroups([]);
+    }
+}
+
 export function saveCanvasesList() {
     localStorage.setItem(CANVASES_KEY, JSON.stringify(state.canvases));
     if (fsDirectoryHandle) {
         saveCanvasesListToFileSystem();
     }
+}
+
+export function saveCanvasGroups() {
+    localStorage.setItem(CANVAS_GROUPS_KEY, JSON.stringify(state.canvasGroups));
 }
 
 export async function saveCurrentCanvas() {
@@ -438,11 +453,19 @@ export async function deleteCanvas(id) {
     const idx = state.canvases.findIndex(c => c.id === id);
     if (idx > -1) {
         state.canvases.splice(idx, 1);
+
+        // Remove from all groups
+        state.canvasGroups.forEach(g => {
+            const gIdx = g.canvasIds.indexOf(id);
+            if (gIdx > -1) g.canvasIds.splice(gIdx, 1);
+        });
+
         localStorage.removeItem('knotpad-data-' + id);
         if (fsDirectoryHandle) {
             await deleteCanvasFromFileSystem(id);
         }
         saveCanvasesList();
+        saveCanvasGroups();
         if (state.currentCanvasId === id) await switchCanvas(state.canvases[0].id);
         else renderCanvasList();
         showToast('Canvas deleted');
@@ -460,18 +483,216 @@ function renameCanvas(id, name) {
     }
 }
 
+// ============ Canvas Group Management ============
+
+export function createNewGroup(name = 'New Group') {
+    const newGroup = {
+        id: generateId(),
+        name: name,
+        canvasIds: [],
+        collapsed: false,
+        createdAt: Date.now()
+    };
+    state.canvasGroups.push(newGroup);
+    saveCanvasGroups();
+    renderCanvasList();
+    return newGroup;
+}
+
+function toggleGroup(groupId) {
+    const group = state.canvasGroups.find(g => g.id === groupId);
+    if (group) {
+        group.collapsed = !group.collapsed;
+        saveCanvasGroups();
+        renderCanvasList();
+    }
+}
+
+function startGroupRename(groupEl, groupId) {
+    const nameEl = groupEl.querySelector('.canvas-group-name');
+    const group = state.canvasGroups.find(g => g.id === groupId);
+    const oldName = group?.name || '';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'canvas-group-name-input';
+    input.value = oldName;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    const finish = () => {
+        if (group) {
+            group.name = input.value.trim() || 'Unnamed Group';
+            saveCanvasGroups();
+            renderCanvasList();
+        }
+    };
+
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.value = oldName; input.blur(); }
+    });
+}
+
+function deleteGroup(groupId) {
+    if (!confirm('Delete this group? Canvases will not be deleted.')) return;
+
+    const idx = state.canvasGroups.findIndex(g => g.id === groupId);
+    if (idx > -1) {
+        state.canvasGroups.splice(idx, 1);
+        saveCanvasGroups();
+        renderCanvasList();
+        showToast('Group deleted');
+    }
+}
+
+export function addCanvasToGroup(canvasId, groupId) {
+    // Remove from all groups first
+    state.canvasGroups.forEach(g => {
+        const idx = g.canvasIds.indexOf(canvasId);
+        if (idx > -1) g.canvasIds.splice(idx, 1);
+    });
+
+    // Add to new group
+    const group = state.canvasGroups.find(g => g.id === groupId);
+    if (group && !group.canvasIds.includes(canvasId)) {
+        group.canvasIds.push(canvasId);
+        saveCanvasGroups();
+        renderCanvasList();
+    }
+}
+
+export function removeCanvasFromGroup(canvasId) {
+    state.canvasGroups.forEach(g => {
+        const idx = g.canvasIds.indexOf(canvasId);
+        if (idx > -1) g.canvasIds.splice(idx, 1);
+    });
+    saveCanvasGroups();
+    renderCanvasList();
+}
+
 function updateTopbarCanvasName() {
     const c = state.canvases.find(x => x.id === state.currentCanvasId);
     $('topbarCanvasName').textContent = c?.name || 'Untitled';
 }
 
 function getCanvasIconHTML(c) {
-    if (c.icon && CANVAS_ICONS[c.icon]) return CANVAS_ICONS[c.icon];
-    return `<span class="icon-letter">${esc((c.name || 'U').charAt(0).toUpperCase())}</span>`;
+    const colorClass = c.color ? `canvas-color-${c.color}` : '';
+    const iconContent = c.icon && CANVAS_ICONS[c.icon]
+        ? CANVAS_ICONS[c.icon]
+        : `<span class="icon-letter">${esc((c.name || 'U').charAt(0).toUpperCase())}</span>`;
+
+    if (c.color) {
+        return `<div class="canvas-icon-wrapper ${colorClass}">${iconContent}</div>`;
+    }
+    return iconContent;
 }
 
 export function renderCanvasList() {
-    canvasList.innerHTML = state.canvases.map(c => `
+    // Get all canvas IDs that are in groups
+    const groupedCanvasIds = new Set();
+    state.canvasGroups.forEach(g => g.canvasIds.forEach(id => groupedCanvasIds.add(id)));
+
+    // Ungrouped canvases
+    const ungroupedCanvases = state.canvases.filter(c => !groupedCanvasIds.has(c.id));
+
+    let html = '';
+
+    // Render ungrouped canvases first
+    ungroupedCanvases.forEach(c => {
+        html += renderCanvasEntry(c);
+    });
+
+    // Render groups
+    state.canvasGroups.forEach(group => {
+        const groupCanvases = state.canvases.filter(c => group.canvasIds.includes(c.id));
+        const isCollapsed = group.collapsed || false;
+        html += `
+            <div class="canvas-group" data-group-id="${group.id}">
+                <div class="canvas-group-header">
+                    <button class="canvas-group-toggle">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${isCollapsed ? 0 : 90}deg)">
+                            <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                    </button>
+                    <div class="canvas-group-name">${esc(group.name)}</div>
+                    <div class="canvas-group-count">${groupCanvases.length}</div>
+                    <div class="canvas-group-actions">
+                        <button class="canvas-group-action-btn rename-group" title="Rename Group">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
+                        <button class="canvas-group-action-btn delete-group" title="Delete Group">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="canvas-group-items" style="display: ${isCollapsed ? 'none' : 'block'}">
+                    ${groupCanvases.map(c => renderCanvasEntry(c)).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    canvasList.innerHTML = html;
+
+    // Attach event listeners to canvas entries
+    canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
+        const id = entry.dataset.id;
+        entry.addEventListener('click', async e => {
+            if (!e.target.closest('.canvas-action-btn') && !e.target.closest('.canvas-icon') && id !== state.currentCanvasId) {
+                saveCurrentCanvas();
+                await switchCanvas(id);
+            }
+        });
+        const moveBtn = entry.querySelector('.move-to-group');
+        const renameBtn = entry.querySelector('.rename');
+        const deleteBtn = entry.querySelector('.delete');
+        const iconBtn = entry.querySelector('.canvas-icon');
+
+        if (moveBtn) moveBtn.addEventListener('click', e => { e.stopPropagation(); showGroupPicker(id, entry); });
+        if (renameBtn) renameBtn.addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
+        if (deleteBtn) deleteBtn.addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
+        if (iconBtn) iconBtn.addEventListener('click', e => { e.stopPropagation(); openIconPicker(id, entry); });
+    });
+
+    // Attach event listeners to group headers
+    canvasList.querySelectorAll('.canvas-group').forEach(groupEl => {
+        const groupId = groupEl.dataset.groupId;
+        const toggle = groupEl.querySelector('.canvas-group-toggle');
+        const header = groupEl.querySelector('.canvas-group-header');
+
+        toggle.addEventListener('click', e => {
+            e.stopPropagation();
+            toggleGroup(groupId);
+        });
+
+        const renameBtn = groupEl.querySelector('.rename-group');
+        const deleteBtn = groupEl.querySelector('.delete-group');
+
+        if (renameBtn) renameBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            startGroupRename(groupEl, groupId);
+        });
+
+        if (deleteBtn) deleteBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            deleteGroup(groupId);
+        });
+    });
+}
+
+function renderCanvasEntry(c) {
+    // Check if canvas is in a group
+    const inGroup = state.canvasGroups.some(g => g.canvasIds.includes(c.id));
+
+    return `
         <div class="canvas-item-entry ${c.id === state.currentCanvasId ? 'active' : ''}" data-id="${c.id}">
             <div class="canvas-icon" data-canvas-id="${c.id}">${getCanvasIconHTML(c)}</div>
             <div class="canvas-info">
@@ -479,6 +700,11 @@ export function renderCanvasList() {
                 <div class="canvas-meta">${c.itemCount || 0} items</div>
             </div>
             <div class="canvas-actions">
+                <button class="canvas-action-btn move-to-group" title="${inGroup ? 'Remove from group' : 'Add to group'}">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                    </svg>
+                </button>
                 <button class="canvas-action-btn rename" title="Rename">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
@@ -492,20 +718,7 @@ export function renderCanvasList() {
                 </button>
             </div>
         </div>
-    `).join('');
-
-    canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
-        const id = entry.dataset.id;
-        entry.addEventListener('click', async e => {
-            if (!e.target.closest('.canvas-action-btn') && !e.target.closest('.canvas-icon') && id !== state.currentCanvasId) {
-                saveCurrentCanvas();
-                await switchCanvas(id);
-            }
-        });
-        entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
-        entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
-        entry.querySelector('.canvas-icon').addEventListener('click', e => { e.stopPropagation(); openIconPicker(id, entry); });
-    });
+    `;
 }
 
 function startRename(entry, id) {
@@ -536,6 +749,9 @@ function openIconPicker(canvasId, entry) {
     canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt =>
         opt.classList.toggle('selected', opt.dataset.icon === (canvas?.icon || ''))
     );
+    canvasIconPicker.querySelectorAll('.color-opt').forEach(opt =>
+        opt.classList.toggle('selected', opt.dataset.color === (canvas?.color || ''))
+    );
     canvasIconPicker.classList.add('active');
 }
 
@@ -549,11 +765,84 @@ function setCanvasIcon(canvasId, icon) {
     }
 }
 
+function setCanvasColor(canvasId, color) {
+    const c = state.canvases.find(x => x.id === canvasId);
+    if (c) {
+        c.color = color || null;
+        c.updatedAt = Date.now();
+        saveCanvasesList();
+        renderCanvasList();
+    }
+}
+
+function showGroupPicker(canvasId, entry) {
+    // Check if canvas is already in a group
+    const currentGroup = state.canvasGroups.find(g => g.canvasIds.includes(canvasId));
+
+    const rect = entry.getBoundingClientRect();
+    const sidebarRect = sidebar.getBoundingClientRect();
+
+    let html = '';
+
+    // Option to remove from group
+    if (currentGroup) {
+        html += `<div class="group-picker-opt" data-action="remove" title="Remove from group">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+            <span>Remove from group</span>
+        </div>`;
+    }
+
+    // List all groups
+    if (state.canvasGroups.length > 0) {
+        state.canvasGroups.forEach(group => {
+            const isInThisGroup = group.id === currentGroup?.id;
+            html += `<div class="group-picker-opt ${isInThisGroup ? 'selected' : ''}" data-group-id="${group.id}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                </svg>
+                <span>${esc(group.name)}</span>
+            </div>`;
+        });
+    } else {
+        html += `<div class="group-picker-opt disabled">No groups available</div>`;
+    }
+
+    canvasGroupPicker.innerHTML = html;
+    canvasGroupPicker.style.top = (rect.top - sidebarRect.top) + 'px';
+    canvasGroupPicker.classList.add('active');
+    canvasGroupPicker.dataset.canvasId = canvasId;
+
+    // Add event listeners
+    canvasGroupPicker.querySelectorAll('.group-picker-opt').forEach(opt => {
+        if (!opt.classList.contains('disabled')) {
+            opt.addEventListener('click', e => {
+                e.stopPropagation();
+                if (opt.dataset.action === 'remove') {
+                    removeCanvasFromGroup(canvasId);
+                } else if (opt.dataset.groupId) {
+                    addCanvasToGroup(canvasId, opt.dataset.groupId);
+                }
+                canvasGroupPicker.classList.remove('active');
+            });
+        }
+    });
+}
+
 export function setupCanvasIconPicker() {
     canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt => {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             if (state.iconPickerTarget) setCanvasIcon(state.iconPickerTarget, opt.dataset.icon);
+            canvasIconPicker.classList.remove('active');
+            state.setIconPickerTarget(null);
+        });
+    });
+    canvasIconPicker.querySelectorAll('.color-opt').forEach(opt => {
+        opt.addEventListener('click', e => {
+            e.stopPropagation();
+            if (state.iconPickerTarget) setCanvasColor(state.iconPickerTarget, opt.dataset.color);
             canvasIconPicker.classList.remove('active');
             state.setIconPickerTarget(null);
         });

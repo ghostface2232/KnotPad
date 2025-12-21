@@ -1,6 +1,7 @@
 // KnotPad - Constants and Configuration
 
 export const CANVASES_KEY = 'knotpad-canvases';
+export const CANVAS_GROUPS_KEY = 'knotpad-canvas-groups';
 export const THEME_KEY = 'knotpad-theme';
 export const FS_STORAGE_KEY = 'knotpad-fs-enabled';
 export const DB_NAME = 'knotpad-media';
