@@ -23,7 +23,6 @@ import {
     loadCanvases,
     saveCurrentCanvas,
     createNewCanvas,
-    createNewGroup,
     updateUndoRedoButtons,
     undo,
     redo,
@@ -137,10 +136,6 @@ function setupSidebarEvents() {
     $('addCanvasBtn').addEventListener('click', () => {
         saveCurrentCanvas();
         createNewCanvas();
-    });
-
-    $('addGroupBtn').addEventListener('click', () => {
-        createNewGroup();
     });
 }
 
