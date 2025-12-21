@@ -46,6 +46,7 @@ export let autoSaveTimer = null;
 // Canvas management
 export let canvases = [];
 export let currentCanvasId = null;
+export let canvasGroups = [];
 
 // Minimap throttle
 export let minimapThrottle = null;
@@ -107,6 +108,7 @@ export function setActiveFilter(val) { activeFilter = val; }
 export function setAutoSaveTimer(val) { autoSaveTimer = val; }
 export function setCanvases(val) { canvases = val; }
 export function setCurrentCanvasId(val) { currentCanvasId = val; }
+export function setCanvasGroups(val) { canvasGroups = val; }
 export function setMinimapThrottle(val) { minimapThrottle = val; }
 export function setSidebarPinned(val) { sidebarPinned = val; localStorage.setItem('knotpad-sidebar-pinned', val); }
 export function setIconPickerTarget(val) { iconPickerTarget = val; }
