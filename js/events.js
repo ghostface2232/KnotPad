@@ -430,9 +430,6 @@ export function setupDocumentClickHandler() {
             $('canvasIconPicker').classList.remove('active');
             state.setIconPickerTarget(null);
         }
-        if (!e.target.closest('.canvas-group-picker') && !e.target.closest('.move-to-group')) {
-            $('canvasGroupPicker').classList.remove('active');
-        }
         if (!e.target.closest('.new-node-picker')) {
             $('newNodePicker').classList.remove('active');
             state.setNewNodePickerData(null);
