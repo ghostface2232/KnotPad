@@ -853,7 +853,13 @@ function startRename(entry, id) {
     input.focus();
     input.select();
 
-    const finish = () => renameCanvas(id, input.value.trim() || 'Untitled');
+    // Disable drag while editing to allow text selection
+    entry.draggable = false;
+
+    const finish = () => {
+        entry.draggable = true; // Restore drag capability
+        renameCanvas(id, input.value.trim() || 'Untitled');
+    };
     input.addEventListener('blur', finish);
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
@@ -866,7 +872,21 @@ function openIconPicker(canvasId, entry) {
     const canvas = state.canvases.find(c => c.id === canvasId);
     const rect = entry.getBoundingClientRect();
     const sidebarRect = sidebar.getBoundingClientRect();
-    canvasIconPicker.style.top = (rect.top - sidebarRect.top) + 'px';
+
+    // Position popup below the thumbnail entry, not covering it
+    const pickerHeight = 180; // Approximate height of the picker
+    const spaceBelow = sidebarRect.bottom - rect.bottom;
+    const spaceAbove = rect.top - sidebarRect.top;
+
+    if (spaceBelow >= pickerHeight || spaceBelow >= spaceAbove) {
+        // Position below the entry
+        canvasIconPicker.style.top = (rect.bottom - sidebarRect.top + 4) + 'px';
+        canvasIconPicker.style.bottom = '';
+    } else {
+        // Position above the entry if not enough space below
+        canvasIconPicker.style.top = '';
+        canvasIconPicker.style.bottom = (sidebarRect.bottom - rect.top + 4) + 'px';
+    }
 
     // Update icon selection state
     canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt =>
@@ -888,6 +908,10 @@ function setCanvasIcon(canvasId, icon) {
         c.updatedAt = Date.now();
         saveCanvasesList();
         renderCanvasList();
+        // Update picker selection state in real-time
+        canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt =>
+            opt.classList.toggle('selected', opt.dataset.icon === (icon || ''))
+        );
     }
 }
 
@@ -898,6 +922,10 @@ function setCanvasColor(canvasId, color) {
         c.updatedAt = Date.now();
         saveCanvasesList();
         renderCanvasList();
+        // Update picker selection state in real-time
+        canvasIconPicker.querySelectorAll('.canvas-color-opt').forEach(opt =>
+            opt.classList.toggle('selected', opt.dataset.color === (color || ''))
+        );
     }
 }
 
