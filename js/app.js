@@ -23,6 +23,7 @@ import {
     loadCanvases,
     saveCurrentCanvas,
     createNewCanvas,
+    createNewGroup,
     updateUndoRedoButtons,
     undo,
     redo,
@@ -32,6 +33,7 @@ import {
     openLinkModal,
     setupSearchEvents,
     setupCanvasIconPicker,
+    setupCanvasListDropZone,
     setupMinimapClick,
     setupContextMenu,
     showContextMenu,
@@ -136,6 +138,10 @@ function setupSidebarEvents() {
     $('addCanvasBtn').addEventListener('click', () => {
         saveCurrentCanvas();
         createNewCanvas();
+    });
+
+    $('addGroupBtn').addEventListener('click', () => {
+        createNewGroup();
     });
 }
 
@@ -306,6 +312,7 @@ async function init() {
     setupImportExportEvents();
     setupSearchEvents();
     setupCanvasIconPicker();
+    setupCanvasListDropZone();
     setupConnDirectionPicker();
     setupConnectionContextMenu();
     setupMinimapClick();
