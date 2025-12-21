@@ -557,15 +557,34 @@ function getCanvasIconStyle(c, isActive) {
     return '';
 }
 
+function formatRelativeDate(timestamp) {
+    if (!timestamp) return '';
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+
+    const date = new Date(timestamp);
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function renderCanvasEntry(c) {
     const isActive = c.id === state.currentCanvasId;
     const iconStyle = getCanvasIconStyle(c, isActive);
+    const lastModified = formatRelativeDate(c.updatedAt || c.createdAt);
+    const metaText = `${c.itemCount || 0} items${lastModified ? ` · ${lastModified}` : ''}`;
     return `
         <div class="canvas-item-entry ${isActive ? 'active' : ''}${c.color ? ' has-color' : ''}" data-id="${c.id}" draggable="true">
             <div class="canvas-icon${c.color ? ' colored' : ''}" data-canvas-id="${c.id}" style="${iconStyle}">${getCanvasIconHTML(c)}</div>
             <div class="canvas-info">
                 <div class="canvas-name">${esc(c.name)}</div>
-                <div class="canvas-meta">${c.itemCount || 0} items</div>
+                <div class="canvas-meta">${metaText}</div>
             </div>
             <div class="canvas-actions">
                 <button class="canvas-action-btn rename" title="Rename">
@@ -590,26 +609,25 @@ function renderGroupHTML(group, canvasesInGroup) {
         <div class="canvas-group ${isCollapsed ? 'collapsed' : ''}" data-group-id="${group.id}">
             <div class="canvas-group-header" data-group-id="${group.id}">
                 <svg class="group-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                <div class="group-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                </div>
                 <span class="group-name">${esc(group.name)}</span>
-                <span class="group-count">${canvasesInGroup.length}</span>
-                <div class="group-actions">
-                    <button class="group-action-btn add" title="Add Canvas">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-                    </button>
-                    <button class="group-action-btn rename" title="Rename">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                    </button>
-                    <button class="group-action-btn delete" title="Delete Group">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                        </svg>
-                    </button>
+                <div class="group-right">
+                    <span class="group-count">${canvasesInGroup.length}</span>
+                    <div class="group-actions">
+                        <button class="group-action-btn add" title="Add Canvas">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+                        </button>
+                        <button class="group-action-btn rename" title="Rename">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
+                        <button class="group-action-btn delete" title="Delete Group">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="canvas-group-content">
@@ -698,36 +716,60 @@ function setupCanvasDragDrop(entry, canvasId) {
         e.dataTransfer.effectAllowed = 'move';
         entry.classList.add('dragging');
         canvasList.classList.add('drag-active');
+        // Small delay to ensure drag image is captured
+        setTimeout(() => {
+            entry.style.opacity = '0.4';
+        }, 0);
     });
 
     entry.addEventListener('dragend', () => {
         entry.classList.remove('dragging');
+        entry.style.opacity = '';
         canvasList.classList.remove('drag-active');
-        canvasList.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        canvasList.querySelectorAll('.drag-over, .drag-over-top, .drag-over-bottom').forEach(el => {
+            el.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
+        });
     });
 
     entry.addEventListener('dragover', e => {
         e.preventDefault();
+        e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
+
+        if (entry.classList.contains('dragging')) return;
+
+        // Determine if dropping above or below based on mouse position
+        const rect = entry.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const isAbove = e.clientY < midY;
+
+        entry.classList.remove('drag-over-top', 'drag-over-bottom');
+        entry.classList.add(isAbove ? 'drag-over-top' : 'drag-over-bottom');
     });
 
     entry.addEventListener('dragenter', e => {
         e.preventDefault();
-        if (!entry.classList.contains('dragging')) {
-            entry.classList.add('drag-over');
-        }
+        e.stopPropagation();
     });
 
-    entry.addEventListener('dragleave', () => {
-        entry.classList.remove('drag-over');
+    entry.addEventListener('dragleave', e => {
+        // Only remove classes if leaving to outside the entry
+        const relatedTarget = e.relatedTarget;
+        if (!entry.contains(relatedTarget)) {
+            entry.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
+        }
     });
 
     entry.addEventListener('drop', e => {
         e.preventDefault();
-        entry.classList.remove('drag-over');
+        e.stopPropagation();
+
+        const isAbove = entry.classList.contains('drag-over-top');
+        entry.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
+
         const draggedId = e.dataTransfer.getData('text/plain');
         if (draggedId && draggedId !== canvasId) {
-            reorderCanvas(draggedId, canvasId);
+            reorderCanvas(draggedId, canvasId, isAbove);
         }
     });
 }
@@ -757,7 +799,7 @@ function setupGroupDragDrop(header, groupId) {
     });
 }
 
-function reorderCanvas(draggedId, targetId) {
+function reorderCanvas(draggedId, targetId, insertBefore = false) {
     const draggedIdx = state.canvases.findIndex(c => c.id === draggedId);
     const targetIdx = state.canvases.findIndex(c => c.id === targetId);
 
@@ -768,8 +810,11 @@ function reorderCanvas(draggedId, targetId) {
     // Match target's group
     draggedCanvas.groupId = targetCanvas.groupId || null;
 
+    // Find where target is now after removal
     const newTargetIdx = state.canvases.findIndex(c => c.id === targetId);
-    state.canvases.splice(newTargetIdx, 0, draggedCanvas);
+    // Insert before or after based on drop position
+    const insertIdx = insertBefore ? newTargetIdx : newTargetIdx + 1;
+    state.canvases.splice(insertIdx, 0, draggedCanvas);
 
     saveCanvasesList();
     renderCanvasList();
@@ -833,12 +878,6 @@ function openIconPicker(canvasId, entry) {
         opt.classList.toggle('selected', opt.dataset.color === (canvas?.color || ''))
     );
 
-    // Reset to icon tab
-    canvasIconPicker.querySelectorAll('.picker-tab').forEach(t => t.classList.remove('active'));
-    canvasIconPicker.querySelectorAll('.picker-panel').forEach(p => p.classList.remove('active'));
-    canvasIconPicker.querySelector('.picker-tab[data-tab="icon"]')?.classList.add('active');
-    canvasIconPicker.querySelector('.picker-panel[data-panel="icon"]')?.classList.add('active');
-
     canvasIconPicker.classList.add('active');
 }
 
@@ -863,25 +902,11 @@ function setCanvasColor(canvasId, color) {
 }
 
 export function setupCanvasIconPicker() {
-    // Tab switching
-    canvasIconPicker.querySelectorAll('.picker-tab').forEach(tab => {
-        tab.addEventListener('click', e => {
-            e.stopPropagation();
-            const targetPanel = tab.dataset.tab;
-            canvasIconPicker.querySelectorAll('.picker-tab').forEach(t => t.classList.remove('active'));
-            canvasIconPicker.querySelectorAll('.picker-panel').forEach(p => p.classList.remove('active'));
-            tab.classList.add('active');
-            canvasIconPicker.querySelector(`.picker-panel[data-panel="${targetPanel}"]`)?.classList.add('active');
-        });
-    });
-
     // Icon selection
     canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt => {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             if (state.iconPickerTarget) setCanvasIcon(state.iconPickerTarget, opt.dataset.icon);
-            canvasIconPicker.classList.remove('active');
-            state.setIconPickerTarget(null);
         });
     });
 
@@ -890,9 +915,22 @@ export function setupCanvasIconPicker() {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             if (state.iconPickerTarget) setCanvasColor(state.iconPickerTarget, opt.dataset.color);
+        });
+    });
+
+    // Close picker when clicking outside
+    document.addEventListener('click', e => {
+        if (canvasIconPicker.classList.contains('active') &&
+            !canvasIconPicker.contains(e.target) &&
+            !e.target.closest('.canvas-icon')) {
             canvasIconPicker.classList.remove('active');
             state.setIconPickerTarget(null);
-        });
+        }
+    });
+
+    // Prevent clicks inside picker from closing it
+    canvasIconPicker.addEventListener('click', e => {
+        e.stopPropagation();
     });
 }
 
@@ -1394,6 +1432,58 @@ export function closeSidebarIfUnpinned() {
     if (!state.sidebarPinned && sidebar.classList.contains('open')) {
         sidebar.classList.remove('open');
     }
+}
+
+// ============ Sidebar Resize ============
+
+const SIDEBAR_WIDTH_KEY = 'knotpad-sidebar-width';
+const MIN_SIDEBAR_WIDTH = 220;
+const MAX_SIDEBAR_WIDTH = 480;
+
+export function setupSidebarResize() {
+    const resizeHandle = $('sidebarResizeHandle');
+    if (!resizeHandle) return;
+
+    // Load saved width
+    const savedWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (savedWidth) {
+        document.documentElement.style.setProperty('--sidebar-width', savedWidth + 'px');
+    }
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizeHandle.addEventListener('mousedown', e => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 280;
+        sidebar.classList.add('resizing');
+        resizeHandle.classList.add('active');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!isResizing) return;
+        const delta = e.clientX - startX;
+        let newWidth = startWidth + delta;
+        newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, newWidth));
+        document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+        isResizing = false;
+        sidebar.classList.remove('resizing');
+        resizeHandle.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        // Save the width
+        const currentWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 280;
+        localStorage.setItem(SIDEBAR_WIDTH_KEY, currentWidth);
+    });
 }
 
 // ============ File Handling ============

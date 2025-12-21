@@ -43,6 +43,7 @@ import {
     setupLinkModal,
     setupSettingsModal,
     setupCanvasContextMenu,
+    setupSidebarResize,
     handleFile
 } from './ui.js';
 import {
@@ -308,6 +309,7 @@ async function init() {
     // Setup all event handlers
     setupToolbarEvents();
     setupSidebarEvents();
+    setupSidebarResize();
     setupFilterColorEvents();
     setupImportExportEvents();
     setupSearchEvents();
