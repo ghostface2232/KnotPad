@@ -126,7 +126,15 @@ function setupSidebarEvents() {
     const sidebarToggle = $('sidebarToggle');
     const sidebarPinBtn = $('sidebarPinBtn');
 
-    sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    // Restore sidebar open state from localStorage
+    if (state.sidebarOpen) {
+        sidebar.classList.add('open');
+    }
+
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+        state.setSidebarOpen(sidebar.classList.contains('open'));
+    });
 
     if (state.sidebarPinned) sidebarPinBtn.classList.add('pinned');
 

@@ -1459,6 +1459,7 @@ document.addEventListener('visibilitychange', () => {
 export function closeSidebarIfUnpinned() {
     if (!state.sidebarPinned && sidebar.classList.contains('open')) {
         sidebar.classList.remove('open');
+        state.setSidebarOpen(false);
     }
 }
 

@@ -56,6 +56,7 @@ export let minimapThrottle = null;
 
 // Sidebar state
 export let sidebarPinned = localStorage.getItem('knotpad-sidebar-pinned') === 'true';
+export let sidebarOpen = localStorage.getItem('knotpad-sidebar-open') === 'true';
 
 // Picker state
 export let iconPickerTarget = null;
@@ -121,6 +122,7 @@ export function toggleGroupCollapsed(groupId) {
 }
 export function setMinimapThrottle(val) { minimapThrottle = val; }
 export function setSidebarPinned(val) { sidebarPinned = val; localStorage.setItem('knotpad-sidebar-pinned', val); }
+export function setSidebarOpen(val) { sidebarOpen = val; localStorage.setItem('knotpad-sidebar-open', val); }
 export function setIconPickerTarget(val) { iconPickerTarget = val; }
 export function setChildPickerData(val) { childPickerData = val; }
 export function setNewNodePickerData(val) { newNodePickerData = val; }
