@@ -1,6 +1,6 @@
 // KnotPad - UI Module (Toolbar, Menus, Modals, Minimap, Search, Canvas Management)
 
-import { CANVASES_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
+import { CANVASES_KEY, CANVAS_GROUPS_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
 import { $, esc, generateId, showToast } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
@@ -258,6 +258,7 @@ function restoreState(stateData) {
 export async function loadCanvases() {
     try {
         state.setCanvases(JSON.parse(localStorage.getItem(CANVASES_KEY) || '[]'));
+        state.setCanvasGroups(JSON.parse(localStorage.getItem(CANVAS_GROUPS_KEY) || '[]'));
         if (!state.canvases.length) {
             state.setCanvases([{ id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 }]);
         }
@@ -273,6 +274,7 @@ export async function loadCanvases() {
 
 export function saveCanvasesList() {
     localStorage.setItem(CANVASES_KEY, JSON.stringify(state.canvases));
+    localStorage.setItem(CANVAS_GROUPS_KEY, JSON.stringify(state.canvasGroups));
     if (fsDirectoryHandle) {
         saveCanvasesListToFileSystem();
     }
@@ -421,11 +423,88 @@ export async function switchCanvas(id) {
     updateTopbarCanvasName();
 }
 
-export async function createNewCanvas() {
-    const nc = { id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 };
-    state.canvases.unshift(nc);
+export async function createNewCanvas(groupId = null) {
+    const nc = { id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0, groupId: groupId };
+    if (groupId) {
+        // Add to end of group
+        const groupCanvases = state.canvases.filter(c => c.groupId === groupId);
+        const lastGroupCanvas = groupCanvases[groupCanvases.length - 1];
+        const insertIndex = lastGroupCanvas ? state.canvases.indexOf(lastGroupCanvas) + 1 : state.canvases.length;
+        state.canvases.splice(insertIndex, 0, nc);
+    } else {
+        state.canvases.unshift(nc);
+    }
     saveCanvasesList();
     await switchCanvas(nc.id);
+}
+
+// ============ Canvas Group Management ============
+
+export function createNewGroup() {
+    const ng = { id: generateId(), name: 'New Group', createdAt: Date.now() };
+    state.canvasGroups.push(ng);
+    saveCanvasesList();
+    renderCanvasList();
+    // Start renaming immediately
+    setTimeout(() => {
+        const header = canvasList.querySelector(`.canvas-group[data-group-id="${ng.id}"] .canvas-group-header`);
+        if (header) startGroupRename(header, ng.id);
+    }, 50);
+}
+
+export function deleteGroup(groupId) {
+    if (!confirm('Delete this group? Canvases inside will be moved out.')) return;
+
+    // Remove group assignment from canvases
+    state.canvases.forEach(c => {
+        if (c.groupId === groupId) c.groupId = null;
+    });
+
+    // Remove the group
+    const idx = state.canvasGroups.findIndex(g => g.id === groupId);
+    if (idx > -1) {
+        state.canvasGroups.splice(idx, 1);
+        saveCanvasesList();
+        renderCanvasList();
+        showToast('Group deleted');
+    }
+}
+
+function renameGroup(groupId, name) {
+    const g = state.canvasGroups.find(x => x.id === groupId);
+    if (g) {
+        g.name = name || 'Untitled Group';
+        saveCanvasesList();
+        renderCanvasList();
+    }
+}
+
+function startGroupRename(header, groupId) {
+    const nameEl = header.querySelector('.group-name');
+    const oldName = state.canvasGroups.find(g => g.id === groupId)?.name || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'group-name-input';
+    input.value = oldName;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    const finish = () => renameGroup(groupId, input.value.trim() || 'Untitled Group');
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.value = oldName; input.blur(); }
+    });
+}
+
+function moveCanvasToGroup(canvasId, groupId) {
+    const canvas = state.canvases.find(c => c.id === canvasId);
+    if (canvas) {
+        canvas.groupId = groupId || null;
+        saveCanvasesList();
+        renderCanvasList();
+    }
 }
 
 export async function deleteCanvas(id) {
@@ -470,10 +549,20 @@ function getCanvasIconHTML(c) {
     return `<span class="icon-letter">${esc((c.name || 'U').charAt(0).toUpperCase())}</span>`;
 }
 
-export function renderCanvasList() {
-    canvasList.innerHTML = state.canvases.map(c => `
-        <div class="canvas-item-entry ${c.id === state.currentCanvasId ? 'active' : ''}" data-id="${c.id}">
-            <div class="canvas-icon" data-canvas-id="${c.id}">${getCanvasIconHTML(c)}</div>
+function getCanvasIconStyle(c, isActive) {
+    if (c.color && COLOR_MAP[c.color]) {
+        // For colored canvas, use color as background with adjusted opacity
+        return `background: ${COLOR_MAP[c.color]}${isActive ? '' : '33'}; ${isActive ? 'color: white;' : `color: ${COLOR_MAP[c.color]};`}`;
+    }
+    return '';
+}
+
+function renderCanvasEntry(c) {
+    const isActive = c.id === state.currentCanvasId;
+    const iconStyle = getCanvasIconStyle(c, isActive);
+    return `
+        <div class="canvas-item-entry ${isActive ? 'active' : ''}${c.color ? ' has-color' : ''}" data-id="${c.id}" draggable="true">
+            <div class="canvas-icon${c.color ? ' colored' : ''}" data-canvas-id="${c.id}" style="${iconStyle}">${getCanvasIconHTML(c)}</div>
             <div class="canvas-info">
                 <div class="canvas-name">${esc(c.name)}</div>
                 <div class="canvas-meta">${c.itemCount || 0} items</div>
@@ -492,8 +581,69 @@ export function renderCanvasList() {
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+}
 
+function renderGroupHTML(group, canvasesInGroup) {
+    const isCollapsed = state.collapsedGroups.has(group.id);
+    return `
+        <div class="canvas-group ${isCollapsed ? 'collapsed' : ''}" data-group-id="${group.id}">
+            <div class="canvas-group-header" data-group-id="${group.id}">
+                <svg class="group-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                <div class="group-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                </div>
+                <span class="group-name">${esc(group.name)}</span>
+                <span class="group-count">${canvasesInGroup.length}</span>
+                <div class="group-actions">
+                    <button class="group-action-btn add" title="Add Canvas">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+                    </button>
+                    <button class="group-action-btn rename" title="Rename">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="group-action-btn delete" title="Delete Group">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="canvas-group-content">
+                ${canvasesInGroup.map(c => renderCanvasEntry(c)).join('')}
+            </div>
+        </div>
+    `;
+}
+
+export function renderCanvasList() {
+    // Separate canvases by group
+    const ungroupedCanvases = state.canvases.filter(c => !c.groupId);
+    const groupedCanvasMap = new Map();
+
+    state.canvasGroups.forEach(g => {
+        groupedCanvasMap.set(g.id, state.canvases.filter(c => c.groupId === g.id));
+    });
+
+    let html = '';
+
+    // Render ungrouped canvases first
+    ungroupedCanvases.forEach(c => {
+        html += renderCanvasEntry(c);
+    });
+
+    // Render groups
+    state.canvasGroups.forEach(group => {
+        const canvasesInGroup = groupedCanvasMap.get(group.id) || [];
+        html += renderGroupHTML(group, canvasesInGroup);
+    });
+
+    canvasList.innerHTML = html;
+
+    // Bind canvas entry events
     canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
         const id = entry.dataset.id;
         entry.addEventListener('click', async e => {
@@ -505,6 +655,145 @@ export function renderCanvasList() {
         entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
         entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
         entry.querySelector('.canvas-icon').addEventListener('click', e => { e.stopPropagation(); openIconPicker(id, entry); });
+
+        // Drag and drop for canvases
+        setupCanvasDragDrop(entry, id);
+    });
+
+    // Bind group events
+    canvasList.querySelectorAll('.canvas-group').forEach(groupEl => {
+        const groupId = groupEl.dataset.groupId;
+        const header = groupEl.querySelector('.canvas-group-header');
+
+        // Toggle collapse
+        header.addEventListener('click', e => {
+            if (!e.target.closest('.group-action-btn')) {
+                state.toggleGroupCollapsed(groupId);
+                groupEl.classList.toggle('collapsed');
+            }
+        });
+
+        // Group actions
+        header.querySelector('.group-action-btn.add')?.addEventListener('click', e => {
+            e.stopPropagation();
+            createNewCanvas(groupId);
+        });
+        header.querySelector('.group-action-btn.rename')?.addEventListener('click', e => {
+            e.stopPropagation();
+            startGroupRename(header, groupId);
+        });
+        header.querySelector('.group-action-btn.delete')?.addEventListener('click', e => {
+            e.stopPropagation();
+            deleteGroup(groupId);
+        });
+
+        // Drag drop for groups
+        setupGroupDragDrop(header, groupId);
+    });
+}
+
+function setupCanvasDragDrop(entry, canvasId) {
+    entry.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', canvasId);
+        e.dataTransfer.effectAllowed = 'move';
+        entry.classList.add('dragging');
+        canvasList.classList.add('drag-active');
+    });
+
+    entry.addEventListener('dragend', () => {
+        entry.classList.remove('dragging');
+        canvasList.classList.remove('drag-active');
+        canvasList.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    });
+
+    entry.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    });
+
+    entry.addEventListener('dragenter', e => {
+        e.preventDefault();
+        if (!entry.classList.contains('dragging')) {
+            entry.classList.add('drag-over');
+        }
+    });
+
+    entry.addEventListener('dragleave', () => {
+        entry.classList.remove('drag-over');
+    });
+
+    entry.addEventListener('drop', e => {
+        e.preventDefault();
+        entry.classList.remove('drag-over');
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (draggedId && draggedId !== canvasId) {
+            reorderCanvas(draggedId, canvasId);
+        }
+    });
+}
+
+function setupGroupDragDrop(header, groupId) {
+    header.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    });
+
+    header.addEventListener('dragenter', e => {
+        e.preventDefault();
+        header.classList.add('drag-over');
+    });
+
+    header.addEventListener('dragleave', () => {
+        header.classList.remove('drag-over');
+    });
+
+    header.addEventListener('drop', e => {
+        e.preventDefault();
+        header.classList.remove('drag-over');
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (draggedId) {
+            moveCanvasToGroup(draggedId, groupId);
+        }
+    });
+}
+
+function reorderCanvas(draggedId, targetId) {
+    const draggedIdx = state.canvases.findIndex(c => c.id === draggedId);
+    const targetIdx = state.canvases.findIndex(c => c.id === targetId);
+
+    if (draggedIdx === -1 || targetIdx === -1 || draggedIdx === targetIdx) return;
+
+    const targetCanvas = state.canvases[targetIdx];
+    const [draggedCanvas] = state.canvases.splice(draggedIdx, 1);
+    // Match target's group
+    draggedCanvas.groupId = targetCanvas.groupId || null;
+
+    const newTargetIdx = state.canvases.findIndex(c => c.id === targetId);
+    state.canvases.splice(newTargetIdx, 0, draggedCanvas);
+
+    saveCanvasesList();
+    renderCanvasList();
+}
+
+// Setup drop zone on canvas list for removing from groups
+export function setupCanvasListDropZone() {
+    canvasList.addEventListener('dragover', e => {
+        // Only handle drops directly on the list, not on items
+        if (e.target === canvasList) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+    });
+
+    canvasList.addEventListener('drop', e => {
+        if (e.target === canvasList) {
+            e.preventDefault();
+            const draggedId = e.dataTransfer.getData('text/plain');
+            if (draggedId) {
+                // Move canvas out of any group to ungrouped
+                moveCanvasToGroup(draggedId, null);
+            }
+        }
     });
 }
 
@@ -533,9 +822,23 @@ function openIconPicker(canvasId, entry) {
     const rect = entry.getBoundingClientRect();
     const sidebarRect = sidebar.getBoundingClientRect();
     canvasIconPicker.style.top = (rect.top - sidebarRect.top) + 'px';
+
+    // Update icon selection state
     canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt =>
         opt.classList.toggle('selected', opt.dataset.icon === (canvas?.icon || ''))
     );
+
+    // Update color selection state
+    canvasIconPicker.querySelectorAll('.canvas-color-opt').forEach(opt =>
+        opt.classList.toggle('selected', opt.dataset.color === (canvas?.color || ''))
+    );
+
+    // Reset to icon tab
+    canvasIconPicker.querySelectorAll('.picker-tab').forEach(t => t.classList.remove('active'));
+    canvasIconPicker.querySelectorAll('.picker-panel').forEach(p => p.classList.remove('active'));
+    canvasIconPicker.querySelector('.picker-tab[data-tab="icon"]')?.classList.add('active');
+    canvasIconPicker.querySelector('.picker-panel[data-panel="icon"]')?.classList.add('active');
+
     canvasIconPicker.classList.add('active');
 }
 
@@ -549,11 +852,44 @@ function setCanvasIcon(canvasId, icon) {
     }
 }
 
+function setCanvasColor(canvasId, color) {
+    const c = state.canvases.find(x => x.id === canvasId);
+    if (c) {
+        c.color = color || null;
+        c.updatedAt = Date.now();
+        saveCanvasesList();
+        renderCanvasList();
+    }
+}
+
 export function setupCanvasIconPicker() {
+    // Tab switching
+    canvasIconPicker.querySelectorAll('.picker-tab').forEach(tab => {
+        tab.addEventListener('click', e => {
+            e.stopPropagation();
+            const targetPanel = tab.dataset.tab;
+            canvasIconPicker.querySelectorAll('.picker-tab').forEach(t => t.classList.remove('active'));
+            canvasIconPicker.querySelectorAll('.picker-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            canvasIconPicker.querySelector(`.picker-panel[data-panel="${targetPanel}"]`)?.classList.add('active');
+        });
+    });
+
+    // Icon selection
     canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt => {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             if (state.iconPickerTarget) setCanvasIcon(state.iconPickerTarget, opt.dataset.icon);
+            canvasIconPicker.classList.remove('active');
+            state.setIconPickerTarget(null);
+        });
+    });
+
+    // Color selection
+    canvasIconPicker.querySelectorAll('.canvas-color-opt').forEach(opt => {
+        opt.addEventListener('click', e => {
+            e.stopPropagation();
+            if (state.iconPickerTarget) setCanvasColor(state.iconPickerTarget, opt.dataset.color);
             canvasIconPicker.classList.remove('active');
             state.setIconPickerTarget(null);
         });

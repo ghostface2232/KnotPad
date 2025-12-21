@@ -47,6 +47,10 @@ export let autoSaveTimer = null;
 export let canvases = [];
 export let currentCanvasId = null;
 
+// Canvas groups
+export let canvasGroups = [];
+export let collapsedGroups = new Set();
+
 // Minimap throttle
 export let minimapThrottle = null;
 
@@ -107,6 +111,14 @@ export function setActiveFilter(val) { activeFilter = val; }
 export function setAutoSaveTimer(val) { autoSaveTimer = val; }
 export function setCanvases(val) { canvases = val; }
 export function setCurrentCanvasId(val) { currentCanvasId = val; }
+export function setCanvasGroups(val) { canvasGroups = val; }
+export function toggleGroupCollapsed(groupId) {
+    if (collapsedGroups.has(groupId)) {
+        collapsedGroups.delete(groupId);
+    } else {
+        collapsedGroups.add(groupId);
+    }
+}
 export function setMinimapThrottle(val) { minimapThrottle = val; }
 export function setSidebarPinned(val) { sidebarPinned = val; localStorage.setItem('knotpad-sidebar-pinned', val); }
 export function setIconPickerTarget(val) { iconPickerTarget = val; }
