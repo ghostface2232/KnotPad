@@ -324,6 +324,7 @@ function setupItemEvents(item) {
     });
 
     if (item.type === 'memo') {
+        const itemMemo = el.querySelector('.item-memo');
         const mb = el.querySelector('.memo-body');
         const toolbar = el.querySelector('.memo-toolbar');
 
@@ -331,6 +332,51 @@ function setupItemEvents(item) {
         let contentBeforeEdit = item.content;
         let hasUnsavedChanges = false;
         let undoSaveTimer = null;
+
+        // Handle border/padding area click - select node instead of focusing text
+        itemMemo.addEventListener('mousedown', e => {
+            // Only handle left mouse button
+            if (e.button !== 0) return;
+
+            const mbRect = mb.getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
+
+            // Check if click is outside memo-body (in padding/border area)
+            const isInPaddingArea = x < mbRect.left || x > mbRect.right ||
+                                    y < mbRect.top || y > mbRect.bottom;
+
+            if (isInPaddingArea) {
+                e.preventDefault();  // Prevent text focus
+                e.stopPropagation();
+
+                // Bring item to top
+                el.style.zIndex = state.incrementHighestZ();
+
+                // Handle selection
+                if (e.shiftKey) {
+                    if (state.selectedItems.has(item)) {
+                        state.selectedItems.delete(item);
+                        item.el.classList.remove('selected');
+                    } else {
+                        state.selectedItems.add(item);
+                        item.el.classList.add('selected');
+                    }
+                } else {
+                    selectItem(item, false);
+                }
+
+                // Setup drag if not locked
+                if (!item.locked) {
+                    const rect = el.getBoundingClientRect();
+                    item.ox = (e.clientX - rect.left) / state.scale;
+                    item.oy = (e.clientY - rect.top) / state.scale;
+                    state.setDraggedItem(item);
+                    state.selectedItems.forEach(i => i.el.classList.add('dragging'));
+                    canvas.classList.add('dragging-item');
+                }
+            }
+        });
 
         // Handle text selection drag outside memo area
         mb.addEventListener('mousedown', e => {
