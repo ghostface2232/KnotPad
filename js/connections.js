@@ -66,14 +66,21 @@ export function completeConnection(target, handle) {
 }
 
 // Cancel connection drawing
-export function cancelConnection() {
+export function cancelConnection(withFade = false) {
     // Clear any pending cancel timer
     if (state.connectCancelTimer) {
         clearTimeout(state.connectCancelTimer);
         state.setConnectCancelTimer(null);
     }
     if (state.tempLine) {
-        state.tempLine.remove();
+        if (withFade) {
+            // Fade out animation before removing
+            const line = state.tempLine;
+            line.classList.add('fading');
+            line.addEventListener('animationend', () => line.remove(), { once: true });
+        } else {
+            state.tempLine.remove();
+        }
         state.setTempLine(null);
     }
     state.setConnectSource(null);
