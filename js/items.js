@@ -613,8 +613,9 @@ export function deleteSelectedItems() {
 }
 
 // Delete a single item
-export function deleteItem(item, update = true) {
-    state.connections.filter(c => c.from === item || c.to === item).forEach(c => deleteConnectionFn(c, false));
+export function deleteItem(item, update = true, withFade = true) {
+    // Delete connections without fade (they disappear with the node)
+    state.connections.filter(c => c.from === item || c.to === item).forEach(c => deleteConnectionFn(c, false, false));
 
     if ((item.type === 'image' || item.type === 'video') && item.content?.startsWith('media_')) {
         deleteMedia(item.content);
@@ -631,7 +632,13 @@ export function deleteItem(item, update = true) {
     const i = state.items.indexOf(item);
     if (i > -1) {
         state.items.splice(i, 1);
-        item.el.remove();
+        if (withFade) {
+            // Add fade animation then remove
+            item.el.classList.add('deleting');
+            item.el.addEventListener('animationend', () => item.el.remove(), { once: true });
+        } else {
+            item.el.remove();
+        }
     }
 
     if (update) {
