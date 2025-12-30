@@ -67,6 +67,11 @@ export function completeConnection(target, handle) {
 
 // Cancel connection drawing
 export function cancelConnection() {
+    // Clear any pending cancel timer
+    if (state.connectCancelTimer) {
+        clearTimeout(state.connectCancelTimer);
+        state.setConnectCancelTimer(null);
+    }
     if (state.tempLine) {
         state.tempLine.remove();
         state.setTempLine(null);
@@ -410,6 +415,32 @@ export function setupConnectionContextMenu() {
             connectionContextMenu.classList.remove('active');
         });
     });
+}
+
+// Complete connection by creating a new memo at the specified position
+export function completeConnectionWithNewMemo(canvasX, canvasY) {
+    if (!state.connectSource) return null;
+
+    const source = state.connectSource;
+    const sourceHandle = state.connectHandle;
+
+    // Determine the opposite handle for the new memo
+    const oppositeHandle = {
+        'top': 'bottom',
+        'bottom': 'top',
+        'left': 'right',
+        'right': 'left'
+    }[sourceHandle] || 'top';
+
+    // Create new memo with the same color as source
+    const newMemo = addMemo('', canvasX, canvasY, source.color);
+
+    // Create connection
+    addConnection(source, sourceHandle, newMemo, oppositeHandle);
+    cancelConnection();
+    saveStateFn();
+
+    return newMemo;
 }
 
 // Add child node connected to parent

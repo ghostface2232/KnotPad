@@ -36,6 +36,7 @@ export let resizingItem = null;
 export let connectSource = null;
 export let connectHandle = null;
 export let tempLine = null;
+export let connectCancelTimer = null;
 
 // Filter state
 export let activeFilter = 'all';
@@ -108,6 +109,7 @@ export function setResizingItem(val) { resizingItem = val; }
 export function setConnectSource(val) { connectSource = val; }
 export function setConnectHandle(val) { connectHandle = val; }
 export function setTempLine(val) { tempLine = val; }
+export function setConnectCancelTimer(val) { connectCancelTimer = val; }
 export function setActiveFilter(val) { activeFilter = val; }
 export function setAutoSaveTimer(val) { autoSaveTimer = val; }
 export function setCanvases(val) { canvases = val; }
