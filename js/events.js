@@ -132,7 +132,7 @@ export function setupMouseEvents() {
             // Set timer to cancel connection (allows double-click to override)
             state.setConnectCancelTimer(setTimeout(() => {
                 state.setConnectCancelTimer(null);
-                cancelConnection();
+                cancelConnection(true); // with fade effect
             }, 300));
         }
     });
