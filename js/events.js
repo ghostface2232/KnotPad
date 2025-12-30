@@ -4,7 +4,7 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, setZoom, throttledMinimap, startPan, updateMinimap } from './viewport.js';
 import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink } from './items.js';
-import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine } from './connections.js';
+import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo } from './connections.js';
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
@@ -93,6 +93,18 @@ export function setupMouseEvents() {
             const rect = app.getBoundingClientRect();
             const canvasX = (e.clientX - rect.left - state.offsetX) / state.scale - 100;
             const canvasY = (e.clientY - rect.top - state.offsetY) / state.scale - 70;
+
+            // If in connecting mode, create a new memo and complete connection
+            if (state.connectSource) {
+                // Clear any pending cancel timer
+                if (state.connectCancelTimer) {
+                    clearTimeout(state.connectCancelTimer);
+                    state.setConnectCancelTimer(null);
+                }
+                completeConnectionWithNewMemo(canvasX, canvasY);
+                return;
+            }
+
             showNewNodePicker(e.clientX, e.clientY, canvasX, canvasY);
         }
     });
@@ -105,6 +117,21 @@ export function setupMouseEvents() {
             const canvasX = (e.clientX - rect.left - state.offsetX) / state.scale - 90;
             const canvasY = (e.clientY - rect.top - state.offsetY) / state.scale - 60;
             showCanvasContextMenu(e.clientX, e.clientY, canvasX, canvasY);
+        }
+    });
+
+    // Single click on canvas in connecting mode - cancel connection after delay
+    app.addEventListener('click', e => {
+        if (state.connectSource && (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app)) {
+            // Clear any existing timer
+            if (state.connectCancelTimer) {
+                clearTimeout(state.connectCancelTimer);
+            }
+            // Set timer to cancel connection (allows double-click to override)
+            state.setConnectCancelTimer(setTimeout(() => {
+                state.setConnectCancelTimer(null);
+                cancelConnection();
+            }, 300));
         }
     });
 
