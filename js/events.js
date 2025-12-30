@@ -333,7 +333,7 @@ export function setupKeyboardEvents() {
             }
         }
         if (e.key === 'Escape') {
-            cancelConnection();
+            cancelConnection(true); // with fade effect
             closeLinkModal();
             closeSearch();
             deselectAll();
