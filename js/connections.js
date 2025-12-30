@@ -346,14 +346,28 @@ export function selectConnection(c, e) {
 }
 
 // Delete a connection
-export function deleteConnection(c, save = true) {
+export function deleteConnection(c, save = true, withFade = true) {
     const i = state.connections.indexOf(c);
     if (i > -1) {
         state.connections.splice(i, 1);
-        c.el.remove();
-        if (c.hitArea) c.hitArea.remove();
-        if (c.arrow) c.arrow.remove();
         state.setSelectedConn(null);
+
+        if (withFade) {
+            // Add fade animation then remove
+            c.el.classList.add('deleting');
+            if (c.hitArea) c.hitArea.classList.add('deleting');
+            if (c.arrow) c.arrow.classList.add('deleting');
+            c.el.addEventListener('animationend', () => {
+                c.el.remove();
+                if (c.hitArea) c.hitArea.remove();
+                if (c.arrow) c.arrow.remove();
+            }, { once: true });
+        } else {
+            c.el.remove();
+            if (c.hitArea) c.hitArea.remove();
+            if (c.arrow) c.arrow.remove();
+        }
+
         if (save) {
             saveStateFn();
             triggerAutoSaveFn();
