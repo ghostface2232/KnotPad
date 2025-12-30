@@ -75,6 +75,8 @@ export function setupMouseEvents() {
         if (e.button === 0 && (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app)) {
             // Don't start box selection if text is being selected in a memo
             if (state.isSelectingText) return;
+            // Don't start box selection if in connecting mode (wait for click/dblclick)
+            if (state.connectSource) return;
             if (!e.shiftKey) deselectAll();
             state.setIsSelecting(true);
             state.setSelStartX(e.clientX);
