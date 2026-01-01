@@ -444,26 +444,19 @@ function setupItemEvents(item) {
             hasUnsavedChanges = false;
         });
 
-        // Block image paste in memo - only allow plain text
+        // Block image paste in memo
         mb.addEventListener('paste', e => {
             const cd = e.clipboardData;
             if (!cd) return;
 
-            // Check if clipboard contains images
+            // Check if clipboard contains images - block them
             for (let i = 0; i < cd.items.length; i++) {
                 if (cd.items[i].type.indexOf('image') !== -1) {
-                    // Block image paste completely
                     e.preventDefault();
                     return;
                 }
             }
-
-            // For text, paste as plain text only (no HTML formatting from external sources)
-            const text = cd.getData('text/plain');
-            if (text) {
-                e.preventDefault();
-                document.execCommand('insertText', false, text);
-            }
+            // Allow default paste behavior for text (preserves formatting)
         });
 
         // Markdown toolbar buttons - simple toggle with execCommand
