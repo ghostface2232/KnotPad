@@ -98,11 +98,6 @@ export function setupMouseEvents() {
 
             // If in connecting mode, create a new memo and complete connection
             if (state.connectSource) {
-                // Clear any pending cancel timer
-                if (state.connectCancelTimer) {
-                    clearTimeout(state.connectCancelTimer);
-                    state.setConnectCancelTimer(null);
-                }
                 completeConnectionWithNewMemo(canvasX, canvasY);
                 return;
             }
@@ -111,10 +106,17 @@ export function setupMouseEvents() {
         }
     });
 
-    // Right-click on canvas to show context menu
+    // Right-click on canvas to show context menu (or cancel connection in connecting mode)
     app.addEventListener('contextmenu', e => {
         if (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app) {
             e.preventDefault();
+
+            // In connecting mode, right-click cancels the connection immediately
+            if (state.connectSource) {
+                cancelConnection(true); // with fade effect
+                return;
+            }
+
             const rect = app.getBoundingClientRect();
             const canvasX = (e.clientX - rect.left - state.offsetX) / state.scale - 90;
             const canvasY = (e.clientY - rect.top - state.offsetY) / state.scale - 60;
@@ -122,20 +124,6 @@ export function setupMouseEvents() {
         }
     });
 
-    // Single click on canvas in connecting mode - cancel connection after delay
-    app.addEventListener('click', e => {
-        if (state.connectSource && (e.target === canvas || e.target.classList.contains('grid-overlay') || e.target === app)) {
-            // Clear any existing timer
-            if (state.connectCancelTimer) {
-                clearTimeout(state.connectCancelTimer);
-            }
-            // Set timer to cancel connection (allows double-click to override)
-            state.setConnectCancelTimer(setTimeout(() => {
-                state.setConnectCancelTimer(null);
-                cancelConnection(true); // with fade effect
-            }, 300));
-        }
-    });
 
     // Mouse move
     window.addEventListener('mousemove', e => {

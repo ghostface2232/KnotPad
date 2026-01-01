@@ -67,11 +67,6 @@ export function completeConnection(target, handle) {
 
 // Cancel connection drawing
 export function cancelConnection(withFade = false) {
-    // Clear any pending cancel timer
-    if (state.connectCancelTimer) {
-        clearTimeout(state.connectCancelTimer);
-        state.setConnectCancelTimer(null);
-    }
     if (state.tempLine) {
         if (withFade) {
             // Fade out animation before removing
