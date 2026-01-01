@@ -586,29 +586,16 @@ function setupItemEvents(item) {
 
                 if (isEmptyItem) {
                     // Double enter - remove the list marker and exit list mode
-                    // Select the current line content and delete it
-                    const currentRange = sel.getRangeAt(0);
+                    // Get the prefix length to delete
+                    const prefixLen = orderedMatch
+                        ? orderedMatch[0].length  // "1. " or "10. " etc.
+                        : unorderedMatch[0].length;  // "- " or "* "
 
-                    // Find start of line
-                    let startNode = node;
-                    let startOffset = 0;
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        const text = node.textContent;
-                        // Find beginning of line in this text node
-                        let idx = range.startOffset - 1;
-                        while (idx >= 0 && text[idx] !== '\n') idx--;
-                        startOffset = idx + 1;
-                        startNode = node;
+                    // Delete the prefix characters backwards using execCommand
+                    // This keeps cursor position stable
+                    for (let i = 0; i < prefixLen; i++) {
+                        document.execCommand('delete', false, null);
                     }
-
-                    // Delete from start of line to cursor
-                    const deleteRange = document.createRange();
-                    deleteRange.setStart(startNode, startOffset);
-                    deleteRange.setEnd(range.startContainer, range.startOffset);
-                    deleteRange.deleteContents();
-
-                    // Insert a line break
-                    document.execCommand('insertLineBreak', false, null);
                 } else {
                     // Continue the list
                     let prefix;
