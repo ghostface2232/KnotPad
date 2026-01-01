@@ -444,7 +444,7 @@ function setupItemEvents(item) {
             hasUnsavedChanges = false;
         });
 
-        // Block image paste in memo
+        // Block image paste in memo and strip text/background colors
         mb.addEventListener('paste', e => {
             const cd = e.clipboardData;
             if (!cd) return;
@@ -456,7 +456,25 @@ function setupItemEvents(item) {
                     return;
                 }
             }
-            // Allow default paste behavior for text (preserves formatting)
+
+            // Process HTML to remove text color and background color
+            const html = cd.getData('text/html');
+            if (html) {
+                e.preventDefault();
+                // Parse HTML and strip color styles
+                const temp = document.createElement('div');
+                temp.innerHTML = html;
+                temp.querySelectorAll('*').forEach(el => {
+                    el.style.color = '';
+                    el.style.backgroundColor = '';
+                    el.style.background = '';
+                    // Also remove color attribute
+                    el.removeAttribute('color');
+                    el.removeAttribute('bgcolor');
+                });
+                document.execCommand('insertHTML', false, temp.innerHTML);
+            }
+            // Plain text falls through to default behavior
         });
 
         // Markdown toolbar buttons - simple toggle with execCommand
