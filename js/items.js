@@ -464,6 +464,43 @@ function setupItemEvents(item) {
                 // Parse HTML and strip color styles
                 const temp = document.createElement('div');
                 temp.innerHTML = html;
+
+                // Convert ordered lists to text-based numbering to preserve numbers correctly
+                temp.querySelectorAll('ol').forEach(ol => {
+                    const startNum = parseInt(ol.getAttribute('start'), 10) || 1;
+                    const items = ol.querySelectorAll(':scope > li');
+                    items.forEach((li, index) => {
+                        // Check if li has explicit value attribute
+                        const liValue = li.getAttribute('value');
+                        const num = liValue ? parseInt(liValue, 10) : startNum + index;
+                        // Prepend the number to the list item content
+                        li.innerHTML = num + '. ' + li.innerHTML;
+                    });
+                    // Convert ol to div to remove list styling
+                    const div = document.createElement('div');
+                    div.innerHTML = ol.innerHTML;
+                    ol.replaceWith(div);
+                });
+
+                // Convert unordered lists to text-based format
+                temp.querySelectorAll('ul').forEach(ul => {
+                    const items = ul.querySelectorAll(':scope > li');
+                    items.forEach(li => {
+                        li.innerHTML = '- ' + li.innerHTML;
+                    });
+                    // Convert ul to div
+                    const div = document.createElement('div');
+                    div.innerHTML = ul.innerHTML;
+                    ul.replaceWith(div);
+                });
+
+                // Convert remaining li elements to div with line break
+                temp.querySelectorAll('li').forEach(li => {
+                    const div = document.createElement('div');
+                    div.innerHTML = li.innerHTML;
+                    li.replaceWith(div);
+                });
+
                 temp.querySelectorAll('*').forEach(el => {
                     el.style.color = '';
                     el.style.backgroundColor = '';
@@ -475,6 +512,123 @@ function setupItemEvents(item) {
                 document.execCommand('insertHTML', false, temp.innerHTML);
             }
             // Plain text falls through to default behavior
+        });
+
+        // Auto list formatting on Enter key
+        mb.addEventListener('keydown', e => {
+            if (e.key !== 'Enter' || e.shiftKey) return;
+
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+
+            // Get the current line text
+            const range = sel.getRangeAt(0);
+            let node = range.startContainer;
+
+            // Find the line/block element
+            let lineNode = node;
+            while (lineNode && lineNode !== mb) {
+                if (lineNode.nodeType === Node.ELEMENT_NODE) {
+                    const tag = lineNode.tagName;
+                    if (tag === 'DIV' || tag === 'P' || tag === 'LI' || tag === 'BR') {
+                        break;
+                    }
+                }
+                lineNode = lineNode.parentNode;
+            }
+
+            // Get text content of current line
+            let lineText = '';
+            if (node.nodeType === Node.TEXT_NODE) {
+                // Get the full text of the line
+                let textNode = node;
+                while (textNode.previousSibling) {
+                    if (textNode.previousSibling.nodeType === Node.TEXT_NODE) {
+                        textNode = textNode.previousSibling;
+                    } else if (textNode.previousSibling.tagName === 'BR') {
+                        break;
+                    } else {
+                        textNode = textNode.previousSibling;
+                    }
+                }
+                // Collect text from start of line to cursor
+                let currentNode = textNode;
+                while (currentNode) {
+                    if (currentNode === node) {
+                        lineText += node.textContent.substring(0, range.startOffset);
+                        break;
+                    } else if (currentNode.nodeType === Node.TEXT_NODE) {
+                        lineText += currentNode.textContent;
+                    } else if (currentNode.tagName === 'BR') {
+                        lineText = '';
+                    } else if (currentNode.textContent) {
+                        lineText += currentNode.textContent;
+                    }
+                    currentNode = currentNode.nextSibling;
+                }
+            } else if (lineNode && lineNode !== mb) {
+                lineText = lineNode.textContent;
+            }
+
+            // Check for list patterns
+            // Ordered list: "1. ", "2. ", "10. ", etc.
+            const orderedMatch = lineText.match(/^(\d+)\.\s/);
+            // Unordered list: "- " or "* "
+            const unorderedMatch = lineText.match(/^([-*])\s/);
+
+            if (orderedMatch || unorderedMatch) {
+                e.preventDefault();
+
+                // Check if the line only contains the list marker (empty item)
+                const isEmptyItem = orderedMatch
+                    ? lineText.trim() === orderedMatch[1] + '.'
+                    : lineText.trim() === unorderedMatch[1];
+
+                if (isEmptyItem) {
+                    // Double enter - remove the list marker and exit list mode
+                    // Select the current line content and delete it
+                    const currentRange = sel.getRangeAt(0);
+
+                    // Find start of line
+                    let startNode = node;
+                    let startOffset = 0;
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        const text = node.textContent;
+                        // Find beginning of line in this text node
+                        let idx = range.startOffset - 1;
+                        while (idx >= 0 && text[idx] !== '\n') idx--;
+                        startOffset = idx + 1;
+                        startNode = node;
+                    }
+
+                    // Delete from start of line to cursor
+                    const deleteRange = document.createRange();
+                    deleteRange.setStart(startNode, startOffset);
+                    deleteRange.setEnd(range.startContainer, range.startOffset);
+                    deleteRange.deleteContents();
+
+                    // Insert a line break
+                    document.execCommand('insertLineBreak', false, null);
+                } else {
+                    // Continue the list
+                    let prefix;
+                    if (orderedMatch) {
+                        // Increment the number for ordered list
+                        const nextNum = parseInt(orderedMatch[1], 10) + 1;
+                        prefix = nextNum + '. ';
+                    } else {
+                        // Use the same marker for unordered list
+                        prefix = unorderedMatch[1] + ' ';
+                    }
+
+                    // Insert new line with prefix
+                    document.execCommand('insertLineBreak', false, null);
+                    document.execCommand('insertText', false, prefix);
+                }
+
+                // Trigger input event for saving
+                mb.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         });
 
         // Markdown toolbar buttons - simple toggle with execCommand
