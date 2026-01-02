@@ -5,6 +5,7 @@ import { $, esc, findFreePosition } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap, updateMinimap } from './viewport.js';
 import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle } from './storage.js';
+import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
 
@@ -77,38 +78,10 @@ function getHtmlContent(el) {
     return el.innerHTML;
 }
 
-// External function references (set by other modules)
-let updateAllConnectionsFn = () => {};
-let updateConnectionFn = () => {};
-let deleteConnectionFn = () => {};
-let saveStateFn = () => {};
-let triggerAutoSaveFn = () => {};
-let showChildTypePickerFn = () => {};
-let startConnectionFn = () => {};
-let completeConnectionFn = () => {};
-let showContextMenuFn = () => {};
-
-export function setExternalFunctions({
-    updateAllConnections,
-    updateConnection,
-    deleteConnection,
-    saveState,
-    triggerAutoSave,
-    showChildTypePicker,
-    startConnection,
-    completeConnection,
-    showContextMenu
-}) {
-    if (updateAllConnections) updateAllConnectionsFn = updateAllConnections;
-    if (updateConnection) updateConnectionFn = updateConnection;
-    if (deleteConnection) deleteConnectionFn = deleteConnection;
-    if (saveState) saveStateFn = saveState;
-    if (triggerAutoSave) triggerAutoSaveFn = triggerAutoSave;
-    if (showChildTypePicker) showChildTypePickerFn = showChildTypePicker;
-    if (startConnection) startConnectionFn = startConnection;
-    if (completeConnection) completeConnectionFn = completeConnection;
-    if (showContextMenu) showContextMenuFn = showContextMenu;
-}
+// Note: External function calls are now handled via eventBus
+// Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER, CONNECTIONS_UPDATE_ALL,
+// CONNECTIONS_UPDATE, CONNECTIONS_DELETE, UI_SHOW_CHILD_TYPE_PICKER,
+// CONNECTIONS_START, CONNECTIONS_COMPLETE, UI_SHOW_CONTEXT_MENU
 
 // Create an item on the canvas
 export function createItem(cfg, loading = false) {
@@ -295,7 +268,7 @@ function setupItemEvents(item) {
     el.querySelectorAll('.add-child-btn').forEach(btn => {
         btn.addEventListener('click', e => {
             e.stopPropagation();
-            showChildTypePickerFn(item, btn.dataset.d, e);
+            eventBus.emit(Events.UI_SHOW_CHILD_TYPE_PICKER, item, btn.dataset.d, e);
         });
     });
 
@@ -303,9 +276,9 @@ function setupItemEvents(item) {
         h.addEventListener('mousedown', e => {
             e.stopPropagation();
             if (state.connectSource) {
-                completeConnectionFn(item, h.dataset.h);
+                eventBus.emit(Events.CONNECTIONS_COMPLETE, item, h.dataset.h);
             } else {
-                startConnectionFn(item, h.dataset.h);
+                eventBus.emit(Events.CONNECTIONS_START, item, h.dataset.h);
             }
         });
         h.addEventListener('mouseenter', () => {
@@ -320,7 +293,7 @@ function setupItemEvents(item) {
         e.preventDefault();
         e.stopPropagation();
         if (!state.selectedItems.has(item)) selectItem(item);
-        showContextMenuFn(e.clientX, e.clientY, item);
+        eventBus.emit(Events.UI_SHOW_CONTEXT_MENU, e.clientX, e.clientY, item);
     });
 
     if (item.type === 'memo') {
@@ -406,14 +379,14 @@ function setupItemEvents(item) {
         mb.addEventListener('input', () => {
             item.content = getHtmlContent(mb);
             autoResizeItem(item);
-            triggerAutoSaveFn();
+            eventBus.emit(Events.AUTOSAVE_TRIGGER);
             hasUnsavedChanges = true;
 
             // Debounced save to undo stack (save after 1 second of no typing)
             if (undoSaveTimer) clearTimeout(undoSaveTimer);
             undoSaveTimer = setTimeout(() => {
                 if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
-                    saveStateFn();
+                    eventBus.emit(Events.STATE_SAVE);
                     contentBeforeEdit = item.content;
                     hasUnsavedChanges = false;
                 }
@@ -430,7 +403,7 @@ function setupItemEvents(item) {
             }
             // Save to undo stack if content changed during editing
             if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
-                saveStateFn();
+                eventBus.emit(Events.STATE_SAVE);
                 contentBeforeEdit = item.content;
                 hasUnsavedChanges = false;
             }
@@ -648,12 +621,12 @@ function setupItemEvents(item) {
 
                 item.content = getHtmlContent(mb);
                 autoResizeItem(item);
-                triggerAutoSaveFn();
+                eventBus.emit(Events.AUTOSAVE_TRIGGER);
                 hasUnsavedChanges = true;
 
                 // Save to undo stack immediately for formatting changes
                 if (item.content !== contentBeforeEdit) {
-                    saveStateFn();
+                    eventBus.emit(Events.STATE_SAVE);
                     contentBeforeEdit = item.content;
                     hasUnsavedChanges = false;
                 }
@@ -723,11 +696,11 @@ export function setItemColor(targetItem, color) {
             }
         }
         // Update connections from this node
-        state.connections.filter(c => c.from === item).forEach(updateConnectionFn);
+        state.connections.filter(c => c.from === item).forEach(c => eventBus.emit(Events.CONNECTIONS_UPDATE, c));
     });
     throttledMinimap();
-    saveStateFn();
-    triggerAutoSaveFn();
+    eventBus.emit(Events.STATE_SAVE);
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
 // Set item font size
@@ -743,8 +716,8 @@ export function setItemFontSize(item) {
         item.el.classList.add('font-size-' + newSize);
     }
     setTimeout(() => autoResizeItem(item), 10);
-    saveStateFn();
-    triggerAutoSaveFn();
+    eventBus.emit(Events.STATE_SAVE);
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
 // Auto-resize item based on content - fit to content height
@@ -783,7 +756,7 @@ export function autoResizeItem(item) {
     if (Math.abs(newH - item.h) >= lineHeight / 2) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
-        updateAllConnectionsFn();
+        eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
         throttledMinimap();
     }
 }
@@ -825,17 +798,17 @@ export { hideMenus };
 // Delete selected items
 export function deleteSelectedItems() {
     if (!state.selectedItems.size) return;
-    saveStateFn();
+    eventBus.emit(Events.STATE_SAVE);
     state.selectedItems.forEach(item => deleteItem(item, false));
     state.selectedItems.clear();
     throttledMinimap();
-    triggerAutoSaveFn();
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
 // Delete a single item
 export function deleteItem(item, update = true, withFade = true) {
     // Delete connections without fade (they disappear with the node)
-    state.connections.filter(c => c.from === item || c.to === item).forEach(c => deleteConnectionFn(c, false, false));
+    state.connections.filter(c => c.from === item || c.to === item).forEach(c => eventBus.emit(Events.CONNECTIONS_DELETE, c, false, false));
 
     if ((item.type === 'image' || item.type === 'video') && item.content?.startsWith('media_')) {
         deleteMedia(item.content);
@@ -862,9 +835,9 @@ export function deleteItem(item, update = true, withFade = true) {
     }
 
     if (update) {
-        saveStateFn();
+        eventBus.emit(Events.STATE_SAVE);
         throttledMinimap();
-        triggerAutoSaveFn();
+        eventBus.emit(Events.AUTOSAVE_TRIGGER);
     }
 }
 
@@ -881,8 +854,8 @@ export function duplicateItem(item) {
         color: item.color,
         fontSize: item.fontSize
     });
-    saveStateFn();
-    triggerAutoSaveFn();
+    eventBus.emit(Events.STATE_SAVE);
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
 // Duplicate an item for drag operation (same position, no auto-save)
@@ -925,7 +898,7 @@ export function addMemo(text = '', x, y, color = null) {
         color,
         fontSize
     });
-    triggerAutoSaveFn();
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
     return item;
 }
 
@@ -944,7 +917,7 @@ export function addLink(url, title, x, y) {
             display: url.replace(/^https?:\/\//, '').replace(/\/$/, '')
         }
     });
-    triggerAutoSaveFn();
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
     return item;
 }
 
@@ -1098,8 +1071,8 @@ export function sortByColor() {
         currentX += col.maxWidth + horizontalGap;
     });
 
-    updateAllConnectionsFn();
+    eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
     updateMinimap();
-    saveStateFn();
-    triggerAutoSaveFn();
+    eventBus.emit(Events.STATE_SAVE);
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }

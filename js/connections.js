@@ -5,20 +5,15 @@ import { $, curvePath, getHandlePos } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap } from './viewport.js';
 import { addMemo, deselectAll } from './items.js';
+import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
 const connectionsSvg = $('connectionsSvg');
 const connDirectionPicker = $('connDirectionPicker');
 const connectionContextMenu = $('connectionContextMenu');
 
-// External function references
-let saveStateFn = () => {};
-let triggerAutoSaveFn = () => {};
-
-export function setExternalFunctions({ saveState, triggerAutoSave }) {
-    if (saveState) saveStateFn = saveState;
-    if (triggerAutoSave) triggerAutoSaveFn = triggerAutoSave;
-}
+// Note: External function calls are now handled via eventBus
+// Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
 
 // Start drawing a connection
 export function startConnection(item, handle) {
@@ -62,7 +57,7 @@ export function completeConnection(target, handle) {
 
     addConnection(state.connectSource, state.connectHandle, target, handle);
     cancelConnection();
-    saveStateFn();
+    eventBus.emit(Events.STATE_SAVE);
 }
 
 // Cancel connection drawing
@@ -133,7 +128,7 @@ export function addConnection(from, fh, to, th, loading = false) {
 
     if (!loading) {
         throttledMinimap();
-        triggerAutoSaveFn();
+        eventBus.emit(Events.AUTOSAVE_TRIGGER);
     }
 
     return conn;
@@ -364,8 +359,8 @@ export function deleteConnection(c, save = true, withFade = true) {
         }
 
         if (save) {
-            saveStateFn();
-            triggerAutoSaveFn();
+            eventBus.emit(Events.STATE_SAVE);
+            eventBus.emit(Events.AUTOSAVE_TRIGGER);
         }
         throttledMinimap();
     }
@@ -389,8 +384,8 @@ export function setupConnDirectionPicker() {
             if (state.selectedConn) {
                 state.selectedConn.dir = btn.dataset.dir;
                 updateConnectionArrow(state.selectedConn);
-                saveStateFn();
-                triggerAutoSaveFn();
+                eventBus.emit(Events.STATE_SAVE);
+                eventBus.emit(Events.AUTOSAVE_TRIGGER);
             }
             connDirectionPicker.classList.remove('active');
         });
@@ -454,7 +449,7 @@ export function completeConnectionWithNewMemo(canvasX, canvasY) {
     // Create connection
     addConnection(source, sourceHandle, newMemo, oppositeHandle);
     cancelConnection();
-    saveStateFn();
+    eventBus.emit(Events.STATE_SAVE);
 
     return newMemo;
 }
@@ -495,6 +490,6 @@ export function addChildNode(parent, dir, type = 'memo') {
 
     const child = addMemo('', x, y, parent.color);
     addConnection(parent, fh, child, th);
-    saveStateFn();
+    eventBus.emit(Events.STATE_SAVE);
     return child;
 }

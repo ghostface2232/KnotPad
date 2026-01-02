@@ -4,9 +4,8 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
-import { setExternalFunctions as setItemsExternal, createItem, addMemo, setFilter, setItemColor, sortByColor } from './items.js';
+import { createItem, addMemo, setFilter, setItemColor, sortByColor } from './items.js';
 import {
-    setExternalFunctions as setConnectionsExternal,
     setupConnDirectionPicker,
     setupConnectionContextMenu,
     addChildNode,
@@ -17,7 +16,6 @@ import {
     deleteConnection
 } from './connections.js';
 import {
-    setExternalFunctions as setUIExternal,
     loadTheme,
     toggleTheme,
     loadCanvases,
@@ -54,34 +52,28 @@ import {
     setupPasteEvents,
     setupDocumentClickHandler
 } from './events.js';
+import eventBus, { Events } from './events-bus.js';
 
-// ============ Wire up module dependencies ============
+// ============ Register Event Bus Listeners ============
+// This replaces the old setExternalFunctions pattern with a centralized event system
 
-// Set external functions for items module
-setItemsExternal({
-    updateAllConnections,
-    updateConnection,
-    deleteConnection,
-    saveState,
-    triggerAutoSave,
-    showChildTypePicker,
-    startConnection,
-    completeConnection,
-    showContextMenu
-});
+// State management events
+eventBus.on(Events.STATE_SAVE, () => saveState());
+eventBus.on(Events.AUTOSAVE_TRIGGER, () => triggerAutoSave());
 
-// Set external functions for connections module
-setConnectionsExternal({
-    saveState,
-    triggerAutoSave
-});
+// Connection events
+eventBus.on(Events.CONNECTIONS_UPDATE_ALL, () => updateAllConnections());
+eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => updateConnection(conn));
+eventBus.on(Events.CONNECTIONS_DELETE, (conn, save, withFade) => deleteConnection(conn, save, withFade));
+eventBus.on(Events.CONNECTIONS_START, (item, handle) => startConnection(item, handle));
+eventBus.on(Events.CONNECTIONS_COMPLETE, (target, handle) => completeConnection(target, handle));
 
-// Set external functions for UI module
-setUIExternal({
-    saveState,
-    triggerAutoSave,
-    addChildNode
-});
+// UI events
+eventBus.on(Events.UI_SHOW_CHILD_TYPE_PICKER, (item, direction, e) => showChildTypePicker(item, direction, e));
+eventBus.on(Events.UI_SHOW_CONTEXT_MENU, (x, y, item) => showContextMenu(x, y, item));
+
+// Item events
+eventBus.on(Events.ITEMS_ADD_CHILD_NODE, (parent, direction, type) => addChildNode(parent, direction, type));
 
 // ============ Setup Toolbar Events ============
 
