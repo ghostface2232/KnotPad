@@ -3,9 +3,10 @@
 import { CANVASES_KEY, CANVAS_GROUPS_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
 import { $, esc, generateId, showToast } from './utils.js';
 import * as state from './state.js';
+import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
 import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus } from './items.js';
-import { addConnection, updateConnectionArrow, updateAllConnections } from './connections.js';
+import { addConnection, updateConnectionArrow, updateAllConnections, addChildNode } from './connections.js';
 import {
     fsDirectoryHandle,
     isFileSystemSupported,
@@ -21,6 +22,7 @@ import {
     disconnectStorageFolder,
     updateStorageIndicator
 } from './storage.js';
+import eventBus, { Events } from './events-bus.js';
 
 // DOM Elements
 const sidebar = $('sidebar');
@@ -35,16 +37,9 @@ const contextMenu = $('contextMenu');
 const canvasContextMenu = $('canvasContextMenu');
 const fileInput = $('fileInput');
 
-// External function references
-let saveStateFn = () => {};
-let triggerAutoSaveFn = () => {};
-let addChildNodeFn = () => {};
-
-export function setExternalFunctions({ saveState, triggerAutoSave, addChildNode }) {
-    if (saveState) saveStateFn = saveState;
-    if (triggerAutoSave) triggerAutoSaveFn = triggerAutoSave;
-    if (addChildNode) addChildNodeFn = addChildNode;
-}
+// Note: External function calls are now handled via eventBus
+// Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
+// Events listened: ITEMS_ADD_CHILD_NODE
 
 // ============ Theme ============
 
@@ -184,14 +179,20 @@ export function saveState() {
             dir: c.dir
         }))
     };
-    const stateString = JSON.stringify(stateData);
 
-    // Prevent duplicate states - don't save if identical to last state
-    if (state.undoStack.length > 0 && state.undoStack[state.undoStack.length - 1] === stateString) {
-        return;
+    // Prevent duplicate states - compare with last state
+    const lastState = peekUndo();
+    if (lastState) {
+        // Compare serialized versions for equality check
+        const lastStr = JSON.stringify(lastState);
+        const currentStr = JSON.stringify(stateData);
+        if (lastStr === currentStr) {
+            return;
+        }
     }
 
-    state.pushUndo(stateString);
+    // Store structured object directly (not JSON string)
+    state.pushUndo(stateData);
     if (state.undoStack.length > MAX_HISTORY) state.undoStack.shift();
     state.clearRedo();
     updateUndoRedoButtons();
@@ -209,18 +210,20 @@ export function updateUndoRedoButtons() {
 export function undo() {
     if (state.undoStack.length < 2) return;
     state.pushRedo(state.popUndo());
-    restoreState(JSON.parse(state.undoStack[state.undoStack.length - 1]));
+    // State is now stored as structured object, not JSON string
+    restoreState(state.undoStack[state.undoStack.length - 1]);
     updateUndoRedoButtons();
-    triggerAutoSaveFn();
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
 export function redo() {
     if (!state.redoStack.length) return;
     const stateData = state.popRedo();
     state.pushUndo(stateData);
-    restoreState(JSON.parse(stateData));
+    // State is now stored as structured object, not JSON string
+    restoreState(stateData);
     updateUndoRedoButtons();
-    triggerAutoSaveFn();
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
 function restoreState(stateData) {
@@ -383,7 +386,8 @@ async function loadCanvasData(id) {
         });
 
         updateMinimap();
-        state.setUndoStack([JSON.stringify({ items: data.items, connections: data.connections.map(c => ({ ...c })) })]);
+        // Store structured object directly (not JSON string)
+        state.setUndoStack([{ items: data.items, connections: data.connections.map(c => ({ ...c })) }]);
         state.setRedoStack([]);
         updateUndoRedoButtons();
     } catch (e) {
@@ -414,7 +418,8 @@ export async function switchCanvas(id) {
     await loadCanvasData(id);
 
     if (!state.undoStack.length) {
-        state.setUndoStack([JSON.stringify({ items: [], connections: [] })]);
+        // Store structured object directly (not JSON string)
+        state.setUndoStack([{ items: [], connections: [] }]);
     }
     updateUndoRedoButtons();
     setFilter('all');
@@ -1067,8 +1072,8 @@ export function setupContextMenu() {
                         window.selectedItem.locked = !window.selectedItem.locked;
                         window.selectedItem.el.classList.toggle('locked', window.selectedItem.locked);
                         if (window.selectedItem.locked) window.selectedItem.el.style.zIndex = 1;
-                        saveStateFn();
-                        triggerAutoSaveFn();
+                        eventBus.emit(Events.STATE_SAVE);
+                        eventBus.emit(Events.AUTOSAVE_TRIGGER);
                         break;
                     case 'delete':
                         if (state.selectedItems.size > 0) deleteSelectedItems();
@@ -1111,7 +1116,7 @@ export function setupCanvasContextMenu() {
             switch (el.dataset.action) {
                 case 'new-memo':
                     addMemo('', canvasContextX, canvasContextY);
-                    saveStateFn();
+                    eventBus.emit(Events.STATE_SAVE);
                     break;
                 case 'new-link':
                     openLinkModal();
@@ -1137,7 +1142,7 @@ export function setupCanvasContextMenu() {
 
 export function showChildTypePicker(parentItem, direction, e) {
     // Create memo directly without popup
-    addChildNodeFn(parentItem, direction, 'memo');
+    addChildNode(parentItem, direction, 'memo');
 }
 
 export function setupChildTypePicker() {
@@ -1149,7 +1154,7 @@ export function setupChildTypePicker() {
 export function showNewNodePicker(clientX, clientY, canvasX, canvasY) {
     // Create memo directly without popup
     addMemo('', canvasX, canvasY);
-    saveStateFn();
+    eventBus.emit(Events.STATE_SAVE);
 }
 
 export function setupNewNodePicker() {
@@ -1180,7 +1185,7 @@ export function setupLinkModal() {
             const x = (innerWidth / 2 - state.offsetX) / state.scale - 130;
             const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
             addLink(url, $('linkTitle').value.trim(), x, y);
-            saveStateFn();
+            eventBus.emit(Events.STATE_SAVE);
             closeLinkModal();
         }
     });
@@ -1534,7 +1539,7 @@ export async function handleFile(file, x, y) {
             }
             state.blobURLCache.set(mediaId, URL.createObjectURL(file));
             createItem({ type: 'image', x, y, w, h, content: mediaId });
-            saveStateFn();
+            eventBus.emit(Events.STATE_SAVE);
             triggerAutoSave();
         };
         img.src = url;
@@ -1545,7 +1550,7 @@ export async function handleFile(file, x, y) {
         }
         state.blobURLCache.set(mediaId, URL.createObjectURL(file));
         createItem({ type: 'video', x, y, w: 400, h: 225, content: mediaId });
-        saveStateFn();
+        eventBus.emit(Events.STATE_SAVE);
         triggerAutoSave();
     }
 }
