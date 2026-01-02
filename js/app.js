@@ -53,6 +53,7 @@ import {
     setupDocumentClickHandler
 } from './events.js';
 import eventBus, { Events } from './events-bus.js';
+import { setupCanvasEventDelegation } from './item-events.js';
 
 // ============ Register Event Bus Listeners ============
 // This replaces the old setExternalFunctions pattern with a centralized event system
@@ -305,6 +306,9 @@ async function init() {
 
     // Update undo/redo buttons
     updateUndoRedoButtons();
+
+    // Setup canvas event delegation (must be before loading items)
+    setupCanvasEventDelegation();
 
     // Setup all event handlers
     setupToolbarEvents();
