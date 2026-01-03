@@ -127,6 +127,7 @@ export const Events = {
     CONNECTIONS_DELETE: 'connections:delete',
     CONNECTIONS_START: 'connections:start',
     CONNECTIONS_COMPLETE: 'connections:complete',
+    CONNECTIONS_CANCEL: 'connections:cancel',
 
     // UI events
     UI_SHOW_CHILD_TYPE_PICKER: 'ui:showChildTypePicker',
