@@ -456,7 +456,7 @@ export function completeConnectionWithNewMemo(canvasX, canvasY) {
 
 // Add child node connected to parent
 export function addChildNode(parent, dir, type = 'memo') {
-    const gap = 72;
+    const gap = 100;
     const cw = 180;
     const ch = 100;
     let x, y, fh, th;
