@@ -476,13 +476,13 @@ export function addChildNode(parent, dir, type = 'memo') {
             break;
         case 'left':
             x = parent.x - cw - gap;
-            y = parent.y + parent.h / 2 - ch / 2;
+            y = parent.y;
             fh = 'left';
             th = 'right';
             break;
         case 'right':
             x = parent.x + parent.w + gap;
-            y = parent.y + parent.h / 2 - ch / 2;
+            y = parent.y;
             fh = 'right';
             th = 'left';
             break;
