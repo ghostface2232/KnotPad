@@ -292,6 +292,13 @@ function setupItemEvents(item) {
     el.addEventListener('contextmenu', e => {
         e.preventDefault();
         e.stopPropagation();
+
+        // In connecting mode, right-click cancels the connection
+        if (state.connectSource) {
+            eventBus.emit(Events.CONNECTIONS_CANCEL, true); // with fade effect
+            return;
+        }
+
         if (!state.selectedItems.has(item)) selectItem(item);
         eventBus.emit(Events.UI_SHOW_CONTEXT_MENU, e.clientX, e.clientY, item);
     });

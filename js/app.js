@@ -11,6 +11,7 @@ import {
     addChildNode,
     startConnection,
     completeConnection,
+    cancelConnection,
     updateAllConnections,
     updateConnection,
     deleteConnection
@@ -67,6 +68,7 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => updateConnection(conn));
 eventBus.on(Events.CONNECTIONS_DELETE, (conn, save, withFade) => deleteConnection(conn, save, withFade));
 eventBus.on(Events.CONNECTIONS_START, (item, handle) => startConnection(item, handle));
 eventBus.on(Events.CONNECTIONS_COMPLETE, (target, handle) => completeConnection(target, handle));
+eventBus.on(Events.CONNECTIONS_CANCEL, (withFade) => cancelConnection(withFade));
 
 // UI events
 eventBus.on(Events.UI_SHOW_CHILD_TYPE_PICKER, (item, direction, e) => showChildTypePicker(item, direction, e));
