@@ -25,10 +25,16 @@ export function showToast(msg, type = 'success') {
 }
 
 // Calculate curved path for connections with directional handles
+// Optimized for graceful curves at any distance between nodes
 export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // For very close or overlapping points, use a simple line
+    if (dist < 1) {
+        return `M${x1} ${y1} L${x2} ${y2}`;
+    }
 
     // Get handle directions as unit vectors
     const handleDirs = {
@@ -38,31 +44,48 @@ export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
         right: { x: 1, y: 0 }
     };
 
-    // Direction from start to end
-    const dirX = dist > 0 ? dx / dist : 1;
-    const dirY = dist > 0 ? dy / dist : 0;
+    // Direction from start to end (unit vector)
+    const dirX = dx / dist;
+    const dirY = dy / dist;
 
     // Get handle direction vectors
     const fromDir = handleDirs[fromHandle] || { x: Math.sign(dx || 1), y: 0 };
     const toDir = handleDirs[toHandle] || { x: -Math.sign(dx || 1), y: 0 };
 
     // Calculate dot product to detect opposing directions
+    // fromDot: positive when handle points toward target, negative when away
     const fromDot = fromDir.x * dirX + fromDir.y * dirY;
     const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
 
-    // Base handle length - longer for more pronounced direction, scales with distance
-    const minHandleLength = 50;
-    const maxHandleLength = 150;
-    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.4, maxHandleLength));
+    // === Key fix: Distance-adaptive handle length calculation ===
+    // The handle length must scale with distance to prevent control points from crossing
+
+    // For short distances: handles should be proportionally shorter
+    // For long distances: handles can be longer but capped
+    const minHandleLength = Math.min(25, dist * 0.2);  // At least 20% of distance, max 25
+    const maxHandleLength = Math.min(150, dist * 0.5); // At most 50% of distance, max 150
+
+    // Base handle length: 35% of distance, within bounds
+    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.35, maxHandleLength));
 
     // Calculate alignment factors - when handles align with direction, use longer handles
-    // When opposing, handles need to curve more dramatically
     const fromAlignmentFactor = Math.max(0.5, (1 + fromDot) / 2);
     const toAlignmentFactor = Math.max(0.5, (1 + toDot) / 2);
 
-    // Handle lengths - make departing direction more pronounced
-    const fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.6);
-    const toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.6);
+    // Handle lengths with reduced variance for close distances
+    let fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.5);
+    let toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.5);
+
+    // === Critical: Ensure total handle length doesn't exceed safe threshold ===
+    // When handles are too long relative to distance, curves become distorted
+    const totalHandleLength = fromHandleLength + toHandleLength;
+    const maxTotalLength = dist * 0.85; // Combined handles should not exceed 85% of distance
+
+    if (totalHandleLength > maxTotalLength) {
+        const scale = maxTotalLength / totalHandleLength;
+        fromHandleLength *= scale;
+        toHandleLength *= scale;
+    }
 
     // Start with control points in handle direction
     let cp1x = x1 + fromDir.x * fromHandleLength;
@@ -70,11 +93,13 @@ export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
     let cp2x = x2 + toDir.x * toHandleLength;
     let cp2y = y2 + toDir.y * toHandleLength;
 
-    // For opposing directions, create smooth S-curves by blending towards target
-    // Use progressive blending to ensure curves remain smooth without sharp bends
+    // === S-curve smoothing for opposing directions ===
+    // Scale the effect based on distance - less dramatic curves for close nodes
+    const distFactor = Math.min(1, dist / 120); // Full effect at distance >= 120
+
     if (fromDot < 0) {
         // Handle points away from target - need to curve around
-        const blendFactor = Math.min(0.35, Math.abs(fromDot) * 0.35);
+        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3) * distFactor;
         // Add perpendicular component for smoother curves
         const perpX = -fromDir.y;
         const perpY = fromDir.x;
@@ -83,15 +108,16 @@ export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
 
         cp1x += dirX * dist * blendFactor;
         cp1y += dirY * dist * blendFactor;
-        // Add slight perpendicular movement for smoother S-curves
+        // Add slight perpendicular movement for smoother S-curves (reduced at close range)
         if (fromDot < -0.5) {
-            cp1x += perpX * perpSign * dist * 0.1;
-            cp1y += perpY * perpSign * dist * 0.1;
+            const perpFactor = 0.08 * distFactor;
+            cp1x += perpX * perpSign * dist * perpFactor;
+            cp1y += perpY * perpSign * dist * perpFactor;
         }
     }
 
     if (toDot < 0) {
-        const blendFactor = Math.min(0.35, Math.abs(toDot) * 0.35);
+        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3) * distFactor;
         const perpX = -toDir.y;
         const perpY = toDir.x;
         const perpDot = perpX * (-dirX) + perpY * (-dirY);
@@ -100,8 +126,9 @@ export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
         cp2x -= dirX * dist * blendFactor;
         cp2y -= dirY * dist * blendFactor;
         if (toDot < -0.5) {
-            cp2x += perpX * perpSign * dist * 0.1;
-            cp2y += perpY * perpSign * dist * 0.1;
+            const perpFactor = 0.08 * distFactor;
+            cp2x += perpX * perpSign * dist * perpFactor;
+            cp2y += perpY * perpSign * dist * perpFactor;
         }
     }
 
