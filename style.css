@@ -1440,15 +1440,42 @@ input, textarea, button { font-family: inherit; }
         height: 16px;
     }
 
-    /* Hide less important buttons on mobile */
+    /* Hide less important buttons on mobile - keep only undo/redo and search */
     .topbar-btn#importBtn,
-    .topbar-btn#exportBtn {
+    .topbar-btn#exportBtn,
+    .topbar-btn#themeToggle {
         display: none;
     }
 
-    .topbar-sep:has(+ #importBtn),
-    #exportBtn + .topbar-sep {
+    /* Hide canvas name on very small screens to save space */
+    .topbar-canvas-name {
         display: none;
+    }
+
+    /* Hide all separators on mobile topbar */
+    .topbar-sep {
+        display: none;
+    }
+
+    /* Compact topbar group on mobile */
+    .topbar-group {
+        padding: 6px 8px;
+        gap: 4px;
+    }
+
+    /* Larger touch targets for undo/redo/search */
+    .topbar-btn#undoBtn,
+    .topbar-btn#redoBtn,
+    .topbar-btn#searchBtn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .topbar-btn#undoBtn svg,
+    .topbar-btn#redoBtn svg,
+    .topbar-btn#searchBtn svg {
+        width: 18px;
+        height: 18px;
     }
 
     /* -------------------------------------------------
@@ -1567,22 +1594,42 @@ input, textarea, button { font-family: inherit; }
        SEARCH BAR - Full width on mobile
        ------------------------------------------------- */
     .search-bar {
-        top: 60px;
-        left: 8px;
-        right: 8px;
+        top: 56px;
+        left: 12px;
+        right: 12px;
         width: auto;
         min-width: auto;
         transform: translateY(-8px);
-        padding: 10px 16px;
+        padding: 12px 16px;
+        border-radius: var(--radius-lg);
     }
 
     .search-bar.active {
         transform: translateY(0);
     }
 
+    .search-bar input {
+        font-size: 16px; /* Prevents iOS zoom on focus */
+        height: 24px;
+    }
+
+    .search-nav {
+        gap: 2px;
+    }
+
     .search-nav span {
-        min-width: 40px;
+        min-width: 36px;
         font-size: 11px;
+    }
+
+    .search-nav button {
+        width: 36px;
+        height: 36px;
+    }
+
+    .search-close {
+        width: 36px;
+        height: 36px;
     }
 
     /* -------------------------------------------------
@@ -1604,6 +1651,35 @@ input, textarea, button { font-family: inherit; }
         padding: 20px;
         padding-top: calc(20px + env(safe-area-inset-top, 0px));
         padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-box h3 {
+        font-size: 20px;
+        margin-bottom: 24px;
+    }
+
+    /* Modal inputs - larger touch targets */
+    .modal-input {
+        padding: 14px 16px;
+        font-size: 16px; /* Prevents iOS zoom */
+        min-height: 48px;
+        margin-bottom: 16px;
+    }
+
+    /* Modal buttons - larger touch targets */
+    .modal-actions {
+        margin-top: auto;
+        padding-top: 16px;
+        gap: 12px;
+    }
+
+    .modal-btn {
+        padding: 14px 24px;
+        font-size: 15px;
+        min-height: 48px;
+        border-radius: var(--radius-md);
     }
 
     .settings-modal-box {
@@ -1615,14 +1691,27 @@ input, textarea, button { font-family: inherit; }
         padding: 16px 20px 0;
     }
 
+    .settings-header h3 {
+        margin-bottom: 0;
+    }
+
+    .settings-close-btn {
+        width: 40px;
+        height: 40px;
+    }
+
     .settings-tabs {
-        padding: 12px 20px 0;
-        gap: 4px;
+        padding: 12px 16px 0;
+        gap: 2px;
+        margin: 0 -16px;
+        padding-left: 16px;
+        padding-right: 16px;
     }
 
     .settings-tab {
-        padding: 8px 10px;
-        font-size: 11px;
+        padding: 10px 12px;
+        font-size: 12px;
+        flex-shrink: 0;
     }
 
     .settings-tab svg {
@@ -1632,6 +1721,36 @@ input, textarea, button { font-family: inherit; }
 
     .settings-content {
         padding: 16px 20px;
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    /* Settings options - larger touch targets */
+    .settings-option-btn {
+        padding: 12px 20px;
+        min-height: 44px;
+        font-size: 14px;
+    }
+
+    .settings-toggle-row {
+        padding: 14px 16px;
+        min-height: 52px;
+    }
+
+    .settings-toggle {
+        width: 52px;
+        height: 28px;
+    }
+
+    .settings-toggle-slider:before {
+        height: 22px;
+        width: 22px;
+        left: 2px;
+        bottom: 2px;
+    }
+
+    .settings-toggle input:checked + .settings-toggle-slider:before {
+        transform: translateX(24px);
     }
 
     /* Storage cards stack vertically on mobile */
@@ -1642,6 +1761,31 @@ input, textarea, button { font-family: inherit; }
 
     .storage-card {
         padding: 20px 16px;
+        min-height: 100px;
+    }
+
+    .storage-card-icon {
+        width: 48px;
+        height: 48px;
+    }
+
+    /* Shortcut items - more compact on mobile */
+    .shortcut-item {
+        padding: 12px 14px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .shortcut-desc {
+        width: 100%;
+        text-align: left;
+        font-size: 12px;
+    }
+
+    .shortcut-keys kbd {
+        min-width: 28px;
+        height: 28px;
+        font-size: 12px;
     }
 
     /* -------------------------------------------------
@@ -1740,14 +1884,19 @@ input, textarea, button { font-family: inherit; }
     }
 
     /* Larger hit areas for buttons */
+    .toolbar-btn,
+    .topbar-btn {
+        position: relative;
+    }
+
     .toolbar-btn::before,
     .topbar-btn::before {
         content: '';
         position: absolute;
-        top: -4px;
-        left: -4px;
-        right: -4px;
-        bottom: -4px;
+        top: -6px;
+        left: -6px;
+        right: -6px;
+        bottom: -6px;
     }
 
     /* Show canvas actions on touch devices */
@@ -1762,6 +1911,59 @@ input, textarea, button { font-family: inherit; }
 
     .canvas-group-header .group-count {
         display: none;
+    }
+
+    /* Add child button larger touch area */
+    .add-child-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .add-child-btn.top { top: -40px; margin-left: -16px; }
+    .add-child-btn.bottom { bottom: -40px; margin-left: -16px; }
+    .add-child-btn.left { left: -40px; margin-top: -16px; }
+    .add-child-btn.right { right: -40px; margin-top: -16px; }
+
+    /* Context menu items */
+    .context-menu-item {
+        min-height: 48px;
+        padding: 14px 16px;
+    }
+
+    /* Connection direction picker */
+    .conn-direction-picker button {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* Markdown toolbar buttons */
+    .md-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Color picker options */
+    .color-picker .color-opt {
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Filter/color dropdown options */
+    .filter-dropdown .filter-opt,
+    .color-dropdown .color-opt {
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Canvas icon picker */
+    .canvas-customize-picker .icon-opt {
+        width: 40px;
+        height: 40px;
+    }
+
+    .canvas-color-opt {
+        width: 32px;
+        height: 32px;
     }
 }
 
