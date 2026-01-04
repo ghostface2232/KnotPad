@@ -433,6 +433,31 @@ input, textarea, button { font-family: inherit; }
 
 #fileInput { display: none; }
 
+/* Sidebar backdrop for mobile - only visible on mobile */
+.sidebar-backdrop {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 199;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity var(--transition), visibility var(--transition);
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+    }
+
+    .sidebar-backdrop.active {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
 .sidebar {
     position: fixed; top: 0; left: 0; width: var(--sidebar-width, 280px); height: 100%;
     background: var(--bg-secondary); border-right: 1px solid var(--border-subtle);
@@ -1303,4 +1328,507 @@ input, textarea, button { font-family: inherit; }
 }
 .font-size-preview .preview-text.size-xlarge {
     font-size: 16px;
+}
+
+/* =====================================================
+   MOBILE RESPONSIVE STYLES
+   ===================================================== */
+
+/* CSS Custom Properties for responsive values */
+:root {
+    --mobile-toolbar-height: 56px;
+    --mobile-topbar-height: 48px;
+    --mobile-sidebar-width: 100%;
+    --mobile-btn-size: 44px;
+}
+
+/* =====================================================
+   1. MEDIA QUERY - Tablets (max-width: 768px)
+   ===================================================== */
+@media (max-width: 768px) {
+    /* Topbar adjustments */
+    .topbar {
+        top: 12px;
+        gap: 4px;
+    }
+
+    .topbar-group {
+        padding: 4px 6px;
+    }
+
+    .topbar-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .topbar-canvas-name {
+        max-width: 100px;
+        font-size: 13px;
+    }
+
+    .topbar-sep {
+        margin: 0 2px;
+    }
+
+    /* Search bar */
+    .search-bar {
+        min-width: auto;
+        width: calc(100% - 32px);
+        max-width: 400px;
+        padding: 8px 16px;
+    }
+
+    /* Minimap - hide on tablets */
+    .minimap {
+        width: 120px;
+        height: 75px;
+    }
+
+    /* Settings modal */
+    .settings-modal-box {
+        max-width: 90%;
+        height: 80vh;
+        max-height: 600px;
+    }
+
+    .settings-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .settings-tab {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+/* =====================================================
+   2. MEDIA QUERY - Mobile Phones (max-width: 480px)
+   ===================================================== */
+@media (max-width: 480px) {
+    /* -------------------------------------------------
+       TOPBAR - Compact mobile layout
+       ------------------------------------------------- */
+    .topbar {
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100% - 80px);
+        max-width: none;
+    }
+
+    .topbar-group {
+        flex: 1;
+        justify-content: center;
+        padding: 4px;
+        gap: 2px;
+    }
+
+    .topbar-canvas-name {
+        max-width: 80px;
+        font-size: 12px;
+        padding: 0 4px;
+    }
+
+    .topbar-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    .topbar-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Hide less important buttons on mobile */
+    .topbar-btn#importBtn,
+    .topbar-btn#exportBtn {
+        display: none;
+    }
+
+    .topbar-sep:has(+ #importBtn),
+    #exportBtn + .topbar-sep {
+        display: none;
+    }
+
+    /* -------------------------------------------------
+       TOOLBAR - Mobile optimized bottom bar
+       ------------------------------------------------- */
+    .toolbar {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transform: none;
+        border-radius: 0;
+        padding: 8px 12px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        gap: 2px;
+        justify-content: space-around;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+    }
+
+    .toolbar-btn {
+        width: var(--mobile-btn-size);
+        height: var(--mobile-btn-size);
+        border-radius: var(--radius-md);
+    }
+
+    .toolbar-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Hide zoom controls on mobile - use pinch instead */
+    .toolbar-btn#zoomOutBtn,
+    .toolbar-btn#zoomInBtn,
+    .zoom-display,
+    .toolbar-btn#fitViewBtn {
+        display: none;
+    }
+
+    /* Hide extra separators */
+    .toolbar-sep {
+        display: none;
+    }
+
+    /* Color dropdown position for mobile */
+    .color-dropdown,
+    .filter-dropdown {
+        bottom: calc(var(--mobile-toolbar-height) + 16px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* -------------------------------------------------
+       SIDEBAR - Full screen overlay on mobile
+       ------------------------------------------------- */
+    .sidebar {
+        width: 100% !important;
+        max-width: 100%;
+        transform: translateX(-100%);
+        z-index: 300;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    /* Disable resize on mobile */
+    .sidebar-resize-handle {
+        display: none;
+    }
+
+    /* Sidebar toggle button */
+    .sidebar-toggle {
+        top: 8px;
+        left: 8px;
+        width: 40px;
+        height: 40px;
+        z-index: 301;
+    }
+
+    .sidebar.open ~ .sidebar-toggle {
+        left: calc(100% - 56px);
+        background: var(--bg-card);
+    }
+
+    /* Sidebar header adjustments */
+    .sidebar-header {
+        padding: 12px 16px;
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    }
+
+    .sidebar-title {
+        font-size: 16px;
+    }
+
+    /* Canvas list items - larger touch targets */
+    .canvas-item-entry {
+        padding: 12px 16px;
+        min-height: 56px;
+    }
+
+    .canvas-item-entry .canvas-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .canvas-item-entry .canvas-action-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* Always show actions on mobile (no hover) */
+    .canvas-item-entry .canvas-actions {
+        opacity: 0.7;
+    }
+
+    /* -------------------------------------------------
+       SEARCH BAR - Full width on mobile
+       ------------------------------------------------- */
+    .search-bar {
+        top: 60px;
+        left: 8px;
+        right: 8px;
+        width: auto;
+        min-width: auto;
+        transform: translateY(-8px);
+        padding: 10px 16px;
+    }
+
+    .search-bar.active {
+        transform: translateY(0);
+    }
+
+    .search-nav span {
+        min-width: 40px;
+        font-size: 11px;
+    }
+
+    /* -------------------------------------------------
+       MINIMAP - Hide on mobile
+       ------------------------------------------------- */
+    .minimap {
+        display: none;
+    }
+
+    /* -------------------------------------------------
+       MODALS - Full screen on mobile
+       ------------------------------------------------- */
+    .modal-box {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        padding: 20px;
+        padding-top: calc(20px + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .settings-modal-box {
+        height: 100%;
+        max-height: 100%;
+    }
+
+    .settings-header {
+        padding: 16px 20px 0;
+    }
+
+    .settings-tabs {
+        padding: 12px 20px 0;
+        gap: 4px;
+    }
+
+    .settings-tab {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+
+    .settings-tab svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .settings-content {
+        padding: 16px 20px;
+    }
+
+    /* Storage cards stack vertically on mobile */
+    .storage-cards {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .storage-card {
+        padding: 20px 16px;
+    }
+
+    /* -------------------------------------------------
+       CONTEXT MENU - Larger touch targets
+       ------------------------------------------------- */
+    .context-menu {
+        min-width: 200px;
+    }
+
+    .context-menu-item {
+        padding: 12px 16px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    /* -------------------------------------------------
+       CANVAS ITEMS - Touch friendly controls
+       ------------------------------------------------- */
+    .canvas-item .delete-btn,
+    .canvas-item .color-btn,
+    .canvas-item .font-size-btn {
+        width: 32px;
+        height: 32px;
+        opacity: 0.8;
+    }
+
+    .canvas-item .delete-btn { right: -14px; top: -14px; }
+    .canvas-item .font-size-btn { right: 22px; top: -14px; }
+    .canvas-item .color-btn { right: 58px; top: -14px; }
+    .canvas-item.no-font-btn .color-btn { right: 22px; }
+
+    /* Connection handles larger on mobile */
+    .connection-handle {
+        width: 20px;
+        height: 20px;
+    }
+
+    .connection-handle.top { top: -10px; margin-left: -10px; }
+    .connection-handle.bottom { bottom: -10px; margin-left: -10px; }
+    .connection-handle.left { left: -10px; margin-top: -10px; }
+    .connection-handle.right { right: -10px; margin-top: -10px; }
+
+    /* Resize handle larger */
+    .canvas-item .resize-handle {
+        width: 24px;
+        height: 24px;
+        opacity: 0.6;
+    }
+
+    /* -------------------------------------------------
+       TOAST - Position above toolbar
+       ------------------------------------------------- */
+    .toast {
+        bottom: calc(var(--mobile-toolbar-height) + 16px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* -------------------------------------------------
+       COLOR/FILTER PICKERS - Larger buttons
+       ------------------------------------------------- */
+    .color-picker .color-opt,
+    .filter-dropdown .filter-opt,
+    .color-dropdown .color-opt {
+        width: 32px;
+        height: 32px;
+    }
+
+    .color-picker {
+        padding: 10px 14px;
+    }
+
+    /* -------------------------------------------------
+       TYPOGRAPHY - Slightly larger for readability
+       ------------------------------------------------- */
+    .memo-body {
+        font-size: 14px;
+    }
+}
+
+/* =====================================================
+   3. TOUCH DEVICE SPECIFIC STYLES
+   ===================================================== */
+@media (hover: none) and (pointer: coarse) {
+    /* Show controls by default on touch devices */
+    .canvas-item .delete-btn,
+    .canvas-item .color-btn,
+    .canvas-item .font-size-btn {
+        opacity: 0.7;
+    }
+
+    .canvas-item .resize-handle {
+        opacity: 0.5;
+    }
+
+    .canvas-item .connection-handle {
+        opacity: 0.8;
+    }
+
+    /* Larger hit areas for buttons */
+    .toolbar-btn::before,
+    .topbar-btn::before {
+        content: '';
+        position: absolute;
+        top: -4px;
+        left: -4px;
+        right: -4px;
+        bottom: -4px;
+    }
+
+    /* Show canvas actions on touch devices */
+    .canvas-item-entry .canvas-actions {
+        opacity: 1;
+    }
+
+    .canvas-group-header .group-actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .canvas-group-header .group-count {
+        display: none;
+    }
+}
+
+/* =====================================================
+   4. LANDSCAPE MOBILE (Short viewport)
+   ===================================================== */
+@media (max-height: 500px) and (max-width: 900px) {
+    .toolbar {
+        padding: 6px 12px;
+    }
+
+    .toolbar-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .topbar {
+        top: 6px;
+    }
+
+    .topbar-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    .sidebar-toggle {
+        top: 6px;
+        width: 36px;
+        height: 36px;
+    }
+
+    .search-bar {
+        top: 50px;
+    }
+
+    /* Compact modal in landscape */
+    .settings-modal-box {
+        height: 100%;
+    }
+
+    .settings-header {
+        padding: 12px 16px 0;
+    }
+
+    .settings-header h3 {
+        font-size: 16px;
+    }
+}
+
+/* =====================================================
+   5. SAFE AREA SUPPORT (Notched phones)
+   ===================================================== */
+@supports (padding: env(safe-area-inset-top)) {
+    .sidebar-header {
+        padding-top: max(16px, env(safe-area-inset-top));
+    }
+
+    .toolbar {
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    @media (max-width: 480px) {
+        .modal-box {
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            padding-left: max(20px, env(safe-area-inset-left));
+            padding-right: max(20px, env(safe-area-inset-right));
+        }
+    }
 }

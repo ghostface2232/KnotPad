@@ -1464,6 +1464,8 @@ document.addEventListener('visibilitychange', () => {
 export function closeSidebarIfUnpinned() {
     if (!state.sidebarPinned && sidebar.classList.contains('open')) {
         sidebar.classList.remove('open');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        if (backdrop) backdrop.classList.remove('active');
         state.setSidebarOpen(false);
     }
 }
