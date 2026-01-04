@@ -8,7 +8,7 @@ import { updateAllConnections, cancelConnection, deleteConnection, updateTempLin
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
-    saveCurrentCanvas, showCanvasContextMenu
+    saveCurrentCanvas, showCanvasContextMenu, showContextMenu
 } from './ui.js';
 
 const app = $('app');
@@ -250,23 +250,113 @@ export function setupMouseEvents() {
 // ============ Touch Events ============
 
 let lastDist = 0;
+let longPressTimer = null;
+let touchStartPos = { x: 0, y: 0 };
+let touchMoved = false;
+let touchDragItem = null;
+let touchDragOffset = { x: 0, y: 0 };
+const LONG_PRESS_DURATION = 500; // ms
+const TOUCH_MOVE_THRESHOLD = 10; // px
+
+// Check if device supports touch
+function isTouchDevice() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+// Cancel long press timer
+function cancelLongPress() {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+}
+
+// Trigger haptic feedback if available
+function triggerHaptic() {
+    if (navigator.vibrate) {
+        navigator.vibrate(50);
+    }
+}
 
 export function setupTouchEvents() {
     app.addEventListener('touchstart', e => {
         closeSidebarIfUnpinned();
+        touchMoved = false;
+        touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
         if (e.touches.length === 2) {
+            cancelLongPress();
             lastDist = Math.hypot(
                 e.touches[1].clientX - e.touches[0].clientX,
                 e.touches[1].clientY - e.touches[0].clientY
             );
-        } else if (e.touches.length === 1 && (e.target === canvas || e.target === app)) {
-            state.setIsPanning(true);
-            state.setStartX(e.touches[0].clientX - state.offsetX);
-            state.setStartY(e.touches[0].clientY - state.offsetY);
+        } else if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const target = e.target;
+
+            // Check if touching a canvas item
+            const canvasItem = target.closest('.canvas-item');
+
+            if (canvasItem) {
+                // Find the item in state
+                const item = state.items.find(i => i.el === canvasItem);
+
+                if (item && !item.locked) {
+                    // Setup for potential drag
+                    const rect = app.getBoundingClientRect();
+                    const canvasX = (touch.clientX - rect.left - state.offsetX) / state.scale;
+                    const canvasY = (touch.clientY - rect.top - state.offsetY) / state.scale;
+                    touchDragOffset = { x: canvasX - item.x, y: canvasY - item.y };
+                    touchDragItem = item;
+
+                    // Select the item
+                    if (!state.selectedItems.has(item)) {
+                        deselectAll();
+                        selectItem(item);
+                    }
+
+                    // Long press for context menu on item
+                    longPressTimer = setTimeout(() => {
+                        if (!touchMoved && touchDragItem) {
+                            triggerHaptic();
+                            window.selectedItem = touchDragItem;
+                            showContextMenu(touch.clientX, touch.clientY, touchDragItem);
+                            touchDragItem = null; // Cancel drag after context menu
+                        }
+                    }, LONG_PRESS_DURATION);
+                }
+            } else if (target === canvas || target.classList.contains('grid-overlay') || target === app) {
+                // Pan or long press for canvas context menu
+                state.setIsPanning(true);
+                state.setStartX(touch.clientX - state.offsetX);
+                state.setStartY(touch.clientY - state.offsetY);
+
+                // Long press for canvas context menu
+                longPressTimer = setTimeout(() => {
+                    if (!touchMoved) {
+                        triggerHaptic();
+                        state.setIsPanning(false);
+                        const rect = app.getBoundingClientRect();
+                        const canvasX = (touch.clientX - rect.left - state.offsetX) / state.scale - 90;
+                        const canvasY = (touch.clientY - rect.top - state.offsetY) / state.scale - 60;
+                        showCanvasContextMenu(touch.clientX, touch.clientY, canvasX, canvasY);
+                    }
+                }, LONG_PRESS_DURATION);
+            }
         }
-    });
+    }, { passive: true });
 
     app.addEventListener('touchmove', e => {
+        const touch = e.touches[0];
+        const dx = touch.clientX - touchStartPos.x;
+        const dy = touch.clientY - touchStartPos.y;
+
+        // Check if moved beyond threshold
+        if (Math.abs(dx) > TOUCH_MOVE_THRESHOLD || Math.abs(dy) > TOUCH_MOVE_THRESHOLD) {
+            touchMoved = true;
+            cancelLongPress();
+        }
+
         if (e.touches.length === 2) {
             e.preventDefault();
             const dist = Math.hypot(
@@ -278,15 +368,57 @@ export function setupTouchEvents() {
             const rect = app.getBoundingClientRect();
             setZoom(state.scale * dist / lastDist, cx - rect.left, cy - rect.top, false);
             lastDist = dist;
-        } else if (state.isPanning) {
-            state.setOffsetX(e.touches[0].clientX - state.startX);
-            state.setOffsetY(e.touches[0].clientY - state.startY);
+        } else if (touchDragItem && touchMoved) {
+            // Dragging a canvas item
+            e.preventDefault();
+            const rect = app.getBoundingClientRect();
+            let newX = (touch.clientX - rect.left - state.offsetX) / state.scale - touchDragOffset.x;
+            let newY = (touch.clientY - rect.top - state.offsetY) / state.scale - touchDragOffset.y;
+
+            // Apply grid snap if enabled
+            if (state.gridSnap) {
+                newX = Math.round(newX / state.GRID_SIZE) * state.GRID_SIZE;
+                newY = Math.round(newY / state.GRID_SIZE) * state.GRID_SIZE;
+            }
+
+            const dx = newX - touchDragItem.x;
+            const dy = newY - touchDragItem.y;
+
+            // Move all selected items
+            state.selectedItems.forEach(item => {
+                item.x += dx;
+                item.y += dy;
+                item.el.style.left = item.x + 'px';
+                item.el.style.top = item.y + 'px';
+            });
+            updateAllConnections();
+            throttledMinimap();
+        } else if (state.isPanning && touchMoved) {
+            state.setOffsetX(touch.clientX - state.startX);
+            state.setOffsetY(touch.clientY - state.startY);
             updateTransform();
             throttledMinimap();
         }
     }, { passive: false });
 
-    app.addEventListener('touchend', () => state.setIsPanning(false));
+    app.addEventListener('touchend', e => {
+        cancelLongPress();
+
+        if (touchDragItem && touchMoved) {
+            // Save state after drag
+            saveState();
+            triggerAutoSave();
+        }
+
+        touchDragItem = null;
+        state.setIsPanning(false);
+    });
+
+    app.addEventListener('touchcancel', () => {
+        cancelLongPress();
+        touchDragItem = null;
+        state.setIsPanning(false);
+    });
 }
 
 // ============ Keyboard Events ============
