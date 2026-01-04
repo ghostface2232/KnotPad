@@ -197,6 +197,9 @@ export function updateConnectionArrow(c) {
     const dy = tp.y - fp.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
+    // Handle very close points
+    if (dist < 1) return;
+
     // Handle direction vectors
     const handleDirs = {
         top: { x: 0, y: -1 },
@@ -205,8 +208,8 @@ export function updateConnectionArrow(c) {
         right: { x: 1, y: 0 }
     };
 
-    const dirX = dist > 0 ? dx / dist : 1;
-    const dirY = dist > 0 ? dy / dist : 0;
+    const dirX = dx / dist;
+    const dirY = dy / dist;
 
     const fromDir = handleDirs[c.fh] || { x: Math.sign(dx || 1), y: 0 };
     const toDir = handleDirs[c.th] || { x: -Math.sign(dx || 1), y: 0 };
@@ -214,15 +217,25 @@ export function updateConnectionArrow(c) {
     const fromDot = fromDir.x * dirX + fromDir.y * dirY;
     const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
 
-    // Match updated curvePath parameters
-    const minHandleLength = 50;
-    const maxHandleLength = 150;
-    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.4, maxHandleLength));
+    // === Match updated curvePath parameters (distance-adaptive) ===
+    const minHandleLength = Math.min(25, dist * 0.2);
+    const maxHandleLength = Math.min(150, dist * 0.5);
+    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.35, maxHandleLength));
+
     const fromAlignmentFactor = Math.max(0.5, (1 + fromDot) / 2);
     const toAlignmentFactor = Math.max(0.5, (1 + toDot) / 2);
 
-    const fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.6);
-    const toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.6);
+    let fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.5);
+    let toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.5);
+
+    // Ensure total handle length doesn't exceed safe threshold
+    const totalHandleLength = fromHandleLength + toHandleLength;
+    const maxTotalLength = dist * 0.85;
+    if (totalHandleLength > maxTotalLength) {
+        const scale = maxTotalLength / totalHandleLength;
+        fromHandleLength *= scale;
+        toHandleLength *= scale;
+    }
 
     const p0 = { x: fp.x, y: fp.y };
     const p3 = { x: tp.x, y: tp.y };
@@ -231,9 +244,11 @@ export function updateConnectionArrow(c) {
     let p1 = { x: fp.x + fromDir.x * fromHandleLength, y: fp.y + fromDir.y * fromHandleLength };
     let p2 = { x: tp.x + toDir.x * toHandleLength, y: tp.y + toDir.y * toHandleLength };
 
-    // Apply the same curve smoothing as curvePath
+    // Apply the same curve smoothing as curvePath (distance-scaled)
+    const distFactor = Math.min(1, dist / 120);
+
     if (fromDot < 0) {
-        const blendFactor = Math.min(0.35, Math.abs(fromDot) * 0.35);
+        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3) * distFactor;
         const perpX = -fromDir.y;
         const perpY = fromDir.x;
         const perpDot = perpX * dirX + perpY * dirY;
@@ -242,13 +257,14 @@ export function updateConnectionArrow(c) {
         p1.x += dirX * dist * blendFactor;
         p1.y += dirY * dist * blendFactor;
         if (fromDot < -0.5) {
-            p1.x += perpX * perpSign * dist * 0.1;
-            p1.y += perpY * perpSign * dist * 0.1;
+            const perpFactor = 0.08 * distFactor;
+            p1.x += perpX * perpSign * dist * perpFactor;
+            p1.y += perpY * perpSign * dist * perpFactor;
         }
     }
 
     if (toDot < 0) {
-        const blendFactor = Math.min(0.35, Math.abs(toDot) * 0.35);
+        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3) * distFactor;
         const perpX = -toDir.y;
         const perpY = toDir.x;
         const perpDot = perpX * (-dirX) + perpY * (-dirY);
@@ -257,8 +273,9 @@ export function updateConnectionArrow(c) {
         p2.x -= dirX * dist * blendFactor;
         p2.y -= dirY * dist * blendFactor;
         if (toDot < -0.5) {
-            p2.x += perpX * perpSign * dist * 0.1;
-            p2.y += perpY * perpSign * dist * 0.1;
+            const perpFactor = 0.08 * distFactor;
+            p2.x += perpX * perpSign * dist * perpFactor;
+            p2.y += perpY * perpSign * dist * perpFactor;
         }
     }
 
