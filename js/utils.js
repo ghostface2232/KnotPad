@@ -24,111 +24,117 @@ export function showToast(msg, type = 'success') {
     setTimeout(() => toast.classList.remove('show'), 2000);
 }
 
+// Handle direction lookup table (cached for performance)
+const HANDLE_DIRS = {
+    top: { x: 0, y: -1 },
+    bottom: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 }
+};
+
+// Legacy algorithm constants (for backward compatibility)
+const LEGACY_MIN_HANDLE = 50;
+const LEGACY_MAX_HANDLE = 150;
+const LEGACY_HANDLE_RATIO = 0.4;
+
+// Threshold for applying short-distance correction
+const SHORT_DIST_THRESHOLD = 100;
+const BLEND_RANGE = 50; // Blend over 50px range for smooth transition
+
 // Calculate curved path for connections with directional handles
-// Optimized for graceful curves at any distance between nodes
+// Maintains legacy behavior for existing canvases while fixing distortion at close range
 export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
     const dx = x2 - x1;
     const dy = y2 - y1;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const distSq = dx * dx + dy * dy;
 
-    // For very close or overlapping points, use a simple line
-    if (dist < 1) {
+    // Fast path for overlapping points
+    if (distSq < 1) {
         return `M${x1} ${y1} L${x2} ${y2}`;
     }
 
-    // Get handle directions as unit vectors
-    const handleDirs = {
-        top: { x: 0, y: -1 },
-        bottom: { x: 0, y: 1 },
-        left: { x: -1, y: 0 },
-        right: { x: 1, y: 0 }
-    };
+    const dist = Math.sqrt(distSq);
+    const invDist = 1 / dist;
 
-    // Direction from start to end (unit vector)
-    const dirX = dx / dist;
-    const dirY = dy / dist;
+    // Direction unit vector
+    const dirX = dx * invDist;
+    const dirY = dy * invDist;
 
-    // Get handle direction vectors
-    const fromDir = handleDirs[fromHandle] || { x: Math.sign(dx || 1), y: 0 };
-    const toDir = handleDirs[toHandle] || { x: -Math.sign(dx || 1), y: 0 };
+    // Get handle direction vectors (with fallback)
+    const fromDir = HANDLE_DIRS[fromHandle] || { x: dx >= 0 ? 1 : -1, y: 0 };
+    const toDir = HANDLE_DIRS[toHandle] || { x: dx >= 0 ? -1 : 1, y: 0 };
 
-    // Calculate dot product to detect opposing directions
-    // fromDot: positive when handle points toward target, negative when away
+    // Dot products for direction alignment
     const fromDot = fromDir.x * dirX + fromDir.y * dirY;
     const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
 
-    // === Key fix: Distance-adaptive handle length calculation ===
-    // The handle length must scale with distance to prevent control points from crossing
+    // === Legacy-compatible handle length calculation ===
+    // Use original algorithm as base, apply correction only for short distances
 
-    // For short distances: handles should be proportionally shorter
-    // For long distances: handles can be longer but capped
-    const minHandleLength = Math.min(25, dist * 0.2);  // At least 20% of distance, max 25
-    const maxHandleLength = Math.min(150, dist * 0.5); // At most 50% of distance, max 150
+    // Legacy base calculation (maintains existing canvas appearance)
+    const legacyBase = Math.max(LEGACY_MIN_HANDLE, Math.min(dist * LEGACY_HANDLE_RATIO, LEGACY_MAX_HANDLE));
 
-    // Base handle length: 35% of distance, within bounds
-    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.35, maxHandleLength));
+    // Alignment factors (unchanged from legacy)
+    const fromAlignFactor = Math.max(0.5, (1 + fromDot) * 0.5);
+    const toAlignFactor = Math.max(0.5, (1 + toDot) * 0.5);
 
-    // Calculate alignment factors - when handles align with direction, use longer handles
-    const fromAlignmentFactor = Math.max(0.5, (1 + fromDot) / 2);
-    const toAlignmentFactor = Math.max(0.5, (1 + toDot) / 2);
+    // Legacy handle lengths
+    let fromHandleLen = legacyBase * (0.7 + fromAlignFactor * 0.6);
+    let toHandleLen = legacyBase * (0.7 + toAlignFactor * 0.6);
 
-    // Handle lengths with reduced variance for close distances
-    let fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.5);
-    let toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.5);
+    // === Short-distance correction (smoothly blended) ===
+    // Only apply when nodes are close, with smooth transition to preserve legacy behavior
+    if (dist < SHORT_DIST_THRESHOLD) {
+        // Calculate blend factor: 0 at threshold, 1 at (threshold - BLEND_RANGE)
+        const blendStart = SHORT_DIST_THRESHOLD - BLEND_RANGE;
+        const correctionStrength = dist <= blendStart ? 1 :
+            (SHORT_DIST_THRESHOLD - dist) / BLEND_RANGE;
 
-    // === Critical: Ensure total handle length doesn't exceed safe threshold ===
-    // When handles are too long relative to distance, curves become distorted
-    const totalHandleLength = fromHandleLength + toHandleLength;
-    const maxTotalLength = dist * 0.85; // Combined handles should not exceed 85% of distance
+        // Maximum safe total handle length (prevents control point crossing)
+        const maxSafeTotal = dist * 0.8;
+        const currentTotal = fromHandleLen + toHandleLen;
 
-    if (totalHandleLength > maxTotalLength) {
-        const scale = maxTotalLength / totalHandleLength;
-        fromHandleLength *= scale;
-        toHandleLength *= scale;
+        if (currentTotal > maxSafeTotal) {
+            // Smoothly blend toward corrected values
+            const safeScale = maxSafeTotal / currentTotal;
+            const blendedScale = 1 - correctionStrength * (1 - safeScale);
+            fromHandleLen *= blendedScale;
+            toHandleLen *= blendedScale;
+        }
     }
 
-    // Start with control points in handle direction
-    let cp1x = x1 + fromDir.x * fromHandleLength;
-    let cp1y = y1 + fromDir.y * fromHandleLength;
-    let cp2x = x2 + toDir.x * toHandleLength;
-    let cp2y = y2 + toDir.y * toHandleLength;
+    // Calculate control points
+    let cp1x = x1 + fromDir.x * fromHandleLen;
+    let cp1y = y1 + fromDir.y * fromHandleLen;
+    let cp2x = x2 + toDir.x * toHandleLen;
+    let cp2y = y2 + toDir.y * toHandleLen;
 
     // === S-curve smoothing for opposing directions ===
-    // Scale the effect based on distance - less dramatic curves for close nodes
-    const distFactor = Math.min(1, dist / 120); // Full effect at distance >= 120
-
     if (fromDot < 0) {
-        // Handle points away from target - need to curve around
-        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3) * distFactor;
-        // Add perpendicular component for smoother curves
-        const perpX = -fromDir.y;
-        const perpY = fromDir.x;
-        const perpDot = perpX * dirX + perpY * dirY;
-        const perpSign = perpDot >= 0 ? 1 : -1;
-
+        const blendFactor = Math.min(0.35, -fromDot * 0.35);
         cp1x += dirX * dist * blendFactor;
         cp1y += dirY * dist * blendFactor;
-        // Add slight perpendicular movement for smoother S-curves (reduced at close range)
+
         if (fromDot < -0.5) {
-            const perpFactor = 0.08 * distFactor;
-            cp1x += perpX * perpSign * dist * perpFactor;
-            cp1y += perpY * perpSign * dist * perpFactor;
+            const perpX = -fromDir.y;
+            const perpY = fromDir.x;
+            const perpSign = (perpX * dirX + perpY * dirY) >= 0 ? 1 : -1;
+            cp1x += perpX * perpSign * dist * 0.1;
+            cp1y += perpY * perpSign * dist * 0.1;
         }
     }
 
     if (toDot < 0) {
-        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3) * distFactor;
-        const perpX = -toDir.y;
-        const perpY = toDir.x;
-        const perpDot = perpX * (-dirX) + perpY * (-dirY);
-        const perpSign = perpDot >= 0 ? 1 : -1;
-
+        const blendFactor = Math.min(0.35, -toDot * 0.35);
         cp2x -= dirX * dist * blendFactor;
         cp2y -= dirY * dist * blendFactor;
+
         if (toDot < -0.5) {
-            const perpFactor = 0.08 * distFactor;
-            cp2x += perpX * perpSign * dist * perpFactor;
-            cp2y += perpY * perpSign * dist * perpFactor;
+            const perpX = -toDir.y;
+            const perpY = toDir.x;
+            const perpSign = (perpX * (-dirX) + perpY * (-dirY)) >= 0 ? 1 : -1;
+            cp2x += perpX * perpSign * dist * 0.1;
+            cp2y += perpY * perpSign * dist * 0.1;
         }
     }
 
