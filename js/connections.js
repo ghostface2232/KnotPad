@@ -180,7 +180,16 @@ function bezierTangent(p0, p1, p2, p3, t) {
     return Math.atan2(dy, dx);
 }
 
+// Handle direction lookup (cached)
+const ARROW_HANDLE_DIRS = {
+    top: { x: 0, y: -1 },
+    bottom: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 }
+};
+
 // Update connection arrow based on direction
+// Uses same algorithm as curvePath for consistency
 export function updateConnectionArrow(c) {
     if (c.arrow) {
         c.arrow.remove();
@@ -192,90 +201,78 @@ export function updateConnectionArrow(c) {
     const fp = getHandlePos(c.from, c.fh);
     const tp = getHandlePos(c.to, c.th);
 
-    // Calculate control points for the cubic Bezier curve (matching curvePath in utils.js)
     const dx = tp.x - fp.x;
     const dy = tp.y - fp.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const distSq = dx * dx + dy * dy;
 
     // Handle very close points
-    if (dist < 1) return;
+    if (distSq < 1) return;
 
-    // Handle direction vectors
-    const handleDirs = {
-        top: { x: 0, y: -1 },
-        bottom: { x: 0, y: 1 },
-        left: { x: -1, y: 0 },
-        right: { x: 1, y: 0 }
-    };
+    const dist = Math.sqrt(distSq);
+    const invDist = 1 / dist;
+    const dirX = dx * invDist;
+    const dirY = dy * invDist;
 
-    const dirX = dx / dist;
-    const dirY = dy / dist;
-
-    const fromDir = handleDirs[c.fh] || { x: Math.sign(dx || 1), y: 0 };
-    const toDir = handleDirs[c.th] || { x: -Math.sign(dx || 1), y: 0 };
+    const fromDir = ARROW_HANDLE_DIRS[c.fh] || { x: dx >= 0 ? 1 : -1, y: 0 };
+    const toDir = ARROW_HANDLE_DIRS[c.th] || { x: dx >= 0 ? -1 : 1, y: 0 };
 
     const fromDot = fromDir.x * dirX + fromDir.y * dirY;
     const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
 
-    // === Match updated curvePath parameters (distance-adaptive) ===
-    const minHandleLength = Math.min(25, dist * 0.2);
-    const maxHandleLength = Math.min(150, dist * 0.5);
-    const baseHandleLength = Math.max(minHandleLength, Math.min(dist * 0.35, maxHandleLength));
+    // === Legacy-compatible calculation (matching curvePath) ===
+    const legacyBase = Math.max(50, Math.min(dist * 0.4, 150));
+    const fromAlignFactor = Math.max(0.5, (1 + fromDot) * 0.5);
+    const toAlignFactor = Math.max(0.5, (1 + toDot) * 0.5);
 
-    const fromAlignmentFactor = Math.max(0.5, (1 + fromDot) / 2);
-    const toAlignmentFactor = Math.max(0.5, (1 + toDot) / 2);
+    let fromHandleLen = legacyBase * (0.7 + fromAlignFactor * 0.6);
+    let toHandleLen = legacyBase * (0.7 + toAlignFactor * 0.6);
 
-    let fromHandleLength = baseHandleLength * (0.7 + fromAlignmentFactor * 0.5);
-    let toHandleLength = baseHandleLength * (0.7 + toAlignmentFactor * 0.5);
+    // Short-distance correction (smoothly blended)
+    if (dist < 100) {
+        const blendStart = 50;
+        const correctionStrength = dist <= blendStart ? 1 : (100 - dist) / 50;
+        const maxSafeTotal = dist * 0.8;
+        const currentTotal = fromHandleLen + toHandleLen;
 
-    // Ensure total handle length doesn't exceed safe threshold
-    const totalHandleLength = fromHandleLength + toHandleLength;
-    const maxTotalLength = dist * 0.85;
-    if (totalHandleLength > maxTotalLength) {
-        const scale = maxTotalLength / totalHandleLength;
-        fromHandleLength *= scale;
-        toHandleLength *= scale;
+        if (currentTotal > maxSafeTotal) {
+            const safeScale = maxSafeTotal / currentTotal;
+            const blendedScale = 1 - correctionStrength * (1 - safeScale);
+            fromHandleLen *= blendedScale;
+            toHandleLen *= blendedScale;
+        }
     }
 
     const p0 = { x: fp.x, y: fp.y };
     const p3 = { x: tp.x, y: tp.y };
+    let p1 = { x: fp.x + fromDir.x * fromHandleLen, y: fp.y + fromDir.y * fromHandleLen };
+    let p2 = { x: tp.x + toDir.x * toHandleLen, y: tp.y + toDir.y * toHandleLen };
 
-    // Calculate p1 based on fromHandle direction
-    let p1 = { x: fp.x + fromDir.x * fromHandleLength, y: fp.y + fromDir.y * fromHandleLength };
-    let p2 = { x: tp.x + toDir.x * toHandleLength, y: tp.y + toDir.y * toHandleLength };
-
-    // Apply the same curve smoothing as curvePath (distance-scaled)
-    const distFactor = Math.min(1, dist / 120);
-
+    // S-curve smoothing for opposing directions
     if (fromDot < 0) {
-        const blendFactor = Math.min(0.3, Math.abs(fromDot) * 0.3) * distFactor;
-        const perpX = -fromDir.y;
-        const perpY = fromDir.x;
-        const perpDot = perpX * dirX + perpY * dirY;
-        const perpSign = perpDot >= 0 ? 1 : -1;
-
+        const blendFactor = Math.min(0.35, -fromDot * 0.35);
         p1.x += dirX * dist * blendFactor;
         p1.y += dirY * dist * blendFactor;
+
         if (fromDot < -0.5) {
-            const perpFactor = 0.08 * distFactor;
-            p1.x += perpX * perpSign * dist * perpFactor;
-            p1.y += perpY * perpSign * dist * perpFactor;
+            const perpX = -fromDir.y;
+            const perpY = fromDir.x;
+            const perpSign = (perpX * dirX + perpY * dirY) >= 0 ? 1 : -1;
+            p1.x += perpX * perpSign * dist * 0.1;
+            p1.y += perpY * perpSign * dist * 0.1;
         }
     }
 
     if (toDot < 0) {
-        const blendFactor = Math.min(0.3, Math.abs(toDot) * 0.3) * distFactor;
-        const perpX = -toDir.y;
-        const perpY = toDir.x;
-        const perpDot = perpX * (-dirX) + perpY * (-dirY);
-        const perpSign = perpDot >= 0 ? 1 : -1;
-
+        const blendFactor = Math.min(0.35, -toDot * 0.35);
         p2.x -= dirX * dist * blendFactor;
         p2.y -= dirY * dist * blendFactor;
+
         if (toDot < -0.5) {
-            const perpFactor = 0.08 * distFactor;
-            p2.x += perpX * perpSign * dist * perpFactor;
-            p2.y += perpY * perpSign * dist * perpFactor;
+            const perpX = -toDir.y;
+            const perpY = toDir.x;
+            const perpSign = (perpX * (-dirX) + perpY * (-dirY)) >= 0 ? 1 : -1;
+            p2.x += perpX * perpSign * dist * 0.1;
+            p2.y += perpY * perpSign * dist * 0.1;
         }
     }
 
