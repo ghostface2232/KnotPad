@@ -119,16 +119,36 @@ function setupSidebarEvents() {
     const sidebar = $('sidebar');
     const sidebarToggle = $('sidebarToggle');
     const sidebarPinBtn = $('sidebarPinBtn');
+    const sidebarBackdrop = $('sidebarBackdrop');
+
+    // Helper to toggle sidebar with backdrop
+    const toggleSidebar = (open) => {
+        const isOpen = open !== undefined ? open : !sidebar.classList.contains('open');
+        sidebar.classList.toggle('open', isOpen);
+        if (sidebarBackdrop) {
+            sidebarBackdrop.classList.toggle('active', isOpen);
+        }
+        state.setSidebarOpen(isOpen);
+    };
 
     // Restore sidebar open state from localStorage
     if (state.sidebarOpen) {
         sidebar.classList.add('open');
+        if (sidebarBackdrop && window.innerWidth <= 768) {
+            sidebarBackdrop.classList.add('active');
+        }
     }
 
     sidebarToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('open');
-        state.setSidebarOpen(sidebar.classList.contains('open'));
+        toggleSidebar();
     });
+
+    // Close sidebar when clicking backdrop (mobile)
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', () => {
+            toggleSidebar(false);
+        });
+    }
 
     if (state.sidebarPinned) sidebarPinBtn.classList.add('pinned');
 
