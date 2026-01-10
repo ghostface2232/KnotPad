@@ -249,7 +249,7 @@ input, textarea, button { font-family: inherit; }
 .memo-body li { margin: 0.1em 0; }
 
 /* Markdown toolbar */
-.memo-toolbar { display: flex; gap: 4px; padding: 8px 12px; position: absolute; bottom: 0; left: 0; right: 0; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s; background: var(--bg-primary); border-top: 1px solid var(--border-subtle); border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.memo-toolbar { display: flex; gap: 4px; padding: 8px 12px; position: absolute; bottom: 0; left: 0; right: 0; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s; background: var(--bg-card); border-top: 1px solid var(--border-subtle); border-radius: 0 0 var(--radius-md) var(--radius-md); }
 .memo-toolbar.active, .canvas-item:hover .memo-toolbar { opacity: 1; visibility: visible; }
 .md-btn { width: 28px; height: 28px; border: none; background: var(--bg-hover); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .md-btn svg { transform: scale(0.8); }
