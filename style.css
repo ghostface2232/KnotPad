@@ -249,15 +249,12 @@ input, textarea, button { font-family: inherit; }
 .memo-body li { margin: 0.1em 0; }
 
 /* Markdown toolbar */
-.memo-toolbar { display: flex; gap: 4px; padding: 8px 12px; position: absolute; bottom: 0; left: 0; right: 0; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s; background: var(--tag-color, var(--bg-primary)); border-top: 1px solid var(--border-subtle); border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.memo-toolbar { display: flex; gap: 4px; padding: 8px 12px; position: absolute; bottom: 0; left: 0; right: 0; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s; background: var(--bg-primary); border-top: 1px solid var(--border-subtle); border-radius: 0 0 var(--radius-md) var(--radius-md); }
 .memo-toolbar.active, .canvas-item:hover .memo-toolbar { opacity: 1; visibility: visible; }
 .md-btn { width: 28px; height: 28px; border: none; background: var(--bg-hover); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .md-btn svg { transform: scale(0.8); }
 .md-btn:hover { background: var(--accent-glow); color: var(--accent); }
 .md-btn:active { transform: scale(0.95); }
-.canvas-item.has-color .memo-toolbar { border-top-color: rgba(0, 0, 0, 0.15); }
-.canvas-item.has-color .md-btn { background: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.9); }
-.canvas-item.has-color .md-btn:hover { background: rgba(0, 0, 0, 0.35); color: white; }
 
 /* Font size variants */
 .canvas-item.font-size-medium .memo-body { font-size: 15px; }
