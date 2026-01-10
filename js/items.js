@@ -500,10 +500,16 @@ function setupItemEvents(item) {
             }, 1000);
         });
 
-        // Handle blur - hide toolbar and save state if changed
+        // Handle blur - save state if changed
         mb.addEventListener('blur', () => {
             el.classList.remove('editing');
-            toolbar.classList.remove('active');
+            // Hide toolbar after a short delay (allows clicking toolbar buttons)
+            setTimeout(() => {
+                const sel = window.getSelection();
+                if (!sel.rangeCount || sel.isCollapsed || !mb.contains(sel.anchorNode)) {
+                    toolbar.classList.remove('active');
+                }
+            }, 150);
             // Clear pending debounce timer
             if (undoSaveTimer) {
                 clearTimeout(undoSaveTimer);
@@ -517,16 +523,73 @@ function setupItemEvents(item) {
             }
         });
 
-        // Show toolbar on focus and record current state for undo
+        // Record current state for undo on focus
         mb.addEventListener('focus', () => {
             el.classList.add('editing');
-            toolbar.classList.add('active');
             // Record content before editing starts
             contentBeforeEdit = item.content;
             hasUnsavedChanges = false;
         });
 
-        // Block image paste in memo and strip text/background colors
+        // Function to show toolbar near selection
+        function showToolbarNearSelection() {
+            const sel = window.getSelection();
+            if (!sel.rangeCount || sel.isCollapsed) {
+                toolbar.classList.remove('active');
+                return;
+            }
+
+            // Check if selection is within this memo
+            if (!mb.contains(sel.anchorNode) || !mb.contains(sel.focusNode)) {
+                toolbar.classList.remove('active');
+                return;
+            }
+
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            // Position toolbar above the selection
+            const toolbarHeight = 40; // Approximate toolbar height
+            const toolbarWidth = 180; // Approximate toolbar width
+            let left = rect.left + (rect.width / 2) - (toolbarWidth / 2);
+            let top = rect.top - toolbarHeight - 8;
+
+            // Keep toolbar within viewport
+            if (left < 8) left = 8;
+            if (left + toolbarWidth > window.innerWidth - 8) {
+                left = window.innerWidth - toolbarWidth - 8;
+            }
+            if (top < 8) {
+                // If not enough space above, show below selection
+                top = rect.bottom + 8;
+            }
+
+            toolbar.style.left = left + 'px';
+            toolbar.style.top = top + 'px';
+            toolbar.classList.add('active');
+        }
+
+        // Show toolbar on text selection
+        mb.addEventListener('mouseup', () => {
+            // Small delay to ensure selection is finalized
+            setTimeout(showToolbarNearSelection, 10);
+        });
+
+        // Also handle keyboard selection (Shift+Arrow keys)
+        mb.addEventListener('keyup', e => {
+            if (e.shiftKey || e.key === 'Shift') {
+                setTimeout(showToolbarNearSelection, 10);
+            }
+        });
+
+        // Hide toolbar when clicking elsewhere
+        document.addEventListener('mousedown', e => {
+            if (!toolbar.contains(e.target) && !mb.contains(e.target)) {
+                toolbar.classList.remove('active');
+            }
+        });
+
+        // Block image paste in memo and strip all formatting except allowed tags
         mb.addEventListener('paste', e => {
             const cd = e.clipboardData;
             if (!cd) return;
@@ -539,58 +602,68 @@ function setupItemEvents(item) {
                 }
             }
 
-            // Process HTML to remove text color and background color
+            // Process HTML to keep only allowed formatting: h1, h2, h3, strong, em, strike, u
             const html = cd.getData('text/html');
             if (html) {
                 e.preventDefault();
-                // Parse HTML and strip color styles
                 const temp = document.createElement('div');
                 temp.innerHTML = html;
 
-                // Convert ordered lists to text-based numbering to preserve numbers correctly
-                temp.querySelectorAll('ol').forEach(ol => {
-                    const startNum = parseInt(ol.getAttribute('start'), 10) || 1;
-                    const items = ol.querySelectorAll(':scope > li');
-                    items.forEach((li, index) => {
-                        // Check if li has explicit value attribute
-                        const liValue = li.getAttribute('value');
-                        const num = liValue ? parseInt(liValue, 10) : startNum + index;
-                        // Prepend the number to the list item content
-                        li.innerHTML = num + '. ' + li.innerHTML;
+                // Allowed tags (case-insensitive)
+                const allowedTags = ['H1', 'H2', 'H3', 'STRONG', 'B', 'EM', 'I', 'STRIKE', 'S', 'DEL', 'U', 'BR', 'DIV', 'P', 'SPAN'];
+
+                // Function to clean an element recursively
+                function cleanElement(el) {
+                    // Process children first (bottom-up)
+                    const children = Array.from(el.childNodes);
+                    children.forEach(child => {
+                        if (child.nodeType === Node.ELEMENT_NODE) {
+                            cleanElement(child);
+                        }
                     });
-                    // Convert ol to div to remove list styling
-                    const div = document.createElement('div');
-                    div.innerHTML = ol.innerHTML;
-                    ol.replaceWith(div);
-                });
 
-                // Convert unordered lists to text-based format
-                temp.querySelectorAll('ul').forEach(ul => {
-                    const items = ul.querySelectorAll(':scope > li');
-                    items.forEach(li => {
-                        li.innerHTML = '- ' + li.innerHTML;
-                    });
-                    // Convert ul to div
-                    const div = document.createElement('div');
-                    div.innerHTML = ul.innerHTML;
-                    ul.replaceWith(div);
-                });
+                    // For the element itself, if it's not an allowed tag, unwrap it
+                    if (el.nodeType === Node.ELEMENT_NODE && el !== temp) {
+                        const tagName = el.tagName;
 
-                // Convert remaining li elements to div with line break
-                temp.querySelectorAll('li').forEach(li => {
-                    const div = document.createElement('div');
-                    div.innerHTML = li.innerHTML;
-                    li.replaceWith(div);
-                });
+                        // Convert B to STRONG, I to EM, S/DEL to STRIKE for consistency
+                        if (tagName === 'B') {
+                            const strong = document.createElement('strong');
+                            strong.innerHTML = el.innerHTML;
+                            el.replaceWith(strong);
+                            return;
+                        }
+                        if (tagName === 'I') {
+                            const em = document.createElement('em');
+                            em.innerHTML = el.innerHTML;
+                            el.replaceWith(em);
+                            return;
+                        }
+                        if (tagName === 'S' || tagName === 'DEL') {
+                            const strike = document.createElement('strike');
+                            strike.innerHTML = el.innerHTML;
+                            el.replaceWith(strike);
+                            return;
+                        }
 
-                temp.querySelectorAll('*').forEach(el => {
-                    el.style.color = '';
-                    el.style.backgroundColor = '';
-                    el.style.background = '';
-                    // Also remove color attribute
-                    el.removeAttribute('color');
-                    el.removeAttribute('bgcolor');
-                });
+                        // If not allowed, unwrap (keep children, remove wrapper)
+                        if (!allowedTags.includes(tagName)) {
+                            const fragment = document.createDocumentFragment();
+                            while (el.firstChild) {
+                                fragment.appendChild(el.firstChild);
+                            }
+                            el.replaceWith(fragment);
+                            return;
+                        }
+
+                        // If allowed tag, strip all attributes and styles
+                        while (el.attributes.length > 0) {
+                            el.removeAttribute(el.attributes[0].name);
+                        }
+                    }
+                }
+
+                cleanElement(temp);
                 document.execCommand('insertHTML', false, temp.innerHTML);
             }
             // Plain text falls through to default behavior
@@ -748,6 +821,9 @@ function setupItemEvents(item) {
                     contentBeforeEdit = item.content;
                     hasUnsavedChanges = false;
                 }
+
+                // Update toolbar position after formatting
+                setTimeout(showToolbarNearSelection, 10);
             });
         });
     }
