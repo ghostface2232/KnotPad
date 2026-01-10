@@ -498,6 +498,12 @@ function setupItemEvents(item) {
         mb.addEventListener('keydown', e => {
             if (e.key !== 'Enter' || e.shiftKey) return;
 
+            // Skip list continuation if we just cancelled a list
+            if (mb._listCancelled) {
+                delete mb._listCancelled;
+                return; // Allow default Enter behavior
+            }
+
             const sel = window.getSelection();
             if (!sel.rangeCount) return;
 
@@ -576,6 +582,9 @@ function setupItemEvents(item) {
                     for (let i = 0; i < prefixLen; i++) {
                         document.execCommand('delete', false, null);
                     }
+
+                    // Set flag to prevent list from reappearing on next Enter
+                    mb._listCancelled = true;
                 } else {
                     // Continue the list
                     let prefix;
