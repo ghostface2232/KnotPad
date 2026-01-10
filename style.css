@@ -230,7 +230,7 @@ input, textarea, button { font-family: inherit; }
 .item-image { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; border-radius: calc(var(--radius-md) - 1px); }
 .item-video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
 
-.item-memo { padding: 12px; padding-bottom: 0; height: 100%; display: flex; flex-direction: column; }
+.item-memo { padding: 12px; padding-bottom: 0; height: 100%; display: flex; flex-direction: column; position: relative; }
 .memo-body { flex: 1; font-size: 13px; line-height: 1.6; color: var(--text-primary); border: none; background: transparent; outline: none; resize: none; width: 100%; overflow-y: auto; min-height: 40px; cursor: text; }
 .memo-body:empty::before { content: attr(data-placeholder); color: var(--text-placeholder); pointer-events: none; }
 .memo-body::-webkit-scrollbar { width: 4px; }
@@ -249,8 +249,8 @@ input, textarea, button { font-family: inherit; }
 .memo-body li { margin: 0.1em 0; }
 
 /* Markdown toolbar */
-.memo-toolbar { display: flex; gap: 4px; padding: 8px 0; margin-top: auto; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s; border-top: 1px solid transparent; }
-.memo-toolbar.active, .canvas-item:hover .memo-toolbar { opacity: 1; visibility: visible; border-top-color: var(--border-subtle); }
+.memo-toolbar { display: flex; gap: 4px; padding: 8px 12px; position: absolute; bottom: 0; left: 0; right: 0; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s; background: var(--bg-primary); border-top: 1px solid var(--border-subtle); border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.memo-toolbar.active, .canvas-item:hover .memo-toolbar { opacity: 1; visibility: visible; }
 .md-btn { width: 28px; height: 28px; border: none; background: var(--bg-hover); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .md-btn svg { transform: scale(0.8); }
 .md-btn:hover { background: var(--accent-glow); color: var(--accent); }
