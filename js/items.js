@@ -334,6 +334,12 @@ function setupItemEvents(item) {
 
             if (isInPaddingArea) {
                 e.preventDefault();  // Prevent text focus
+
+                // Allow event to bubble up for Alt+drag duplication
+                if (e.altKey) {
+                    return;
+                }
+
                 e.stopPropagation();
 
                 // Bring item to top
