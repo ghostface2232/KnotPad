@@ -179,13 +179,16 @@ function setupItemEvents(item) {
         // Always bring item to top when clicking anywhere on it (including memo-body)
         el.style.zIndex = state.incrementHighestZ();
 
-        // Skip drag for interactive elements and contenteditable
+        // Skip drag for interactive elements
         if (t.classList.contains('delete-btn') || t.classList.contains('resize-handle') ||
             t.classList.contains('connection-handle') || t.classList.contains('add-child-btn') ||
             t.classList.contains('color-btn') || t.classList.contains('font-size-btn') ||
             t.classList.contains('color-opt') || t.closest('.color-picker') ||
-            t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
-            isContentEditable) {
+            t.tagName === 'VIDEO' || t.tagName === 'A' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') {
+            return;
+        }
+        // Skip drag for contenteditable, but allow Alt+drag for duplication
+        if (isContentEditable && !e.altKey) {
             return;
         }
         if (item.locked) return;
