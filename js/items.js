@@ -838,7 +838,7 @@ export function setItemFontSize(item) {
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
-// Auto-resize item based on content - fit to content height
+// Auto-resize item based on content - fit to content height (line-by-line)
 export function autoResizeItem(item) {
     if (item.type !== 'memo') return;
     // Skip auto-resize if user manually resized
@@ -853,25 +853,44 @@ export function autoResizeItem(item) {
     else if (item.fontSize === 'xlarge') fontMultiplier = 1.7;
 
     // Get minimum and maximum height based on font size
-    const minH = Math.round(120 * fontMultiplier);
-    const maxH = Math.round(500 * fontMultiplier);
+    const minH = Math.round(140 * fontMultiplier);
+    const maxH = Math.round(600 * fontMultiplier);
 
-    // Get line height for line-based change detection
+    // Get line height for line-based sizing
     const style = window.getComputedStyle(memoBody);
     const lineHeight = parseFloat(style.lineHeight) || 20;
-
-    // Use scrollHeight to measure actual content including word-wrap
-    const contentH = memoBody.scrollHeight;
 
     // Memo layout: padding(12*2=24) + toolbar(~38) + buffer(3)
     const extraH = 24 + 38 + 3;
 
-    // Calculate new height - fit to content within min/max bounds
-    const targetH = contentH + extraH;
-    const newH = Math.max(minH, Math.min(targetH, maxH));
+    // Calculate current content area height
+    const currentContentArea = item.h - extraH;
 
-    // Only update if change is at least half a line (prevents jitter)
-    if (Math.abs(newH - item.h) >= lineHeight / 2) {
+    // Use scrollHeight to measure actual content including word-wrap
+    const contentH = memoBody.scrollHeight;
+
+    // Calculate how many lines fit in current height vs how many lines content needs
+    const currentLines = Math.floor(currentContentArea / lineHeight);
+    const neededLines = Math.ceil(contentH / lineHeight);
+
+    // Only expand when content actually overflows (needs more lines than available)
+    // Only shrink when content needs significantly fewer lines (at least 1 full line less)
+    let newH = item.h;
+
+    if (contentH > currentContentArea + 2) {
+        // Content overflows - expand by exactly the lines needed
+        const linesToAdd = neededLines - currentLines;
+        newH = item.h + (linesToAdd * lineHeight);
+    } else if (currentContentArea - contentH > lineHeight) {
+        // Content has shrunk by more than one line - shrink to fit
+        newH = Math.round(neededLines * lineHeight) + extraH;
+    }
+
+    // Apply bounds
+    newH = Math.max(minH, Math.min(newH, maxH));
+
+    // Only update if there's an actual change (at least 1 pixel difference)
+    if (Math.abs(newH - item.h) >= 1) {
         item.h = newH;
         item.el.style.height = item.h + 'px';
         eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
@@ -997,7 +1016,58 @@ function getDefaultHeight(fontSize) {
     else if (fontSize === 'large') fontMultiplier = 1.4;
     else if (fontSize === 'xlarge') fontMultiplier = 1.7;
 
-    return Math.round(120 * fontMultiplier);
+    return Math.round(140 * fontMultiplier);
+}
+
+// Calculate memo size based on text content
+function calculateMemoSizeForText(text, fontSize) {
+    if (!text) return null;
+
+    let fontMultiplier = 1;
+    if (fontSize === 'medium') fontMultiplier = 1.15;
+    else if (fontSize === 'large') fontMultiplier = 1.4;
+    else if (fontSize === 'xlarge') fontMultiplier = 1.7;
+
+    const baseFontSize = 13 * fontMultiplier;
+    const lineHeight = baseFontSize * 1.6;
+    const charWidth = baseFontSize * 0.6; // Approximate character width
+
+    // Split text into lines
+    const lines = text.split('\n');
+    const lineCount = lines.length;
+
+    // Find the longest line
+    let maxLineLength = 0;
+    for (const line of lines) {
+        if (line.length > maxLineLength) {
+            maxLineLength = line.length;
+        }
+    }
+
+    // Calculate width based on longest line (min 220, max 500)
+    const baseWidth = 220;
+    const padding = 24; // 12px * 2
+    const contentWidth = maxLineLength * charWidth + padding;
+    const width = Math.max(baseWidth, Math.min(contentWidth, 500));
+
+    // Calculate height based on line count
+    // Account for word wrapping: estimate how many wrapped lines there will be
+    const availableWidth = width - padding;
+    let totalLines = 0;
+    for (const line of lines) {
+        const lineWidth = line.length * charWidth;
+        const wrappedLines = Math.max(1, Math.ceil(lineWidth / availableWidth));
+        totalLines += wrappedLines;
+    }
+
+    // Height: content + padding(24) + toolbar area(38) + buffer(3)
+    const extraH = 24 + 38 + 3;
+    const minH = Math.round(140 * fontMultiplier);
+    const maxH = Math.round(600 * fontMultiplier);
+    const contentHeight = totalLines * lineHeight;
+    const height = Math.max(minH, Math.min(contentHeight + extraH, maxH));
+
+    return { w: Math.round(width), h: Math.round(height) };
 }
 
 // Add memo
@@ -1005,13 +1075,18 @@ export function addMemo(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
     // Apply default font size setting
     const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
+
+    // Calculate size based on text content if provided
+    const calculatedSize = text ? calculateMemoSizeForText(text, fontSize) : null;
+    const defaultW = 220;
     const defaultH = getDefaultHeight(fontSize);
+
     const item = createItem({
         type: 'memo',
         x: pos.x,
         y: pos.y,
-        w: 180,
-        h: defaultH,
+        w: calculatedSize ? calculatedSize.w : defaultW,
+        h: calculatedSize ? calculatedSize.h : defaultH,
         content: text,
         color,
         fontSize
