@@ -403,8 +403,9 @@ function setupItemEvents(item) {
             }, 1000);
         });
 
-        // Handle blur - save state if changed
+        // Handle blur - hide toolbar and save state if changed
         mb.addEventListener('blur', () => {
+            toolbar.classList.remove('active');
             // Clear pending debounce timer
             if (undoSaveTimer) {
                 clearTimeout(undoSaveTimer);
@@ -418,8 +419,9 @@ function setupItemEvents(item) {
             }
         });
 
-        // Record current state for undo on focus
+        // Show toolbar on focus and record current state for undo
         mb.addEventListener('focus', () => {
+            toolbar.classList.add('active');
             // Record content before editing starts
             contentBeforeEdit = item.content;
             hasUnsavedChanges = false;
