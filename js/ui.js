@@ -352,20 +352,40 @@ async function loadCanvasData(id) {
             updateTransform();
         }
 
-        // Load media
+        // Load media with retry logic for better persistence
         const mediaItems = data.items.filter(d => (d.type === 'image' || d.type === 'video') && d.content?.startsWith('media_'));
-        for (const d of mediaItems) {
-            if (!state.blobURLCache.has(d.content)) {
-                let blob = null;
-                if (fsDirectoryHandle) {
-                    blob = await loadMediaFromFileSystem(d.content);
+        const loadMediaWithRetry = async (mediaId, retries = 2) => {
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    let blob = null;
+                    if (fsDirectoryHandle) {
+                        blob = await loadMediaFromFileSystem(mediaId);
+                    }
+                    if (!blob) {
+                        blob = await loadMedia(mediaId);
+                    }
+                    if (blob) {
+                        state.blobURLCache.set(mediaId, URL.createObjectURL(blob));
+                        return true;
+                    }
+                } catch (e) {
+                    console.warn(`Media load attempt ${attempt + 1} failed for ${mediaId}:`, e);
                 }
-                if (!blob) {
-                    blob = await loadMedia(d.content);
+                if (attempt < retries) {
+                    await new Promise(r => setTimeout(r, 100 * Math.pow(2, attempt)));
                 }
-                if (blob) state.blobURLCache.set(d.content, URL.createObjectURL(blob));
             }
-        }
+            console.warn(`Failed to load media after retries: ${mediaId}`);
+            return false;
+        };
+
+        // Load all media in parallel for better performance
+        await Promise.all(mediaItems.map(d => {
+            if (!state.blobURLCache.has(d.content)) {
+                return loadMediaWithRetry(d.content);
+            }
+            return Promise.resolve(true);
+        }));
 
         const map = {};
         data.items.forEach(d => {
