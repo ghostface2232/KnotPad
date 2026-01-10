@@ -266,7 +266,7 @@ input, textarea, button { font-family: inherit; }
 }
 
 .item-memo { padding: 12px; padding-bottom: 0; height: 100%; display: flex; flex-direction: column; position: relative; }
-.memo-body { flex: 1; font-size: 13px; line-height: 1.6; color: var(--text-primary); border: none; background: transparent; outline: none; resize: none; width: 100%; overflow-y: auto; min-height: 40px; cursor: text; word-wrap: break-word; overflow-wrap: break-word; white-space: pre-wrap; }
+.memo-body { flex: 1; font-size: 13px; line-height: 1.6; color: var(--text-primary); border: none; background: transparent; outline: none; resize: none; width: 100%; overflow-y: auto; min-height: 40px; cursor: text; word-wrap: break-word; overflow-wrap: break-word; }
 .memo-body:empty::before { content: attr(data-placeholder); color: var(--text-placeholder); pointer-events: none; }
 .memo-body::-webkit-scrollbar { width: 4px; }
 .memo-body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
