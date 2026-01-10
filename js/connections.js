@@ -355,6 +355,7 @@ export function deleteConnection(c, save = true, withFade = true) {
     if (i > -1) {
         state.connections.splice(i, 1);
         state.setSelectedConn(null);
+        connDirectionPicker.classList.remove('active');
 
         if (withFade) {
             // Add fade animation then remove
