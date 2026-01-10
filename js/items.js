@@ -4,7 +4,7 @@ import { COLORS, COLOR_MAP, FONT_SIZES } from './constants.js';
 import { $, esc, findFreePosition } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap, updateMinimap } from './viewport.js';
-import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle } from './storage.js';
+import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle, loadMedia, loadMediaFromFileSystem } from './storage.js';
 import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
@@ -83,6 +83,85 @@ function getHtmlContent(el) {
 // CONNECTIONS_UPDATE, CONNECTIONS_DELETE, UI_SHOW_CHILD_TYPE_PICKER,
 // CONNECTIONS_START, CONNECTIONS_COMPLETE, UI_SHOW_CONTEXT_MENU
 
+// ============ Media Reload (for broken blob URLs) ============
+
+// Reload media from storage when blob URL becomes invalid (e.g., after hard refresh)
+async function reloadMediaSource(mediaElement, mediaId, retryCount = 0) {
+    const MAX_RETRIES = 2;
+
+    if (retryCount >= MAX_RETRIES) {
+        console.warn(`Failed to reload media after ${MAX_RETRIES} attempts:`, mediaId);
+        mediaElement.closest('.canvas-item')?.classList.add('media-load-failed');
+        return false;
+    }
+
+    try {
+        // Try file system first, then IndexedDB
+        let blob = null;
+        if (fsDirectoryHandle) {
+            blob = await loadMediaFromFileSystem(mediaId);
+        }
+        if (!blob) {
+            blob = await loadMedia(mediaId);
+        }
+
+        if (blob) {
+            // Revoke old URL if exists
+            const oldUrl = state.blobURLCache.get(mediaId);
+            if (oldUrl) {
+                URL.revokeObjectURL(oldUrl);
+            }
+
+            // Create new blob URL and update cache
+            const newUrl = URL.createObjectURL(blob);
+            state.blobURLCache.set(mediaId, newUrl);
+
+            // Update media element source
+            mediaElement.src = newUrl;
+            mediaElement.closest('.canvas-item')?.classList.remove('media-load-failed');
+            return true;
+        }
+    } catch (e) {
+        console.error('Error reloading media:', e);
+    }
+
+    // Retry with exponential backoff
+    await new Promise(r => setTimeout(r, 100 * Math.pow(2, retryCount)));
+    return reloadMediaSource(mediaElement, mediaId, retryCount + 1);
+}
+
+// Setup error handler for media elements to auto-reload on failure
+function setupMediaErrorHandler(mediaElement, mediaId) {
+    if (!mediaId || !mediaId.startsWith('media_')) return;
+
+    // Track if we're already attempting to reload
+    let isReloading = false;
+
+    const handleError = async () => {
+        if (isReloading) return;
+        isReloading = true;
+
+        const itemEl = mediaElement.closest('.canvas-item');
+        itemEl?.classList.add('media-loading');
+
+        const success = await reloadMediaSource(mediaElement, mediaId);
+
+        itemEl?.classList.remove('media-loading');
+        isReloading = false;
+
+        if (!success) {
+            console.warn('Media reload failed for:', mediaId);
+        }
+    };
+
+    mediaElement.addEventListener('error', handleError);
+
+    // Also handle case where src is empty (blob URL wasn't cached)
+    if (!mediaElement.src || mediaElement.src === window.location.href) {
+        handleError();
+    }
+}
+
 // Create an item on the canvas
 export function createItem(cfg, loading = false) {
     const el = document.createElement('div');
@@ -135,6 +214,15 @@ export function createItem(cfg, loading = false) {
     el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>${fontSizeBtn}<button class="color-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="2" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r="2" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>${memoToolbar}`;
 
     canvas.appendChild(el);
+
+    // Setup media error handlers for auto-reload on broken blob URLs
+    if (cfg.type === 'image' && cfg.content?.startsWith('media_')) {
+        const imgEl = el.querySelector('.item-image');
+        if (imgEl) setupMediaErrorHandler(imgEl, cfg.content);
+    } else if (cfg.type === 'video' && cfg.content?.startsWith('media_')) {
+        const videoEl = el.querySelector('.item-video');
+        if (videoEl) setupMediaErrorHandler(videoEl, cfg.content);
+    }
 
     const item = {
         id: cfg.id || `i${state.incrementItemId()}`,
