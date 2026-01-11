@@ -288,6 +288,7 @@ input, textarea, button { font-family: inherit; }
 .md-btn svg { transform: scale(0.8); }
 .md-btn:hover { background: var(--accent-glow); color: var(--accent); }
 .md-btn:active { transform: scale(0.95); }
+.memo-toolbar .toolbar-sep { width: 1px; height: 20px; background: var(--border-subtle); margin: 4px 4px; flex-shrink: 0; }
 
 /* Font size variants */
 .canvas-item.font-size-medium .memo-body { font-size: 15px; }
