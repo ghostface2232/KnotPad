@@ -138,9 +138,9 @@ function setupSidebarEvents() {
         sidebarPinBtn.classList.toggle('pinned', state.sidebarPinned);
     });
 
-    $('addCanvasBtn').addEventListener('click', () => {
-        saveCurrentCanvas();
-        createNewCanvas();
+    $('addCanvasBtn').addEventListener('click', async () => {
+        await saveCurrentCanvas();
+        await createNewCanvas();
     });
 
     $('addGroupBtn').addEventListener('click', () => {
