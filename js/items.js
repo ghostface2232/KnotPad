@@ -560,13 +560,31 @@ function setupItemEvents(item) {
             }
 
             // Check if selection is within this memo
-            if (!mb.contains(sel.anchorNode) || !mb.contains(sel.focusNode)) {
+            // anchorNode or focusNode could be null in edge cases
+            if (!sel.anchorNode || !sel.focusNode ||
+                !mb.contains(sel.anchorNode) || !mb.contains(sel.focusNode)) {
                 toolbar.classList.remove('active');
                 return;
             }
 
             const range = sel.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
+            let rect = range.getBoundingClientRect();
+
+            // Handle edge case where rect is empty (e.g., empty lines selected)
+            if (rect.width === 0 && rect.height === 0) {
+                // Try to get rect from the anchor node's parent element
+                const parentEl = sel.anchorNode.parentElement;
+                if (parentEl) {
+                    const parentRect = parentEl.getBoundingClientRect();
+                    if (parentRect.width > 0 || parentRect.height > 0) {
+                        rect = parentRect;
+                    }
+                }
+                // If still empty, use the memo body rect as fallback
+                if (rect.width === 0 && rect.height === 0) {
+                    rect = mb.getBoundingClientRect();
+                }
+            }
 
             // Position toolbar above the selection
             // Measure actual toolbar height by temporarily showing it offscreen
@@ -605,10 +623,62 @@ function setupItemEvents(item) {
             setTimeout(showToolbarNearSelection, 10);
         });
 
-        // Also handle keyboard selection (Shift+Arrow keys)
+        // Handle double-click (word selection) and triple-click (paragraph selection)
+        mb.addEventListener('dblclick', () => {
+            setTimeout(showToolbarNearSelection, 10);
+        });
+
+        // Handle all keyboard-based selections:
+        // - Shift+Arrow keys
+        // - Ctrl+A (select all)
+        // - Ctrl+Shift+End/Home (select to end/beginning)
+        // - Any other keyboard selection method
         mb.addEventListener('keyup', e => {
-            if (e.shiftKey || e.key === 'Shift') {
+            // Check for any selection-related key combinations
+            const isSelectionKey = e.shiftKey ||
+                                   e.key === 'Shift' ||
+                                   (e.ctrlKey && e.key.toLowerCase() === 'a') ||
+                                   (e.metaKey && e.key.toLowerCase() === 'a'); // Mac support
+            if (isSelectionKey) {
                 setTimeout(showToolbarNearSelection, 10);
+            }
+        });
+
+        // Use selectionchange event to catch ALL selection methods
+        // This covers: Ctrl+A, context menu "Select All", programmatic selection, etc.
+        let selectionChangeTimeout = null;
+        const handleSelectionChange = () => {
+            // Debounce to avoid excessive calls
+            if (selectionChangeTimeout) {
+                clearTimeout(selectionChangeTimeout);
+            }
+            selectionChangeTimeout = setTimeout(() => {
+                const sel = window.getSelection();
+                // Only handle if selection is within this memo and memo is being edited
+                // Check: selection exists, not collapsed, anchor is in this memo,
+                // and either this memo has focus or is in editing mode
+                const isEditingThisMemo = el.classList.contains('editing') ||
+                                          document.activeElement === mb ||
+                                          mb.contains(document.activeElement);
+                if (sel && !sel.isCollapsed &&
+                    sel.anchorNode && mb.contains(sel.anchorNode) &&
+                    isEditingThisMemo) {
+                    showToolbarNearSelection();
+                }
+            }, 10);
+        };
+
+        // Add selectionchange listener when memo gets focus
+        mb.addEventListener('focus', () => {
+            document.addEventListener('selectionchange', handleSelectionChange);
+        });
+
+        // Remove selectionchange listener when memo loses focus (cleanup)
+        mb.addEventListener('blur', () => {
+            document.removeEventListener('selectionchange', handleSelectionChange);
+            if (selectionChangeTimeout) {
+                clearTimeout(selectionChangeTimeout);
+                selectionChangeTimeout = null;
             }
         });
 
