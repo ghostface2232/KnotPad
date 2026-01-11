@@ -1349,6 +1349,14 @@ export function setupSettingsModal() {
         exportAllBtn.addEventListener('click', exportAllCanvases);
     }
 
+    // Import all canvases
+    const importAllBtn = $('importAllBtn');
+    const importAllInput = $('importAllInput');
+    if (importAllBtn && importAllInput) {
+        importAllBtn.addEventListener('click', () => importAllInput.click());
+        importAllInput.addEventListener('change', importAllCanvases);
+    }
+
     // Default font size
     const fontSizeGroup = $('defaultFontSize');
     if (fontSizeGroup) {
@@ -1411,6 +1419,67 @@ async function exportAllCanvases() {
         console.error('Export failed:', e);
         showToast('Export failed', 'error');
     }
+}
+
+async function importAllCanvases(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const allData = JSON.parse(text);
+
+        // Validate format
+        if (!allData.version || !allData.canvases || !allData.data) {
+            showToast('Invalid file format', 'error');
+            e.target.value = '';
+            return;
+        }
+
+        // Confirm with user
+        const canvasCount = allData.canvases.length;
+        const confirmed = confirm(`This will import ${canvasCount} canvas(es). Existing canvases with the same ID will be overwritten. Continue?`);
+        if (!confirmed) {
+            e.target.value = '';
+            return;
+        }
+
+        // Import canvases
+        for (const canvas of allData.canvases) {
+            // Check if canvas already exists
+            const existingIndex = state.canvases.findIndex(c => c.id === canvas.id);
+            if (existingIndex >= 0) {
+                // Update existing canvas metadata
+                state.canvases[existingIndex] = { ...canvas };
+            } else {
+                // Add new canvas
+                state.canvases.push({ ...canvas });
+            }
+
+            // Import canvas data
+            if (allData.data[canvas.id]) {
+                localStorage.setItem('knotpad-data-' + canvas.id, JSON.stringify(allData.data[canvas.id]));
+            }
+        }
+
+        // Save updated canvas list
+        localStorage.setItem(CANVASES_KEY, JSON.stringify(state.canvases));
+
+        // Refresh sidebar
+        renderCanvasList();
+
+        // If current canvas was updated, reload it
+        if (allData.data[state.currentCanvasId]) {
+            await switchCanvas(state.currentCanvasId);
+        }
+
+        showToast(`Imported ${canvasCount} canvas(es) successfully`);
+    } catch (err) {
+        console.error('Import failed:', err);
+        showToast('Import failed', 'error');
+    }
+
+    e.target.value = '';
 }
 
 // ============ Auto Save ============

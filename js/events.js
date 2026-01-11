@@ -3,7 +3,7 @@
 import { $ } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, setZoom, throttledMinimap, startPan, updateMinimap } from './viewport.js';
-import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink } from './items.js';
+import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading } from './items.js';
 import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo } from './connections.js';
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
@@ -315,6 +315,23 @@ export function setupKeyboardEvents() {
             if (e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]')) {
                 e.preventDefault();
                 document.execCommand('strikeThrough', false, null);
+                return;
+            }
+        }
+        // Ctrl+I for italic in contenteditable
+        if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+            if (e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]')) {
+                e.preventDefault();
+                document.execCommand('italic', false, null);
+                return;
+            }
+        }
+        // Ctrl+H for heading toggle in contenteditable
+        if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+            const editableEl = e.target.matches('[contenteditable="true"]') ? e.target : e.target.closest('[contenteditable="true"]');
+            if (editableEl) {
+                e.preventDefault();
+                toggleHeading(editableEl);
                 return;
             }
         }

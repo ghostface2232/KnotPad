@@ -1086,7 +1086,7 @@ function hideMenus() {
     $('canvasIconPicker').classList.remove('active');
 }
 
-export { hideMenus };
+export { hideMenus, toggleHeading };
 
 // Delete selected items
 export function deleteSelectedItems() {

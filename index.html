@@ -286,6 +286,16 @@
                             Export All Canvases
                         </button>
                     </div>
+
+                    <div class="storage-export-section">
+                        <h4>Import All Data</h4>
+                        <p class="settings-description">Import all canvases from a previously exported JSON file.</p>
+                        <input type="file" id="importAllInput" accept=".json" style="display:none">
+                        <button class="modal-btn modal-btn-submit" id="importAllBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                            Import All Canvases
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Node Style Tab -->
@@ -401,12 +411,20 @@
                                 <span class="shortcut-desc">Bold</span>
                             </div>
                             <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>I</kbd></span>
+                                <span class="shortcut-desc">Italic</span>
+                            </div>
+                            <div class="shortcut-item">
                                 <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>U</kbd></span>
                                 <span class="shortcut-desc">Underline</span>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>D</kbd></span>
                                 <span class="shortcut-desc">Strikethrough</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>H</kbd></span>
+                                <span class="shortcut-desc">Heading (H1 → H2 → H3 → Normal)</span>
                             </div>
                         </div>
                     </div>
