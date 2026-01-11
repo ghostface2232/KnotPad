@@ -567,10 +567,15 @@ function setupItemEvents(item) {
             const rect = range.getBoundingClientRect();
 
             // Position toolbar above the selection
-            const toolbarHeight = 40; // Approximate toolbar height
+            // Measure actual toolbar height by temporarily showing it offscreen
+            toolbar.style.left = '-9999px';
+            toolbar.style.top = '-9999px';
+            toolbar.classList.add('active');
+            const toolbarHeight = toolbar.offsetHeight || 40;
+
             const toolbarWidth = 180; // Approximate toolbar width
             let left = rect.left + (rect.width / 2) - (toolbarWidth / 2);
-            let top = rect.top - toolbarHeight - 16;
+            let top = rect.top - toolbarHeight - 10;
 
             // Keep toolbar within viewport
             if (left < 8) left = 8;
