@@ -339,6 +339,8 @@ function setupItemEvents(item) {
     el.querySelector('.resize-handle').addEventListener('mousedown', e => {
         if (item.locked) return;
         e.stopPropagation();
+        // Store initial aspect ratio for proportional resize (Shift key)
+        item.initialAspectRatio = item.w / item.h;
         state.setResizingItem(item);
     });
 

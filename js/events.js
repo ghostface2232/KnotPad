@@ -184,8 +184,27 @@ export function setupMouseEvents() {
                 y = Math.round(y / state.GRID_SIZE) * state.GRID_SIZE;
             }
 
-            state.resizingItem.w = Math.max(140, x - state.resizingItem.x);
-            state.resizingItem.h = Math.max(80, y - state.resizingItem.y);
+            let newW = Math.max(140, x - state.resizingItem.x);
+            let newH = Math.max(80, y - state.resizingItem.y);
+
+            // Shift key: maintain aspect ratio (proportional resize)
+            if (e.shiftKey && state.resizingItem.initialAspectRatio) {
+                const aspectRatio = state.resizingItem.initialAspectRatio;
+                // Calculate height based on width to maintain ratio
+                const hFromW = newW / aspectRatio;
+                // Calculate width based on height to maintain ratio
+                const wFromH = newH * aspectRatio;
+
+                // Choose the dimension that fits within the drag bounds
+                if (hFromW <= newH) {
+                    newH = Math.max(80, hFromW);
+                } else {
+                    newW = Math.max(140, wFromH);
+                }
+            }
+
+            state.resizingItem.w = newW;
+            state.resizingItem.h = newH;
             state.resizingItem.el.style.width = state.resizingItem.w + 'px';
             state.resizingItem.el.style.height = state.resizingItem.h + 'px';
             updateAllConnections();
