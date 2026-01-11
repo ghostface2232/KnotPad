@@ -237,8 +237,6 @@ export function setupMouseEvents() {
                 state.setDraggedItem(null);
             }
             if (state.resizingItem) {
-                // Mark item as manually resized - disables auto-resize
-                state.resizingItem.manuallyResized = true;
                 saveState();
                 state.setResizingItem(null);
             }
