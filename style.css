@@ -30,6 +30,7 @@
     --tag-green: #22c55e; --tag-blue: #3b82f6; --tag-purple: #8b5cf6; --tag-pink: #ec4899;
     --conn-default: rgba(255, 255, 255, 0.35);
     --conn-hover: rgba(255, 255, 255, 0.6);
+    --bg-thumbnail: #1f1f23;
 }
 
 :root.light {
@@ -42,6 +43,7 @@
     --grid-color: rgba(0, 0, 0, 0.04); --scrollbar: rgba(0, 0, 0, 0.16); --danger: #dc2626;
     --conn-default: rgba(0, 0, 0, 0.3);
     --conn-hover: rgba(0, 0, 0, 0.5);
+    --bg-thumbnail: #ececee;
 }
 
 html, body {
@@ -626,7 +628,7 @@ input, textarea, button { font-family: inherit; }
 .canvas-item-entry:hover { background: var(--bg-hover); }
 .canvas-item-entry.active { background: var(--accent-glow); border: 1px solid var(--accent); }
 .canvas-item-entry .canvas-icon {
-    width: 32px; height: 32px; background: var(--bg-card);
+    width: 32px; height: 32px; background: var(--bg-thumbnail);
     border-radius: 6px; display: flex; align-items: center; justify-content: center;
     color: var(--text-secondary); flex-shrink: 0; cursor: pointer;
 }
