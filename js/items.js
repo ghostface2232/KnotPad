@@ -9,6 +9,25 @@ import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
 
+// ============ Global Event Delegation for Memo Toolbars ============
+// Single document-level listener instead of per-item listeners (prevents memory leaks)
+let memoToolbarDelegationInitialized = false;
+
+function initMemoToolbarDelegation() {
+    if (memoToolbarDelegationInitialized) return;
+    memoToolbarDelegationInitialized = true;
+
+    document.addEventListener('mousedown', e => {
+        // Hide all active memo toolbars when clicking outside
+        document.querySelectorAll('.memo-toolbar.active').forEach(toolbar => {
+            const memoBody = toolbar.closest('.canvas-item')?.querySelector('.memo-body');
+            if (memoBody && !toolbar.contains(e.target) && !memoBody.contains(e.target)) {
+                toolbar.classList.remove('active');
+            }
+        });
+    });
+}
+
 // ============ Content Parser (HTML-only, with legacy markdown migration) ============
 
 // Check if content is legacy markdown (no HTML tags)
@@ -581,12 +600,9 @@ function setupItemEvents(item) {
             }
         });
 
-        // Hide toolbar when clicking elsewhere
-        document.addEventListener('mousedown', e => {
-            if (!toolbar.contains(e.target) && !mb.contains(e.target)) {
-                toolbar.classList.remove('active');
-            }
-        });
+        // Initialize global event delegation for toolbar cleanup (once per module)
+        // This replaces per-item document listeners to prevent memory leaks
+        initMemoToolbarDelegation();
 
         // Block image paste in memo and strip all formatting except allowed tags
         mb.addEventListener('paste', e => {
