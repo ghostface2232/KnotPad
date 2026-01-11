@@ -594,8 +594,8 @@ function setupItemEvents(item) {
             const toolbarHeight = toolbar.offsetHeight || 40;
 
             const toolbarWidth = 180; // Approximate toolbar width
-            let left = rect.left + (rect.width / 2) - (toolbarWidth / 2);
-            let top = rect.top - toolbarHeight - 36;
+            let left = rect.left + (rect.width / 3) - (toolbarWidth / 3);
+            let top = rect.top - toolbarHeight - 28;
 
             // Keep toolbar within viewport
             if (left < 8) left = 8;
