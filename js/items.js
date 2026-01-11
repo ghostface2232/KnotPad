@@ -482,10 +482,9 @@ function setupItemEvents(item) {
             }
         });
 
-        // Handle input - save content and auto-resize
+        // Handle input - save content
         mb.addEventListener('input', () => {
             item.content = getHtmlContent(mb);
-            autoResizeItem(item);
             eventBus.emit(Events.AUTOSAVE_TRIGGER);
             hasUnsavedChanges = true;
 
@@ -811,7 +810,6 @@ function setupItemEvents(item) {
                 }
 
                 item.content = getHtmlContent(mb);
-                autoResizeItem(item);
                 eventBus.emit(Events.AUTOSAVE_TRIGGER);
                 hasUnsavedChanges = true;
 
@@ -909,69 +907,8 @@ export function setItemFontSize(item) {
     if (newSize) {
         item.el.classList.add('font-size-' + newSize);
     }
-    setTimeout(() => autoResizeItem(item), 10);
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
-}
-
-// Auto-resize item based on content - fit to content height (line-by-line)
-export function autoResizeItem(item) {
-    if (item.type !== 'memo') return;
-    // Skip auto-resize if user manually resized
-    if (item.manuallyResized) return;
-
-    const memoBody = item.el.querySelector('.memo-body');
-    if (!memoBody) return;
-
-    let fontMultiplier = 1;
-    if (item.fontSize === 'medium') fontMultiplier = 1.15;
-    else if (item.fontSize === 'large') fontMultiplier = 1.4;
-    else if (item.fontSize === 'xlarge') fontMultiplier = 1.7;
-
-    // Get minimum and maximum height based on font size
-    const minH = Math.round(140 * fontMultiplier);
-    const maxH = Math.round(600 * fontMultiplier);
-
-    // Get line height for line-based sizing
-    const style = window.getComputedStyle(memoBody);
-    const lineHeight = parseFloat(style.lineHeight) || 20;
-
-    // Memo layout: padding(12*2=24) + toolbar(~38) + buffer(3)
-    const extraH = 24 + 38 + 3;
-
-    // Calculate current content area height
-    const currentContentArea = item.h - extraH;
-
-    // Use scrollHeight to measure actual content including word-wrap
-    const contentH = memoBody.scrollHeight;
-
-    // Calculate how many lines fit in current height vs how many lines content needs
-    const currentLines = Math.floor(currentContentArea / lineHeight);
-    const neededLines = Math.ceil(contentH / lineHeight);
-
-    // Only expand when content actually overflows (needs more lines than available)
-    // Only shrink when content needs significantly fewer lines (at least 1 full line less)
-    let newH = item.h;
-
-    if (contentH > currentContentArea + 2) {
-        // Content overflows - expand by exactly the lines needed
-        const linesToAdd = neededLines - currentLines;
-        newH = item.h + (linesToAdd * lineHeight);
-    } else if (currentContentArea - contentH > lineHeight) {
-        // Content has shrunk by more than one line - shrink to fit
-        newH = Math.round(neededLines * lineHeight) + extraH;
-    }
-
-    // Apply bounds
-    newH = Math.max(minH, Math.min(newH, maxH));
-
-    // Only update if there's an actual change (at least 1 pixel difference)
-    if (Math.abs(newH - item.h) >= 1) {
-        item.h = newH;
-        item.el.style.height = item.h + 'px';
-        eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
-        throttledMinimap();
-    }
 }
 
 // Select an item
