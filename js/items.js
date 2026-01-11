@@ -582,6 +582,11 @@ function setupItemEvents(item) {
                 top = rect.bottom + 8;
             }
 
+            // Convert viewport coordinates to canvas coordinates
+            // Toolbar is inside transformed canvas, so position: fixed is relative to canvas
+            left = (left - state.offsetX) / state.scale;
+            top = (top - state.offsetY) / state.scale;
+
             toolbar.style.left = left + 'px';
             toolbar.style.top = top + 'px';
             toolbar.classList.add('active');

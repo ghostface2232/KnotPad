@@ -226,7 +226,6 @@ input, textarea, button { font-family: inherit; }
 .add-child-btn.right { right: -32px; top: 50%; margin-top: -12px; }
 
 #canvas.connecting .add-child-btn { display: none !important; }
-.canvas-item.editing .add-child-btn { display: none; }
 
 .item-image { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; border-radius: calc(var(--radius-md) - 1px); }
 .item-video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
