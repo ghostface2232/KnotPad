@@ -691,7 +691,7 @@ export function renderCanvasList() {
         const id = entry.dataset.id;
         entry.addEventListener('click', async e => {
             if (!e.target.closest('.canvas-action-btn') && !e.target.closest('.canvas-icon') && id !== state.currentCanvasId) {
-                saveCurrentCanvas();
+                await saveCurrentCanvas();
                 await switchCanvas(id);
             }
         });
@@ -717,9 +717,9 @@ export function renderCanvasList() {
         });
 
         // Group actions
-        header.querySelector('.group-action-btn.add')?.addEventListener('click', e => {
+        header.querySelector('.group-action-btn.add')?.addEventListener('click', async e => {
             e.stopPropagation();
-            createNewCanvas(groupId);
+            await createNewCanvas(groupId);
         });
         header.querySelector('.group-action-btn.rename')?.addEventListener('click', e => {
             e.stopPropagation();
