@@ -324,7 +324,7 @@ input, textarea, button { font-family: inherit; }
 .canvas-item.font-size-xlarge .memo-body { font-size: 22px; }
 
 /* Keyword Node Styles (pill-shaped concept node) */
-.canvas-item.keyword-node { border-radius: 9999px; min-width: 140px; min-height: 48px; }
+.canvas-item.keyword-node { border-radius: 9999px; min-width: 140px; min-height: 56px; }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
 .item-keyword {
     display: flex;
@@ -334,8 +334,8 @@ input, textarea, button { font-family: inherit; }
     padding: 10px 28px;
 }
 .keyword-body {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 600;
     line-height: 1.2;
     color: var(--text-primary);
     border: none;
@@ -358,16 +358,48 @@ input, textarea, button { font-family: inherit; }
 .canvas-item.keyword-node .connection-handle.right { right: 8px; }
 .canvas-item.keyword-node .add-child-btn.left { left: 0; }
 .canvas-item.keyword-node .add-child-btn.right { right: 0; }
-.canvas-item.keyword-node .color-btn { right: 24px; top: 50%; transform: translateY(-50%) scale(var(--counter-scale, 1)); }
+/* Keyword node: color button at top like normal nodes */
+.canvas-item.keyword-node .color-btn {
+    right: 18px;
+    top: -10px;
+    transform: scale(var(--counter-scale, 1));
+}
+/* Keyword node: delete button at top right like normal nodes */
+.canvas-item.keyword-node .delete-btn {
+    right: -10px;
+    top: -10px;
+}
+/* Keyword node: color tag as left semicircle */
 .canvas-item.keyword-node .color-dot {
     border-radius: 9999px 0 0 9999px;
-    width: 6px;
+    width: 8px;
     height: 100%;
+    top: 0;
+    left: 0;
+    clip-path: none;
 }
+/* Keyword node: resize handle at right edge, horizontal resize */
 .canvas-item.keyword-node .resize-handle {
-    bottom: 50%;
-    transform: translateY(50%) scale(var(--counter-scale, 1));
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 100%;
+    cursor: ew-resize;
+    border-radius: 0 9999px 9999px 0;
+    transform: scale(var(--counter-scale, 1));
     transform-origin: center right;
+}
+.canvas-item.keyword-node .resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 16px;
+    border-right: 2px solid var(--text-secondary);
+    border-bottom: none;
+    border-radius: 1px;
 }
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }

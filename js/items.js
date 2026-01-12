@@ -1405,7 +1405,8 @@ export function addKeyword(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
 
     // Calculate width based on text length (min 160, max 400)
-    const charWidth = 12;
+    // Font size is 24px, so char width ~14px
+    const charWidth = 14;
     const padding = 60;
     const minW = 160;
     const maxW = 400;
@@ -1417,7 +1418,7 @@ export function addKeyword(text = '', x, y, color = null) {
         x: pos.x,
         y: pos.y,
         w: w,
-        h: 52,
+        h: 56,
         content: text,
         color
     });
