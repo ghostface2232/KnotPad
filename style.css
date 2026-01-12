@@ -149,17 +149,23 @@ input, textarea, button { font-family: inherit; }
     cursor: move; min-width: 140px; min-height: 80px; overflow: visible;
 }
 .canvas-item .color-dot {
-    position: absolute;
-    top: 0; left: 0;
-    width: 12px; height: 12px;
-    background: var(--tag-color, transparent);
-    clip-path: polygon(0 0, 100% 0, 0 100%);
-    border-radius: var(--radius-md) 0 0 0;
-    z-index: 15;
-    pointer-events: none;
     display: none;
 }
-.canvas-item.has-color .color-dot { display: block; }
+/* Color flag/bookmark - unified design for all node types */
+.canvas-item.has-color::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    width: 12px;
+    height: 10px;
+    background: var(--tag-color);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%);
+    z-index: 15;
+    pointer-events: none;
+    transform: scale(var(--counter-scale, 1));
+    transform-origin: top left;
+}
 .canvas-item:hover { border-color: var(--border-active); box-shadow: var(--shadow-lg); }
 .canvas-item.selected { outline: 2px solid var(--accent); outline-offset: -1px; box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-glow); }
 .canvas-item.dragging { opacity: 0.9; }
@@ -330,20 +336,10 @@ input, textarea, button { font-family: inherit; }
     min-height: 56px;
 }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
-/* Hide the default color-dot for keyword nodes - we use flag instead */
-.canvas-item.keyword-node .color-dot { display: none; }
-/* Keyword node: bookmark/flag ribbon on top center */
+/* Keyword node: color flag position adjusted for pill shape */
 .canvas-item.keyword-node.has-color::before {
-    content: '';
-    position: absolute;
-    top: -4px;
-    left: 50%;
-    transform: translateX(-50%) scale(var(--counter-scale, 1));
-    width: 18px;
-    height: 12px;
-    background: var(--tag-color);
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 70%, 0 100%);
-    z-index: 10;
+    top: 8px;
+    left: 14px;
 }
 .item-keyword {
     display: flex;
@@ -375,8 +371,9 @@ input, textarea, button { font-family: inherit; }
 /* Keyword node connection handles adjustments for pill shape */
 .canvas-item.keyword-node .connection-handle.left { left: 12px; }
 .canvas-item.keyword-node .connection-handle.right { right: 12px; }
-.canvas-item.keyword-node .add-child-btn.left { left: 4px; }
-.canvas-item.keyword-node .add-child-btn.right { right: 4px; }
+/* Keyword node: child buttons outside the node */
+.canvas-item.keyword-node .add-child-btn.left { left: -32px; }
+.canvas-item.keyword-node .add-child-btn.right { right: -32px; }
 /* Keyword node: buttons at top */
 .canvas-item.keyword-node .color-btn {
     right: 20px;
@@ -387,39 +384,30 @@ input, textarea, button { font-family: inherit; }
     right: -8px;
     top: -10px;
 }
-/* Keyword node: resize handle - vertical grip on right edge */
+/* Keyword node: resize handle - curved bar on right edge (consistent with other nodes) */
 .canvas-item.keyword-node .resize-handle {
     position: absolute;
     bottom: 0;
-    right: -3px;
-    width: 20px;
+    right: 0;
+    width: 18px;
     height: 100%;
     cursor: ew-resize;
     border-radius: 0 9999px 9999px 0;
     background: transparent;
     transform: scale(var(--counter-scale, 1));
     transform-origin: center right;
-    opacity: 0;
-    transition: opacity 0.15s ease;
 }
-.canvas-item.keyword-node:hover .resize-handle,
-.canvas-item.keyword-node.selected .resize-handle {
-    opacity: 1;
-}
-/* Three vertical dots grip indicator */
+/* Curved bar indicator */
 .canvas-item.keyword-node .resize-handle::before {
     content: '';
     position: absolute;
     top: 50%;
-    right: 8px;
+    right: 5px;
     transform: translateY(-50%);
-    width: 4px;
-    height: 4px;
-    background: var(--text-secondary);
-    border-radius: 50%;
-    box-shadow:
-        0 -7px 0 var(--text-secondary),
-        0 7px 0 var(--text-secondary);
+    width: 0;
+    height: 14px;
+    border-right: 2px solid var(--text-secondary);
+    border-radius: 0 2px 2px 0;
 }
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
