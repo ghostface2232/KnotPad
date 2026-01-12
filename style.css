@@ -339,8 +339,8 @@ input, textarea, button { font-family: inherit; }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
 /* Keyword node: color tag cutout following pill curve */
 .canvas-item.keyword-node.has-color::before {
-    top: 0;
-    left: 0;
+    top: 4px;
+    left: 4px;
     border-top-left-radius: 28px;
 }
 .item-keyword {
