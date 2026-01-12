@@ -6,7 +6,7 @@ import * as state from './state.js';
 import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
 import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus } from './items.js';
-import { addConnection, updateConnectionArrow, updateAllConnections, addChildNode } from './connections.js';
+import { addConnection, updateConnectionArrow, updateConnectionLabel, updateAllConnections, addChildNode } from './connections.js';
 import {
     fsDirectoryHandle,
     isFileSystemSupported,
@@ -111,6 +111,7 @@ function doSearch() {
     state.items.forEach(item => {
         let text = '';
         if (item.type === 'memo') text = (item.content || '').toLowerCase();
+        else if (item.type === 'keyword') text = (item.content || '').toLowerCase();
         else if (item.type === 'link') text = (item.content.title + ' ' + item.content.url).toLowerCase();
         if (text.includes(q)) results.push(item);
     });
@@ -182,7 +183,8 @@ export function saveState() {
             fh: c.fh,
             to: c.to.id,
             th: c.th,
-            dir: c.dir
+            dir: c.dir,
+            label: c.label || ''
         }))
     };
 
@@ -255,7 +257,9 @@ function restoreState(stateData) {
         if (map[d.from] && map[d.to]) {
             const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true);
             c.dir = d.dir || 'none';
+            c.label = d.label || '';
             updateConnectionArrow(c);
+            updateConnectionLabel(c);
         }
     });
 
@@ -312,7 +316,8 @@ export async function saveCurrentCanvas() {
             fh: c.fh,
             to: c.to.id,
             th: c.th,
-            dir: c.dir
+            dir: c.dir,
+            label: c.label || ''
         })),
         view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
         itemId: state.itemId,
@@ -407,7 +412,9 @@ async function loadCanvasData(id) {
             if (map[d.from] && map[d.to]) {
                 const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true);
                 c.dir = d.dir || 'none';
+                c.label = d.label || '';
                 updateConnectionArrow(c);
+                updateConnectionLabel(c);
             }
         });
 
@@ -1618,15 +1625,42 @@ function setupEmptySpaceContextMenu() {
     }
 }
 
-// ============ Child Type Picker (Direct Memo Creation) ============
+// ============ Child Type Picker ============
+const childTypePicker = $('childTypePicker');
 
 export function showChildTypePicker(parentItem, direction, e) {
-    // Create memo directly without popup
-    addChildNode(parentItem, direction, 'memo');
+    // Store picker data
+    state.setChildPickerData({ parent: parentItem, direction });
+
+    // Position picker near the button
+    const x = e.clientX;
+    const y = e.clientY;
+    childTypePicker.style.left = x + 'px';
+    childTypePicker.style.top = y + 'px';
+    childTypePicker.classList.add('active');
 }
 
 export function setupChildTypePicker() {
-    // No longer needed - memo is created directly
+    childTypePicker.querySelectorAll('button[data-type]').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const type = btn.dataset.type;
+            const data = state.childPickerData;
+            if (data) {
+                addChildNode(data.parent, data.direction, type);
+            }
+            childTypePicker.classList.remove('active');
+            state.setChildPickerData(null);
+        });
+    });
+
+    // Close picker on outside click
+    document.addEventListener('click', e => {
+        if (!childTypePicker.contains(e.target) && !e.target.classList.contains('add-child-btn')) {
+            childTypePicker.classList.remove('active');
+            state.setChildPickerData(null);
+        }
+    });
 }
 
 // ============ New Node Picker (Direct Memo Creation) ============
