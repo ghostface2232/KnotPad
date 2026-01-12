@@ -337,13 +337,11 @@ input, textarea, button { font-family: inherit; }
     min-height: 56px;
 }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
-/* Keyword node: color tag as small circle on pill curve */
+/* Keyword node: color tag cutout following pill curve */
 .canvas-item.keyword-node.has-color::before {
-    top: 6px;
-    left: 6px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+    top: 0;
+    left: 0;
+    border-top-left-radius: 28px;
 }
 .item-keyword {
     display: flex;
