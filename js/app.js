@@ -51,6 +51,7 @@ import {
     setupTouchEvents,
     setupKeyboardEvents,
     setupDragDropEvents,
+    setupCopyEvents,
     setupPasteEvents,
     setupDocumentClickHandler
 } from './events.js';
@@ -362,6 +363,7 @@ async function init() {
     setupTouchEvents();
     setupKeyboardEvents();
     setupDragDropEvents();
+    setupCopyEvents();
     setupPasteEvents();
     setupDocumentClickHandler();
 

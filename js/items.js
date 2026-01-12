@@ -693,84 +693,24 @@ function setupItemEvents(item) {
         // This replaces per-item document listeners to prevent memory leaks
         initMemoToolbarDelegation();
 
-        // Block image paste in memo and strip all formatting except allowed tags
+        // Block image paste in memo and only allow plain text
         mb.addEventListener('paste', e => {
+            e.preventDefault();
             const cd = e.clipboardData;
             if (!cd) return;
 
             // Check if clipboard contains images - block them
             for (let i = 0; i < cd.items.length; i++) {
                 if (cd.items[i].type.indexOf('image') !== -1) {
-                    e.preventDefault();
                     return;
                 }
             }
 
-            // Process HTML to keep only allowed formatting: h1, h2, h3, strong, em, strike, u
-            const html = cd.getData('text/html');
-            if (html) {
-                e.preventDefault();
-                const temp = document.createElement('div');
-                temp.innerHTML = html;
-
-                // Allowed tags (case-insensitive)
-                const allowedTags = ['H1', 'H2', 'H3', 'STRONG', 'B', 'EM', 'I', 'STRIKE', 'S', 'DEL', 'U', 'BR', 'DIV', 'P', 'SPAN'];
-
-                // Function to clean an element recursively
-                function cleanElement(el) {
-                    // Process children first (bottom-up)
-                    const children = Array.from(el.childNodes);
-                    children.forEach(child => {
-                        if (child.nodeType === Node.ELEMENT_NODE) {
-                            cleanElement(child);
-                        }
-                    });
-
-                    // For the element itself, if it's not an allowed tag, unwrap it
-                    if (el.nodeType === Node.ELEMENT_NODE && el !== temp) {
-                        const tagName = el.tagName;
-
-                        // Convert B to STRONG, I to EM, S/DEL to STRIKE for consistency
-                        if (tagName === 'B') {
-                            const strong = document.createElement('strong');
-                            strong.innerHTML = el.innerHTML;
-                            el.replaceWith(strong);
-                            return;
-                        }
-                        if (tagName === 'I') {
-                            const em = document.createElement('em');
-                            em.innerHTML = el.innerHTML;
-                            el.replaceWith(em);
-                            return;
-                        }
-                        if (tagName === 'S' || tagName === 'DEL') {
-                            const strike = document.createElement('strike');
-                            strike.innerHTML = el.innerHTML;
-                            el.replaceWith(strike);
-                            return;
-                        }
-
-                        // If not allowed, unwrap (keep children, remove wrapper)
-                        if (!allowedTags.includes(tagName)) {
-                            const fragment = document.createDocumentFragment();
-                            while (el.firstChild) {
-                                fragment.appendChild(el.firstChild);
-                            }
-                            el.replaceWith(fragment);
-                            return;
-                        }
-
-                        // If allowed tag, strip all attributes and styles
-                        while (el.attributes.length > 0) {
-                            el.removeAttribute(el.attributes[0].name);
-                        }
-                    }
-                }
-
-                cleanElement(temp);
-                document.execCommand('insertHTML', false, temp.innerHTML);
+            // Only allow plain text paste
+            const text = cd.getData('text/plain');
+            if (text) {
+                document.execCommand('insertText', false, text);
             }
-            // Plain text falls through to default behavior
         });
 
         // Auto list formatting on Enter key
