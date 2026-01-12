@@ -275,7 +275,24 @@ function setupImportExportEvents() {
             state.items.forEach(i => i.el.remove());
             state.items.length = 0;
             state.selectedItems.clear();
-            state.setItemId(1);
+
+            // Calculate maximum item ID from imported items to prevent ID collisions
+            let maxImportedItemId = 0;
+            if (data.items && data.items.length > 0) {
+                data.items.forEach(d => {
+                    if (d.id) {
+                        const match = d.id.match(/^i(\d+)$/);
+                        if (match) {
+                            const idNum = parseInt(match[1], 10);
+                            if (idNum > maxImportedItemId) {
+                                maxImportedItemId = idNum;
+                            }
+                        }
+                    }
+                });
+            }
+            // Set itemId to the maximum imported ID to prevent collisions
+            state.setItemId(maxImportedItemId);
             state.setHighestZ(1);
 
             const map = {};
@@ -285,8 +302,11 @@ function setupImportExportEvents() {
             });
 
             data.connections.forEach(d => {
-                if (map[d.from] && map[d.to]) {
-                    const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true);
+                const fromItem = map[d.from];
+                const toItem = map[d.to];
+                // Validate: both items must exist and must not be the same item (prevent self-connections)
+                if (fromItem && toItem && fromItem !== toItem) {
+                    const c = addConnection(fromItem, d.fh, toItem, d.th, true);
                     c.dir = d.dir || 'none';
                     c.label = d.label || '';
                     updateConnectionArrow(c);

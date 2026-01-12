@@ -242,9 +242,39 @@ function restoreState(stateData) {
     state.selectedItems.clear();
     state.setSelectedConn(null);
 
+    // Calculate maximum item ID to prevent ID collisions after undo/redo
+    let maxItemId = 0;
+    stateData.items.forEach(d => {
+        if (d.id) {
+            const match = d.id.match(/^i(\d+)$/);
+            if (match) {
+                const idNum = parseInt(match[1], 10);
+                if (idNum > maxItemId) {
+                    maxItemId = idNum;
+                }
+            }
+        }
+    });
+    // Ensure itemId is at least as high as the max restored item ID
+    if (maxItemId > state.itemId) {
+        state.setItemId(maxItemId);
+    }
+
     const map = {};
     stateData.items.forEach(d => {
-        if ((d.type === 'image' || d.type === 'video') && d.content?.startsWith('media_') && !state.blobURLCache.has(d.content)) return;
+        // For media items without cached blob URLs, still create the item
+        // to maintain correct connection mapping (media may reload later)
+        if ((d.type === 'image' || d.type === 'video') && d.content?.startsWith('media_') && !state.blobURLCache.has(d.content)) {
+            // Create the item anyway - it will show a broken state but connections will be correct
+            // The media reload handler will attempt to restore it
+            const i = createItem(d, true);
+            i.el.style.zIndex = d.z || 1;
+            i.locked = d.locked;
+            i.manuallyResized = d.manuallyResized || false;
+            if (i.locked) i.el.classList.add('locked');
+            map[d.id] = i;
+            return;
+        }
         const i = createItem(d, true);
         i.el.style.zIndex = d.z || 1;
         i.locked = d.locked;
@@ -254,8 +284,11 @@ function restoreState(stateData) {
     });
 
     stateData.connections.forEach(d => {
-        if (map[d.from] && map[d.to]) {
-            const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true);
+        const fromItem = map[d.from];
+        const toItem = map[d.to];
+        // Validate: both items must exist and must not be the same item (prevent self-connections)
+        if (fromItem && toItem && fromItem !== toItem) {
+            const c = addConnection(fromItem, d.fh, toItem, d.th, true);
             c.dir = d.dir || 'none';
             c.label = d.label || '';
             updateConnectionArrow(c);
@@ -353,7 +386,27 @@ async function loadCanvasData(id) {
             data = JSON.parse(saved);
         }
 
-        state.setItemId(data.itemId || 0);
+        // Calculate the maximum item ID from loaded items to prevent ID collisions
+        // Item IDs are in format "i{number}" (e.g., "i1", "i25")
+        let maxLoadedItemId = 0;
+        if (data.items && data.items.length > 0) {
+            data.items.forEach(d => {
+                if (d.id) {
+                    const match = d.id.match(/^i(\d+)$/);
+                    if (match) {
+                        const idNum = parseInt(match[1], 10);
+                        if (idNum > maxLoadedItemId) {
+                            maxLoadedItemId = idNum;
+                        }
+                    }
+                }
+            });
+        }
+
+        // Set itemId to the maximum of: saved itemId, max loaded item ID
+        // This prevents ID collisions when creating new items
+        const savedItemId = data.itemId || 0;
+        state.setItemId(Math.max(savedItemId, maxLoadedItemId));
         state.setHighestZ(data.highestZ || 1);
 
         if (data.view) {
@@ -409,8 +462,11 @@ async function loadCanvasData(id) {
         });
 
         data.connections.forEach(d => {
-            if (map[d.from] && map[d.to]) {
-                const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true);
+            const fromItem = map[d.from];
+            const toItem = map[d.to];
+            // Validate: both items must exist and must not be the same item (prevent self-connections)
+            if (fromItem && toItem && fromItem !== toItem) {
+                const c = addConnection(fromItem, d.fh, toItem, d.th, true);
                 c.dir = d.dir || 'none';
                 c.label = d.label || '';
                 updateConnectionArrow(c);
