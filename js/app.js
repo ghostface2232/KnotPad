@@ -53,7 +53,8 @@ import {
     setupDragDropEvents,
     setupCopyEvents,
     setupPasteEvents,
-    setupDocumentClickHandler
+    setupDocumentClickHandler,
+    setupGlobalContextMenuBlock
 } from './events.js';
 import eventBus, { Events } from './events-bus.js';
 
@@ -366,6 +367,7 @@ async function init() {
     setupCopyEvents();
     setupPasteEvents();
     setupDocumentClickHandler();
+    setupGlobalContextMenuBlock();
 
     // Initialize IndexedDB and load canvases
     try {

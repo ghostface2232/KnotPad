@@ -477,6 +477,17 @@ export function setupPasteEvents() {
     });
 }
 
+// ============ Global Context Menu Block ============
+
+export function setupGlobalContextMenuBlock() {
+    // Block browser's default context menu globally
+    // Custom context menus (items, connections, sidebar) use stopPropagation(),
+    // so they won't bubble up here and will work normally
+    document.addEventListener('contextmenu', e => {
+        e.preventDefault();
+    });
+}
+
 // ============ Document Click Handler ============
 
 export function setupDocumentClickHandler() {
