@@ -37,6 +37,12 @@ const contextMenu = $('contextMenu');
 const canvasContextMenu = $('canvasContextMenu');
 const fileInput = $('fileInput');
 
+// Sidebar Context Menu Elements
+const sidebarCanvasContextMenu = $('sidebarCanvasContextMenu');
+const sidebarGroupContextMenu = $('sidebarGroupContextMenu');
+const sidebarEmptyContextMenu = $('sidebarEmptyContextMenu');
+const groupSubmenu = $('groupSubmenu');
+
 // Note: External function calls are now handled via eventBus
 // Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
 // Events listened: ITEMS_ADD_CHILD_NODE
@@ -733,6 +739,9 @@ export function renderCanvasList() {
         // Drag drop for groups
         setupGroupDragDrop(header, groupId);
     });
+
+    // Bind sidebar context menu events
+    bindSidebarContextEvents();
 }
 
 function setupCanvasDragDrop(entry, canvasId) {
@@ -1156,6 +1165,457 @@ export function setupCanvasContextMenu() {
             canvasContextMenu.classList.remove('active');
         });
     });
+}
+
+// ============ Sidebar Context Menus ============
+
+let sidebarContextTargetId = null;
+
+function hideSidebarContextMenus() {
+    sidebarCanvasContextMenu?.classList.remove('active');
+    sidebarGroupContextMenu?.classList.remove('active');
+    sidebarEmptyContextMenu?.classList.remove('active');
+    groupSubmenu?.classList.remove('active');
+}
+
+function positionContextMenu(menu, x, y) {
+    // Ensure menu stays within viewport
+    const menuWidth = 180;
+    const menuHeight = menu.offsetHeight || 200;
+
+    if (x + menuWidth > window.innerWidth) {
+        x = window.innerWidth - menuWidth - 8;
+    }
+    if (y + menuHeight > window.innerHeight) {
+        y = window.innerHeight - menuHeight - 8;
+    }
+
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+}
+
+function buildGroupSubmenu(currentCanvasId) {
+    if (!groupSubmenu) return;
+
+    const canvas = state.canvases.find(c => c.id === currentCanvasId);
+    const currentGroupId = canvas?.groupId || null;
+
+    let html = '';
+
+    // "No group" option (remove from group)
+    if (currentGroupId) {
+        html += `<div class="context-submenu-item" data-group-id="">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            No Group
+        </div>`;
+    }
+
+    // List existing groups
+    state.canvasGroups.forEach(group => {
+        if (group.id !== currentGroupId) {
+            html += `<div class="context-submenu-item" data-group-id="${group.id}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                ${esc(group.name)}
+            </div>`;
+        }
+    });
+
+    // New group option
+    html += `<div class="context-submenu-item new-group" data-action="new-group">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><path d="M12 11v6M9 14h6" stroke-linecap="round"/></svg>
+        New Group...
+    </div>`;
+
+    if (!html.includes('context-submenu-item') || (state.canvasGroups.length === 0 && !currentGroupId)) {
+        html = `<div class="context-submenu-item new-group" data-action="new-group">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><path d="M12 11v6M9 14h6" stroke-linecap="round"/></svg>
+            New Group...
+        </div>`;
+    }
+
+    groupSubmenu.innerHTML = html;
+}
+
+function showSidebarCanvasContextMenu(canvasId, x, y) {
+    hideSidebarContextMenus();
+    hideMenus();
+
+    sidebarContextTargetId = canvasId;
+    const canvas = state.canvases.find(c => c.id === canvasId);
+
+    // Show/hide "Remove from Group" option
+    const removeFromGroupItem = sidebarCanvasContextMenu.querySelector('[data-action="remove-from-group"]');
+    if (removeFromGroupItem) {
+        removeFromGroupItem.style.display = canvas?.groupId ? 'flex' : 'none';
+    }
+
+    // Build group submenu
+    buildGroupSubmenu(canvasId);
+
+    positionContextMenu(sidebarCanvasContextMenu, x, y);
+    sidebarCanvasContextMenu.classList.add('active');
+}
+
+function showSidebarGroupContextMenu(groupId, x, y) {
+    hideSidebarContextMenus();
+    hideMenus();
+
+    sidebarContextTargetId = groupId;
+
+    // Update collapse/expand text
+    const collapseText = document.getElementById('groupCollapseText');
+    if (collapseText) {
+        const isCollapsed = state.collapsedGroups.has(groupId);
+        collapseText.textContent = isCollapsed ? 'Expand' : 'Collapse';
+    }
+
+    positionContextMenu(sidebarGroupContextMenu, x, y);
+    sidebarGroupContextMenu.classList.add('active');
+}
+
+function showSidebarEmptyContextMenu(x, y) {
+    hideSidebarContextMenus();
+    hideMenus();
+
+    positionContextMenu(sidebarEmptyContextMenu, x, y);
+    sidebarEmptyContextMenu.classList.add('active');
+}
+
+async function duplicateCanvas(canvasId) {
+    const original = state.canvases.find(c => c.id === canvasId);
+    if (!original) return;
+
+    // Save current canvas first
+    await saveCurrentCanvas();
+
+    // Create new canvas with copied metadata
+    const newCanvas = {
+        id: generateId(),
+        name: original.name + ' (Copy)',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        itemCount: original.itemCount || 0,
+        groupId: original.groupId || null,
+        icon: original.icon || null,
+        color: original.color || null
+    };
+
+    // Copy canvas data
+    const originalData = localStorage.getItem('knotpad-data-' + canvasId);
+    if (originalData) {
+        localStorage.setItem('knotpad-data-' + newCanvas.id, originalData);
+    }
+
+    // Insert after original
+    const originalIndex = state.canvases.findIndex(c => c.id === canvasId);
+    state.canvases.splice(originalIndex + 1, 0, newCanvas);
+
+    saveCanvasesList();
+    renderCanvasList();
+    showToast('Canvas duplicated');
+}
+
+function collapseAllGroups() {
+    state.canvasGroups.forEach(group => {
+        state.collapsedGroups.add(group.id);
+    });
+    renderCanvasList();
+}
+
+function expandAllGroups() {
+    state.collapsedGroups.clear();
+    renderCanvasList();
+}
+
+export function setupSidebarContextMenus() {
+    if (!sidebarCanvasContextMenu || !sidebarGroupContextMenu || !sidebarEmptyContextMenu) return;
+
+    // Setup empty space context menu handler (one-time)
+    setupEmptySpaceContextMenu();
+
+    // Close menus on outside click
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.context-menu')) {
+            hideSidebarContextMenus();
+        }
+    });
+
+    document.addEventListener('contextmenu', e => {
+        if (!e.target.closest('.sidebar')) {
+            hideSidebarContextMenus();
+        }
+    });
+
+    // Canvas context menu actions
+    sidebarCanvasContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
+        el.addEventListener('click', async e => {
+            e.stopPropagation();
+            const action = el.dataset.action;
+            const canvasId = sidebarContextTargetId;
+
+            switch (action) {
+                case 'rename': {
+                    const entry = canvasList.querySelector(`.canvas-item-entry[data-id="${canvasId}"]`);
+                    if (entry) {
+                        hideSidebarContextMenus();
+                        // Trigger rename mode
+                        const nameEl = entry.querySelector('.canvas-name');
+                        const oldName = state.canvases.find(c => c.id === canvasId)?.name || '';
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'canvas-name-input';
+                        input.value = oldName;
+                        nameEl.replaceWith(input);
+                        input.focus();
+                        input.select();
+                        entry.draggable = false;
+
+                        const finish = () => {
+                            entry.draggable = true;
+                            const c = state.canvases.find(x => x.id === canvasId);
+                            if (c) {
+                                c.name = input.value.trim() || 'Untitled';
+                                c.updatedAt = Date.now();
+                                saveCanvasesList();
+                                renderCanvasList();
+                                updateTopbarCanvasName();
+                            }
+                        };
+                        input.addEventListener('blur', finish);
+                        input.addEventListener('keydown', e => {
+                            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                            if (e.key === 'Escape') { input.value = oldName; input.blur(); }
+                        });
+                    }
+                    break;
+                }
+                case 'customize': {
+                    const entry = canvasList.querySelector(`.canvas-item-entry[data-id="${canvasId}"]`);
+                    if (entry) {
+                        hideSidebarContextMenus();
+                        openIconPicker(canvasId, entry);
+                    }
+                    break;
+                }
+                case 'duplicate':
+                    hideSidebarContextMenus();
+                    await duplicateCanvas(canvasId);
+                    break;
+                case 'add-to-group':
+                    // Toggle submenu
+                    groupSubmenu?.classList.toggle('active');
+                    return; // Don't hide menus
+                case 'remove-from-group': {
+                    const canvas = state.canvases.find(c => c.id === canvasId);
+                    if (canvas) {
+                        canvas.groupId = null;
+                        saveCanvasesList();
+                        renderCanvasList();
+                    }
+                    hideSidebarContextMenus();
+                    break;
+                }
+                case 'delete':
+                    hideSidebarContextMenus();
+                    deleteCanvas(canvasId);
+                    break;
+                default:
+                    hideSidebarContextMenus();
+            }
+        });
+    });
+
+    // Group submenu delegation
+    groupSubmenu?.addEventListener('click', e => {
+        const item = e.target.closest('.context-submenu-item');
+        if (!item) return;
+
+        e.stopPropagation();
+        const canvasId = sidebarContextTargetId;
+
+        if (item.dataset.action === 'new-group') {
+            // Create new group and move canvas to it
+            const ng = { id: generateId(), name: 'New Group', createdAt: Date.now() };
+            state.canvasGroups.push(ng);
+            const canvas = state.canvases.find(c => c.id === canvasId);
+            if (canvas) canvas.groupId = ng.id;
+            saveCanvasesList();
+            renderCanvasList();
+            // Start rename on the new group
+            setTimeout(() => {
+                const header = canvasList.querySelector(`.canvas-group[data-group-id="${ng.id}"] .canvas-group-header`);
+                if (header) {
+                    const nameEl = header.querySelector('.group-name');
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'group-name-input';
+                    input.value = 'New Group';
+                    nameEl.replaceWith(input);
+                    input.focus();
+                    input.select();
+                    const finish = () => {
+                        const g = state.canvasGroups.find(x => x.id === ng.id);
+                        if (g) {
+                            g.name = input.value.trim() || 'Untitled Group';
+                            saveCanvasesList();
+                            renderCanvasList();
+                        }
+                    };
+                    input.addEventListener('blur', finish);
+                    input.addEventListener('keydown', ev => {
+                        if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+                        if (ev.key === 'Escape') { input.value = 'New Group'; input.blur(); }
+                    });
+                }
+            }, 50);
+        } else {
+            // Move to existing group or no group
+            const groupId = item.dataset.groupId || null;
+            const canvas = state.canvases.find(c => c.id === canvasId);
+            if (canvas) {
+                canvas.groupId = groupId || null;
+                saveCanvasesList();
+                renderCanvasList();
+            }
+        }
+
+        hideSidebarContextMenus();
+    });
+
+    // Group context menu actions
+    sidebarGroupContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
+        el.addEventListener('click', async e => {
+            e.stopPropagation();
+            const action = el.dataset.action;
+            const groupId = sidebarContextTargetId;
+
+            switch (action) {
+                case 'rename': {
+                    const header = canvasList.querySelector(`.canvas-group[data-group-id="${groupId}"] .canvas-group-header`);
+                    if (header) {
+                        hideSidebarContextMenus();
+                        const nameEl = header.querySelector('.group-name');
+                        const oldName = state.canvasGroups.find(g => g.id === groupId)?.name || '';
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'group-name-input';
+                        input.value = oldName;
+                        nameEl.replaceWith(input);
+                        input.focus();
+                        input.select();
+                        const finish = () => {
+                            const g = state.canvasGroups.find(x => x.id === groupId);
+                            if (g) {
+                                g.name = input.value.trim() || 'Untitled Group';
+                                saveCanvasesList();
+                                renderCanvasList();
+                            }
+                        };
+                        input.addEventListener('blur', finish);
+                        input.addEventListener('keydown', ev => {
+                            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+                            if (ev.key === 'Escape') { input.value = oldName; input.blur(); }
+                        });
+                    }
+                    break;
+                }
+                case 'add-canvas':
+                    hideSidebarContextMenus();
+                    await saveCurrentCanvas();
+                    await createNewCanvas(groupId);
+                    break;
+                case 'toggle-collapse': {
+                    state.toggleGroupCollapsed(groupId);
+                    const groupEl = canvasList.querySelector(`.canvas-group[data-group-id="${groupId}"]`);
+                    groupEl?.classList.toggle('collapsed');
+                    hideSidebarContextMenus();
+                    break;
+                }
+                case 'delete':
+                    hideSidebarContextMenus();
+                    deleteGroup(groupId);
+                    break;
+                default:
+                    hideSidebarContextMenus();
+            }
+        });
+    });
+
+    // Empty context menu actions
+    sidebarEmptyContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
+        el.addEventListener('click', async e => {
+            e.stopPropagation();
+            const action = el.dataset.action;
+
+            switch (action) {
+                case 'new-canvas':
+                    hideSidebarContextMenus();
+                    await saveCurrentCanvas();
+                    await createNewCanvas();
+                    break;
+                case 'new-group':
+                    hideSidebarContextMenus();
+                    createNewGroup();
+                    break;
+                case 'collapse-all':
+                    hideSidebarContextMenus();
+                    collapseAllGroups();
+                    break;
+                case 'expand-all':
+                    hideSidebarContextMenus();
+                    expandAllGroups();
+                    break;
+                default:
+                    hideSidebarContextMenus();
+            }
+        });
+    });
+}
+
+// Bind context menu events to canvas list items
+export function bindSidebarContextEvents() {
+    // Canvas item right-click
+    canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
+        entry.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            showSidebarCanvasContextMenu(entry.dataset.id, e.clientX, e.clientY);
+        });
+    });
+
+    // Group header right-click
+    canvasList.querySelectorAll('.canvas-group-header').forEach(header => {
+        header.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            showSidebarGroupContextMenu(header.dataset.groupId, e.clientX, e.clientY);
+        });
+    });
+}
+
+// Setup empty space context menu (called once at init)
+function setupEmptySpaceContextMenu() {
+    // Canvas list empty space right-click
+    canvasList.addEventListener('contextmenu', e => {
+        // Only trigger if clicking directly on empty space (not on items/groups)
+        if (!e.target.closest('.canvas-item-entry') && !e.target.closest('.canvas-group-header') && !e.target.closest('.canvas-group-content')) {
+            e.preventDefault();
+            e.stopPropagation();
+            showSidebarEmptyContextMenu(e.clientX, e.clientY);
+        }
+    });
+
+    // Sidebar footer right-click (also empty space)
+    const sidebarFooter = sidebar.querySelector('.sidebar-footer');
+    if (sidebarFooter) {
+        sidebarFooter.addEventListener('contextmenu', e => {
+            if (!e.target.closest('.sidebar-settings-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                showSidebarEmptyContextMenu(e.clientX, e.clientY);
+            }
+        });
+    }
 }
 
 // ============ Child Type Picker (Direct Memo Creation) ============

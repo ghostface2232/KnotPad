@@ -386,6 +386,47 @@ input, textarea, button { font-family: inherit; }
 .context-menu-check { margin-left: auto; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
 .context-menu-check.checked::before { content: '✓'; color: var(--accent); font-weight: 600; font-size: 12px; }
 
+/* Context menu submenu styles */
+.context-menu-item.has-submenu { position: relative; }
+.context-menu-item.has-submenu > span { flex: 1; }
+.context-menu-item .submenu-arrow { margin-left: auto; opacity: 0.5; }
+.context-submenu {
+    display: none;
+    padding: 4px 0 4px 0;
+    margin: 0 4px;
+    border-top: 1px solid var(--border-subtle);
+    max-height: 200px;
+    overflow-y: auto;
+}
+.context-submenu.active { display: block; }
+.context-submenu-item {
+    padding: 8px 12px 8px 28px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.context-submenu-item:hover { background: var(--bg-hover); }
+.context-submenu-item.new-group {
+    color: var(--accent);
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 4px;
+    padding-top: 12px;
+}
+.context-submenu-item svg { flex-shrink: 0; }
+.context-submenu-empty {
+    padding: 8px 12px 8px 28px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
 .modal {
     position: fixed; inset: 0; background: rgba(9, 9, 11, 0.88);
     display: none; align-items: center; justify-content: center;
