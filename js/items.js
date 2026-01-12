@@ -1156,6 +1156,11 @@ function hideMenus() {
     $('colorDropdown').classList.remove('active');
     $('connDirectionPicker').classList.remove('active');
     $('canvasIconPicker').classList.remove('active');
+    // Also hide sidebar context menus
+    $('sidebarCanvasContextMenu')?.classList.remove('active');
+    $('sidebarGroupContextMenu')?.classList.remove('active');
+    $('sidebarEmptyContextMenu')?.classList.remove('active');
+    $('groupSubmenu')?.classList.remove('active');
 }
 
 export { hideMenus, toggleHeading };

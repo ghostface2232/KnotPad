@@ -42,6 +42,7 @@ import {
     setupLinkModal,
     setupSettingsModal,
     setupCanvasContextMenu,
+    setupSidebarContextMenus,
     setupSidebarResize,
     handleFile
 } from './ui.js';
@@ -322,6 +323,7 @@ async function init() {
     setupMinimapClick();
     setupContextMenu();
     setupCanvasContextMenu();
+    setupSidebarContextMenus();
     setupChildTypePicker();
     setupNewNodePicker();
     setupLinkModal();
