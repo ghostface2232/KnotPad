@@ -333,15 +333,17 @@ input, textarea, button { font-family: inherit; }
 /* Keyword Node Styles (pill-shaped concept node) */
 .canvas-item.keyword-node {
     border-radius: 9999px;
-    min-width: 224px;
+    min-width: 100px;
     min-height: 56px;
 }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
-/* Keyword node: color tag position adjusted for pill shape */
+/* Keyword node: color tag as small circle on pill curve */
 .canvas-item.keyword-node.has-color::before {
-    top: 4px;
-    left: 8px;
-    border-top-left-radius: 8px;
+    top: 6px;
+    left: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
 }
 .item-keyword {
     display: flex;
