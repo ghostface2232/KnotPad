@@ -332,7 +332,7 @@ input, textarea, button { font-family: inherit; }
 /* Keyword Node Styles (pill-shaped concept node) */
 .canvas-item.keyword-node {
     border-radius: 9999px;
-    min-width: 140px;
+    min-width: 224px;
     min-height: 56px;
 }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
@@ -368,12 +368,11 @@ input, textarea, button { font-family: inherit; }
     color: var(--text-placeholder);
     pointer-events: none;
 }
-/* Keyword node connection handles adjustments for pill shape */
-.canvas-item.keyword-node .connection-handle.left { left: 12px; }
-.canvas-item.keyword-node .connection-handle.right { right: 12px; }
-/* Keyword node: child buttons outside the node */
-.canvas-item.keyword-node .add-child-btn.left { left: -32px; }
-.canvas-item.keyword-node .add-child-btn.right { right: -32px; }
+/* Keyword node: connection handles use default edge positions (no override) */
+/* This ensures getHandlePos() calculation matches visual handle positions */
+/* Keyword node: child buttons further outside to avoid overlap with handles */
+.canvas-item.keyword-node .add-child-btn.left { left: -36px; }
+.canvas-item.keyword-node .add-child-btn.right { right: -36px; }
 /* Keyword node: buttons at top */
 .canvas-item.keyword-node .color-btn {
     right: 20px;

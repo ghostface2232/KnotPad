@@ -1404,12 +1404,12 @@ export function addMemo(text = '', x, y, color = null) {
 export function addKeyword(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
 
-    // Calculate width based on text length (min 160, max 400)
+    // Calculate width based on text length (min 256, max 640)
     // Font size is 24px, so char width ~14px
     const charWidth = 14;
-    const padding = 60;
-    const minW = 160;
-    const maxW = 400;
+    const padding = 80;
+    const minW = 256;
+    const maxW = 640;
     const textWidth = text.length * charWidth + padding;
     const w = Math.max(minW, Math.min(textWidth, maxW));
 
