@@ -1404,11 +1404,11 @@ export function addMemo(text = '', x, y, color = null) {
 export function addKeyword(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
 
-    // Calculate width based on text length (min 100, max 300)
-    const charWidth = 10;
-    const padding = 40;
-    const minW = 100;
-    const maxW = 300;
+    // Calculate width based on text length (min 160, max 400)
+    const charWidth = 12;
+    const padding = 60;
+    const minW = 160;
+    const maxW = 400;
     const textWidth = text.length * charWidth + padding;
     const w = Math.max(minW, Math.min(textWidth, maxW));
 
@@ -1417,7 +1417,7 @@ export function addKeyword(text = '', x, y, color = null) {
         x: pos.x,
         y: pos.y,
         w: w,
-        h: 44,
+        h: 52,
         content: text,
         color
     });

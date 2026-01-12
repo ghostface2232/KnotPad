@@ -1625,42 +1625,15 @@ function setupEmptySpaceContextMenu() {
     }
 }
 
-// ============ Child Type Picker ============
-const childTypePicker = $('childTypePicker');
+// ============ Child Type Picker (Direct Memo Creation) ============
 
 export function showChildTypePicker(parentItem, direction, e) {
-    // Store picker data
-    state.setChildPickerData({ parent: parentItem, direction });
-
-    // Position picker near the button
-    const x = e.clientX;
-    const y = e.clientY;
-    childTypePicker.style.left = x + 'px';
-    childTypePicker.style.top = y + 'px';
-    childTypePicker.classList.add('active');
+    // Create memo directly without popup
+    addChildNode(parentItem, direction);
 }
 
 export function setupChildTypePicker() {
-    childTypePicker.querySelectorAll('button[data-type]').forEach(btn => {
-        btn.addEventListener('click', e => {
-            e.stopPropagation();
-            const type = btn.dataset.type;
-            const data = state.childPickerData;
-            if (data) {
-                addChildNode(data.parent, data.direction, type);
-            }
-            childTypePicker.classList.remove('active');
-            state.setChildPickerData(null);
-        });
-    });
-
-    // Close picker on outside click
-    document.addEventListener('click', e => {
-        if (!childTypePicker.contains(e.target) && !e.target.classList.contains('add-child-btn')) {
-            childTypePicker.classList.remove('active');
-            state.setChildPickerData(null);
-        }
-    });
+    // No longer needed - memo is created directly
 }
 
 // ============ New Node Picker (Direct Memo Creation) ============
