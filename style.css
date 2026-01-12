@@ -336,12 +336,28 @@ input, textarea, button { font-family: inherit; }
     min-width: 185px;
     min-height: 56px;
 }
-.canvas-item.keyword-node .item-content { border-radius: 9999px; }
-/* Keyword node: color tag cutout following pill curve */
+.canvas-item.keyword-node .item-content {
+    border-radius: 9999px;
+    position: relative;
+}
+/* Keyword node: color tag follows pill outline via cutout */
 .canvas-item.keyword-node.has-color::before {
-    top: 4px;
-    left: 4px;
-    border-top-left-radius: 56px;
+    content: none;
+}
+.canvas-item.keyword-node.has-color .item-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    background: var(--tag-color);
+    border-top-left-radius: calc(var(--radius-md) - 1px);
+    border-bottom-right-radius: 4px;
+    z-index: 1;
+    pointer-events: none;
+    transform: scale(var(--counter-scale, 1));
+    transform-origin: top left;
 }
 .item-keyword {
     display: flex;
