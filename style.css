@@ -346,7 +346,7 @@ input, textarea, button { font-family: inherit; }
 }
 .keyword-body {
     font-size: 24px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.2;
     color: var(--text-primary);
     border: none;
@@ -358,6 +358,7 @@ input, textarea, button { font-family: inherit; }
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    direction: rtl;
 }
 .keyword-body:empty::before {
     content: attr(data-placeholder);
