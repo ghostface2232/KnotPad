@@ -4,7 +4,7 @@ import { COLOR_MAP } from './constants.js';
 import { $, curvePath, getHandlePos } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap } from './viewport.js';
-import { addMemo, addKeyword, deselectAll } from './items.js';
+import { addMemo, deselectAll } from './items.js';
 import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
@@ -605,13 +605,11 @@ export function completeConnectionWithNewMemo(canvasX, canvasY) {
     return newMemo;
 }
 
-// Add child node connected to parent
-export function addChildNode(parent, dir, type = 'memo') {
+// Add child node connected to parent (always creates memo)
+export function addChildNode(parent, dir) {
     const gap = 100;
-    // Different sizes for different node types
-    const isKeyword = type === 'keyword';
-    const cw = isKeyword ? 120 : 220;
-    const ch = isKeyword ? 44 : 140;
+    const cw = 220;
+    const ch = 140;
     let x, y, fh, th;
 
     switch (dir) {
@@ -641,9 +639,7 @@ export function addChildNode(parent, dir, type = 'memo') {
             break;
     }
 
-    const child = isKeyword
-        ? addKeyword('', x, y, parent.color)
-        : addMemo('', x, y, parent.color);
+    const child = addMemo('', x, y, parent.color);
     addConnection(parent, fh, child, th);
     eventBus.emit(Events.STATE_SAVE);
     return child;
