@@ -151,17 +151,21 @@ input, textarea, button { font-family: inherit; }
 .canvas-item .color-dot {
     display: none;
 }
-/* Color tag - refined corner badge design for all node types */
+/* Color tag - flag shape design for all node types */
 .canvas-item.has-color::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    width: 10px;
-    height: 10px;
+    left: 8px;
+    width: 11px;
+    height: 11px;
     background: var(--tag-color);
-    border-top-left-radius: calc(var(--radius-md) - 1px);
-    border-bottom-right-radius: 4px;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='29' height='28' viewBox='0 0 29 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28.0674 0V22.8018C28.0674 24.6058 28.0072 25.3311 27.8086 26.0898C27.5085 27.2361 26.6175 27.8564 25.3418 27.8564C24.4084 27.8564 23.3459 27.3435 21.7803 26.4473L16.1201 23.207C15.5416 22.8759 15.252 22.7103 14.9541 22.6143C14.6547 22.5177 14.3439 22.4697 14.0332 22.4697C13.7228 22.4698 13.4124 22.5178 13.1133 22.6143C12.8153 22.7103 12.5258 22.8759 11.9473 23.207L6.28711 26.4473C4.72146 27.3435 3.65903 27.8564 2.72559 27.8564C1.44986 27.8564 0.558878 27.2361 0.258789 26.0898C0.0601537 25.3311 0 24.6058 0 22.8018V0H28.0674Z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg width='29' height='28' viewBox='0 0 29 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28.0674 0V22.8018C28.0674 24.6058 28.0072 25.3311 27.8086 26.0898C27.5085 27.2361 26.6175 27.8564 25.3418 27.8564C24.4084 27.8564 23.3459 27.3435 21.7803 26.4473L16.1201 23.207C15.5416 22.8759 15.252 22.7103 14.9541 22.6143C14.6547 22.5177 14.3439 22.4697 14.0332 22.4697C13.7228 22.4698 13.4124 22.5178 13.1133 22.6143C12.8153 22.7103 12.5258 22.8759 11.9473 23.207L6.28711 26.4473C4.72146 27.3435 3.65903 27.8564 2.72559 27.8564C1.44986 27.8564 0.558878 27.2361 0.258789 26.0898C0.0601537 25.3311 0 24.6058 0 22.8018V0H28.0674Z'/%3E%3C/svg%3E");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
     z-index: 15;
     pointer-events: none;
     transform: scale(var(--counter-scale, 1));
@@ -340,20 +344,24 @@ input, textarea, button { font-family: inherit; }
     border-radius: 9999px;
     position: relative;
 }
-/* Keyword node: color tag follows pill outline via cutout */
+/* Keyword node: color flag on the flat portion of the pill shape */
 .canvas-item.keyword-node.has-color::before {
     content: none;
 }
 .canvas-item.keyword-node.has-color .item-content::before {
     content: '';
     position: absolute;
-    top: 3px;
-    left: 4px;
-    width: 10px;
-    height: 10px;
+    top: 0;
+    left: 28px;
+    width: 11px;
+    height: 11px;
     background: var(--tag-color);
-    border-top-left-radius: calc(var(--radius-md) - 1px);
-    border-bottom-right-radius: 4px;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='29' height='28' viewBox='0 0 29 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28.0674 0V22.8018C28.0674 24.6058 28.0072 25.3311 27.8086 26.0898C27.5085 27.2361 26.6175 27.8564 25.3418 27.8564C24.4084 27.8564 23.3459 27.3435 21.7803 26.4473L16.1201 23.207C15.5416 22.8759 15.252 22.7103 14.9541 22.6143C14.6547 22.5177 14.3439 22.4697 14.0332 22.4697C13.7228 22.4698 13.4124 22.5178 13.1133 22.6143C12.8153 22.7103 12.5258 22.8759 11.9473 23.207L6.28711 26.4473C4.72146 27.3435 3.65903 27.8564 2.72559 27.8564C1.44986 27.8564 0.558878 27.2361 0.258789 26.0898C0.0601537 25.3311 0 24.6058 0 22.8018V0H28.0674Z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg width='29' height='28' viewBox='0 0 29 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28.0674 0V22.8018C28.0674 24.6058 28.0072 25.3311 27.8086 26.0898C27.5085 27.2361 26.6175 27.8564 25.3418 27.8564C24.4084 27.8564 23.3459 27.3435 21.7803 26.4473L16.1201 23.207C15.5416 22.8759 15.252 22.7103 14.9541 22.6143C14.6547 22.5177 14.3439 22.4697 14.0332 22.4697C13.7228 22.4698 13.4124 22.5178 13.1133 22.6143C12.8153 22.7103 12.5258 22.8759 11.9473 23.207L6.28711 26.4473C4.72146 27.3435 3.65903 27.8564 2.72559 27.8564C1.44986 27.8564 0.558878 27.2361 0.258789 26.0898C0.0601537 25.3311 0 24.6058 0 22.8018V0H28.0674Z'/%3E%3C/svg%3E");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
     z-index: 1;
     pointer-events: none;
     transform: scale(var(--counter-scale, 1));
