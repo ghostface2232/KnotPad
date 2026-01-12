@@ -333,7 +333,7 @@ input, textarea, button { font-family: inherit; }
 /* Keyword Node Styles (pill-shaped concept node) */
 .canvas-item.keyword-node {
     border-radius: 9999px;
-    min-width: 224px;
+    min-width: 100px;
     min-height: 56px;
 }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
