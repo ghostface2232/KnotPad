@@ -187,8 +187,13 @@ export function setupMouseEvents() {
             let newW = Math.max(140, x - state.resizingItem.x);
             let newH = Math.max(80, y - state.resizingItem.y);
 
-            // Shift key: maintain aspect ratio (proportional resize)
-            if (e.shiftKey && state.resizingItem.initialAspectRatio) {
+            // Keyword node: horizontal resize only, keep fixed height
+            if (state.resizingItem.type === 'keyword') {
+                newW = Math.max(140, x - state.resizingItem.x);
+                newH = state.resizingItem.h; // Keep original height
+            }
+            // Shift key: maintain aspect ratio (proportional resize) - not for keyword nodes
+            else if (e.shiftKey && state.resizingItem.initialAspectRatio) {
                 const aspectRatio = state.resizingItem.initialAspectRatio;
                 // Calculate height based on width to maintain ratio
                 const hFromW = newW / aspectRatio;
