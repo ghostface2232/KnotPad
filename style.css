@@ -151,16 +151,17 @@ input, textarea, button { font-family: inherit; }
 .canvas-item .color-dot {
     display: none;
 }
-/* Color flag/bookmark - unified design for all node types */
+/* Color tag - refined corner badge design for all node types */
 .canvas-item.has-color::before {
     content: '';
     position: absolute;
-    top: 4px;
-    left: 6px;
-    width: 12px;
+    top: 0;
+    left: 0;
+    width: 10px;
     height: 10px;
     background: var(--tag-color);
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%);
+    border-top-left-radius: calc(var(--radius-md) - 1px);
+    border-bottom-right-radius: 4px;
     z-index: 15;
     pointer-events: none;
     transform: scale(var(--counter-scale, 1));
@@ -336,10 +337,11 @@ input, textarea, button { font-family: inherit; }
     min-height: 56px;
 }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
-/* Keyword node: color flag position adjusted for pill shape */
+/* Keyword node: color tag position adjusted for pill shape */
 .canvas-item.keyword-node.has-color::before {
-    top: 8px;
-    left: 14px;
+    top: 4px;
+    left: 8px;
+    border-top-left-radius: 8px;
 }
 .item-keyword {
     display: flex;
