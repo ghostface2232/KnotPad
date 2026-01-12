@@ -328,16 +328,23 @@ input, textarea, button { font-family: inherit; }
     border-radius: 9999px;
     min-width: 140px;
     min-height: 56px;
-    /* Color indicator via border - hide default color-dot */
-    border: 3px solid transparent;
-    transition: border-color 0.15s ease;
-}
-.canvas-item.keyword-node.has-color {
-    border-color: var(--tag-color);
 }
 .canvas-item.keyword-node .item-content { border-radius: 9999px; }
-/* Hide the default color-dot for keyword nodes - we use border instead */
+/* Hide the default color-dot for keyword nodes - we use flag instead */
 .canvas-item.keyword-node .color-dot { display: none; }
+/* Keyword node: bookmark/flag ribbon on top center */
+.canvas-item.keyword-node.has-color::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%) scale(var(--counter-scale, 1));
+    width: 18px;
+    height: 12px;
+    background: var(--tag-color);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 70%, 0 100%);
+    z-index: 10;
+}
 .item-keyword {
     display: flex;
     align-items: center;
