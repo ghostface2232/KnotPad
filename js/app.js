@@ -4,7 +4,7 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
-import { createItem, addMemo, setFilter, setItemColor, sortByColor } from './items.js';
+import { createItem, addMemo, addKeyword, setFilter, setItemColor, sortByColor } from './items.js';
 import {
     setupConnDirectionPicker,
     setupConnectionContextMenu,
@@ -85,6 +85,13 @@ function setupToolbarEvents() {
         const x = (innerWidth / 2 - state.offsetX) / state.scale - 90;
         const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
         addMemo('', x, y);
+        saveState();
+    });
+
+    $('addKeywordBtn').addEventListener('click', () => {
+        const x = (innerWidth / 2 - state.offsetX) / state.scale - 60;
+        const y = (innerHeight / 2 - state.offsetY) / state.scale - 22;
+        addKeyword('', x, y);
         saveState();
     });
 
@@ -213,7 +220,8 @@ function setupImportExportEvents() {
                 fh: c.fh,
                 to: c.to.id,
                 th: c.th,
-                dir: c.dir
+                dir: c.dir,
+                label: c.label || ''
             })),
             name: canvasName
         };
@@ -259,7 +267,7 @@ function setupImportExportEvents() {
         try {
             const text = await file.text();
             const data = JSON.parse(text);
-            const { addConnection, updateConnectionArrow } = await import('./connections.js');
+            const { addConnection, updateConnectionArrow, updateConnectionLabel } = await import('./connections.js');
             const { updateMinimap } = await import('./ui.js');
 
             state.connections.forEach(c => { c.el.remove(); if (c.arrow) c.arrow.remove(); });
@@ -280,7 +288,9 @@ function setupImportExportEvents() {
                 if (map[d.from] && map[d.to]) {
                     const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true);
                     c.dir = d.dir || 'none';
+                    c.label = d.label || '';
                     updateConnectionArrow(c);
+                    updateConnectionLabel(c);
                 }
             });
 

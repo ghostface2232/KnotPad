@@ -217,7 +217,7 @@ export function resetViewport() {
 export function clearItemsAndConnections() {
     blobURLCache.forEach(url => URL.revokeObjectURL(url));
     blobURLCache.clear();
-    state.connections.forEach(c => { c.el.remove(); if (c.arrow) c.arrow.remove(); });
+    state.connections.forEach(c => { c.el.remove(); if (c.arrow) c.arrow.remove(); if (c.labelEl) c.labelEl.remove(); });
     state.connections = [];
     state.items.forEach(i => i.el.remove());
     state.items = [];

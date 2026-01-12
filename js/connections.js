@@ -4,7 +4,7 @@ import { COLOR_MAP } from './constants.js';
 import { $, curvePath, getHandlePos } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap } from './viewport.js';
-import { addMemo, deselectAll } from './items.js';
+import { addMemo, addKeyword, deselectAll } from './items.js';
 import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
@@ -90,7 +90,9 @@ export function addConnection(from, fh, to, th, loading = false) {
         el: null,
         hitArea: null,
         arrow: null,
-        dir: 'none'
+        dir: 'none',
+        label: '',
+        labelEl: null
     };
 
     // Create invisible hit area for easier clicking (wider stroke)
@@ -154,6 +156,99 @@ export function updateConnection(c) {
     }
 
     updateConnectionArrow(c);
+    updateConnectionLabel(c);
+}
+
+// Update connection label position and visibility
+export function updateConnectionLabel(c) {
+    // Remove existing label if empty
+    if (!c.label) {
+        if (c.labelEl) {
+            c.labelEl.remove();
+            c.labelEl = null;
+        }
+        return;
+    }
+
+    // Create label element if needed
+    if (!c.labelEl) {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.classList.add('connection-label');
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.classList.add('connection-label-bg');
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.classList.add('connection-label-text');
+
+        g.appendChild(rect);
+        g.appendChild(text);
+
+        // Make label clickable to select connection
+        g.addEventListener('click', e => {
+            e.stopPropagation();
+            selectConnection(c, e);
+        });
+
+        connectionsSvg.appendChild(g);
+        c.labelEl = g;
+    }
+
+    // Update label text
+    const text = c.labelEl.querySelector('text');
+    text.textContent = c.label;
+
+    // Get midpoint of the connection path
+    const fp = getHandlePos(c.from, c.fh);
+    const tp = getHandlePos(c.to, c.th);
+    const midPoint = getPathMidpoint(c.el);
+
+    // Calculate approximate text width (for centering)
+    const charWidth = 7;
+    const textWidth = c.label.length * charWidth;
+    const paddingX = 12;
+    const paddingY = 4;
+    const height = 22;
+    const width = Math.max(textWidth + paddingX * 2, 40);
+
+    // Position text at center
+    text.setAttribute('x', midPoint.x);
+    text.setAttribute('y', midPoint.y + 5);
+    text.setAttribute('text-anchor', 'middle');
+
+    // Position and size the background pill
+    const rect = c.labelEl.querySelector('rect');
+    rect.setAttribute('x', midPoint.x - width / 2);
+    rect.setAttribute('y', midPoint.y - height / 2);
+    rect.setAttribute('width', width);
+    rect.setAttribute('height', height);
+    rect.setAttribute('rx', height / 2);
+
+    // Apply color from source node
+    if (c.from.color && COLOR_MAP[c.from.color]) {
+        rect.style.fill = COLOR_MAP[c.from.color];
+    } else {
+        rect.style.fill = '';
+    }
+
+    // Add selected class if connection is selected
+    if (state.selectedConn === c) {
+        c.labelEl.classList.add('selected');
+    } else {
+        c.labelEl.classList.remove('selected');
+    }
+}
+
+// Get the midpoint of a path element
+function getPathMidpoint(pathEl) {
+    try {
+        const totalLength = pathEl.getTotalLength();
+        const midPoint = pathEl.getPointAtLength(totalLength / 2);
+        return { x: midPoint.x, y: midPoint.y };
+    } catch (e) {
+        // Fallback if path is invalid
+        return { x: 10000, y: 10000 };
+    }
 }
 
 // Calculate point on cubic Bezier curve at parameter t
@@ -362,15 +457,18 @@ export function deleteConnection(c, save = true, withFade = true) {
             c.el.classList.add('deleting');
             if (c.hitArea) c.hitArea.classList.add('deleting');
             if (c.arrow) c.arrow.classList.add('deleting');
+            if (c.labelEl) c.labelEl.classList.add('deleting');
             c.el.addEventListener('animationend', () => {
                 c.el.remove();
                 if (c.hitArea) c.hitArea.remove();
                 if (c.arrow) c.arrow.remove();
+                if (c.labelEl) c.labelEl.remove();
             }, { once: true });
         } else {
             c.el.remove();
             if (c.hitArea) c.hitArea.remove();
             if (c.arrow) c.arrow.remove();
+            if (c.labelEl) c.labelEl.remove();
         }
 
         if (save) {
@@ -385,9 +483,14 @@ export function deleteConnection(c, save = true, withFade = true) {
 function showConnDirectionPicker(x, y, conn) {
     connDirectionPicker.style.left = x + 'px';
     connDirectionPicker.style.top = y + 'px';
-    connDirectionPicker.querySelectorAll('button').forEach(b =>
+    connDirectionPicker.querySelectorAll('button[data-dir]').forEach(b =>
         b.classList.toggle('active', b.dataset.dir === conn.dir)
     );
+    // Populate label input with current label
+    const labelInput = connDirectionPicker.querySelector('#connLabelInput');
+    if (labelInput) {
+        labelInput.value = conn.label || '';
+    }
     connDirectionPicker.classList.add('active');
 }
 
@@ -405,6 +508,39 @@ export function setupConnDirectionPicker() {
             connDirectionPicker.classList.remove('active');
         });
     });
+
+    // Label input handler
+    const labelInput = connDirectionPicker.querySelector('#connLabelInput');
+    if (labelInput) {
+        let labelSaveTimer = null;
+
+        labelInput.addEventListener('input', e => {
+            e.stopPropagation();
+            if (state.selectedConn) {
+                state.selectedConn.label = labelInput.value;
+                updateConnectionLabel(state.selectedConn);
+
+                // Debounced save
+                if (labelSaveTimer) clearTimeout(labelSaveTimer);
+                labelSaveTimer = setTimeout(() => {
+                    eventBus.emit(Events.STATE_SAVE);
+                    eventBus.emit(Events.AUTOSAVE_TRIGGER);
+                }, 500);
+            }
+        });
+
+        labelInput.addEventListener('keydown', e => {
+            e.stopPropagation();
+            if (e.key === 'Enter') {
+                labelInput.blur();
+                connDirectionPicker.classList.remove('active');
+            }
+        });
+
+        labelInput.addEventListener('click', e => {
+            e.stopPropagation();
+        });
+    }
 
     // Delete button handler
     const deleteBtn = connDirectionPicker.querySelector('.conn-delete-btn');
@@ -472,8 +608,10 @@ export function completeConnectionWithNewMemo(canvasX, canvasY) {
 // Add child node connected to parent
 export function addChildNode(parent, dir, type = 'memo') {
     const gap = 100;
-    const cw = 220;
-    const ch = 140;
+    // Different sizes for different node types
+    const isKeyword = type === 'keyword';
+    const cw = isKeyword ? 120 : 220;
+    const ch = isKeyword ? 44 : 140;
     let x, y, fh, th;
 
     switch (dir) {
@@ -491,19 +629,21 @@ export function addChildNode(parent, dir, type = 'memo') {
             break;
         case 'left':
             x = parent.x - cw - gap;
-            y = parent.y;
+            y = parent.y + (parent.h - ch) / 2;
             fh = 'left';
             th = 'right';
             break;
         case 'right':
             x = parent.x + parent.w + gap;
-            y = parent.y;
+            y = parent.y + (parent.h - ch) / 2;
             fh = 'right';
             th = 'left';
             break;
     }
 
-    const child = addMemo('', x, y, parent.color);
+    const child = isKeyword
+        ? addKeyword('', x, y, parent.color)
+        : addMemo('', x, y, parent.color);
     addConnection(parent, fh, child, th);
     eventBus.emit(Events.STATE_SAVE);
     return child;
