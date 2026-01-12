@@ -422,6 +422,25 @@ export function setupDragDropEvents() {
     });
 }
 
+// ============ Copy Events ============
+
+export function setupCopyEvents() {
+    window.addEventListener('copy', e => {
+        // Only intercept copy from contenteditable elements within the app
+        if (!e.target.matches('[contenteditable="true"]') && !e.target.closest('[contenteditable="true"]')) return;
+
+        const sel = window.getSelection();
+        if (!sel.rangeCount || sel.isCollapsed) return;
+
+        // Get plain text from selection
+        const plainText = sel.toString();
+        if (!plainText) return;
+
+        e.preventDefault();
+        e.clipboardData.setData('text/plain', plainText);
+    });
+}
+
 // ============ Paste Events ============
 
 export function setupPasteEvents() {
