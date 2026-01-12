@@ -187,10 +187,10 @@ export function setupMouseEvents() {
             let newW = Math.max(140, x - state.resizingItem.x);
             let newH = Math.max(80, y - state.resizingItem.y);
 
-            // Keyword node: allow both horizontal and vertical resize
+            // Keyword node: horizontal resize only, fixed height
             if (state.resizingItem.type === 'keyword') {
-                newW = Math.max(224, x - state.resizingItem.x);
-                newH = Math.max(56, y - state.resizingItem.y);
+                newW = Math.max(100, x - state.resizingItem.x);
+                newH = 56; // Fixed height for pill shape
             }
             // Shift key: maintain aspect ratio (proportional resize) - not for keyword nodes
             else if (e.shiftKey && state.resizingItem.initialAspectRatio) {
