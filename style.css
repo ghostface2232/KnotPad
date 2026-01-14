@@ -343,6 +343,7 @@ input, textarea, button { font-family: inherit; }
     justify-content: center;
     height: 100%;
     padding: 10px 36px;
+    direction: rtl; /* Makes overflow clip from left */
 }
 .keyword-body {
     font-size: 24px;
@@ -357,7 +358,10 @@ input, textarea, button { font-family: inherit; }
     cursor: text;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
+    direction: ltr; /* Keeps cursor position correct within the text */
+    /* Fade out effect on left edge instead of ellipsis */
+    -webkit-mask-image: linear-gradient(to right, transparent, black 24px, black);
+    mask-image: linear-gradient(to right, transparent, black 24px, black);
 }
 .keyword-body:empty::before {
     content: attr(data-placeholder);
