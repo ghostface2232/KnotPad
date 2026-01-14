@@ -358,7 +358,6 @@ input, textarea, button { font-family: inherit; }
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    direction: rtl;
 }
 .keyword-body:empty::before {
     content: attr(data-placeholder);
