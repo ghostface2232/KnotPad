@@ -4,13 +4,16 @@ import { COLOR_MAP } from './constants.js';
 import { $, curvePath, getHandlePos } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap } from './viewport.js';
-import { addMemo, deselectAll } from './items.js';
+import { addMemo, deselectAll, hideMenus } from './items.js';
 import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
 const connectionsSvg = $('connectionsSvg');
 const connDirectionPicker = $('connDirectionPicker');
 const connectionContextMenu = $('connectionContextMenu');
+const connLabelModal = $('connLabelModal');
+const connLabelModalInput = $('connLabelModalInput');
+const connLabelBtn = $('connLabelBtn');
 
 // Note: External function calls are now handled via eventBus
 // Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
@@ -492,10 +495,9 @@ function showConnDirectionPicker(x, y, conn) {
     connDirectionPicker.querySelectorAll('button[data-dir]').forEach(b =>
         b.classList.toggle('active', b.dataset.dir === conn.dir)
     );
-    // Populate label input with current label
-    const labelInput = connDirectionPicker.querySelector('#connLabelInput');
-    if (labelInput) {
-        labelInput.value = conn.label || '';
+    // Update label button state
+    if (connLabelBtn) {
+        connLabelBtn.classList.toggle('has-label', !!conn.label);
     }
     connDirectionPicker.classList.add('active');
 }
@@ -512,41 +514,22 @@ export function setupConnDirectionPicker() {
                 eventBus.emit(Events.AUTOSAVE_TRIGGER);
             }
             connDirectionPicker.classList.remove('active');
+            deselectConnection();
         });
     });
 
-    // Label input handler
-    const labelInput = connDirectionPicker.querySelector('#connLabelInput');
-    if (labelInput) {
-        let labelSaveTimer = null;
-
-        labelInput.addEventListener('input', e => {
+    // Label button handler - opens modal
+    if (connLabelBtn) {
+        connLabelBtn.addEventListener('click', e => {
             e.stopPropagation();
             if (state.selectedConn) {
-                state.selectedConn.label = labelInput.value;
-                updateConnectionLabel(state.selectedConn);
-
-                // Debounced save
-                if (labelSaveTimer) clearTimeout(labelSaveTimer);
-                labelSaveTimer = setTimeout(() => {
-                    eventBus.emit(Events.STATE_SAVE);
-                    eventBus.emit(Events.AUTOSAVE_TRIGGER);
-                }, 500);
+                openConnLabelModal();
             }
-        });
-
-        labelInput.addEventListener('keydown', e => {
-            e.stopPropagation();
-            if (e.key === 'Enter') {
-                labelInput.blur();
-                connDirectionPicker.classList.remove('active');
-            }
-        });
-
-        labelInput.addEventListener('click', e => {
-            e.stopPropagation();
         });
     }
+
+    // Setup label modal
+    setupConnLabelModal();
 
     // Delete button handler
     const deleteBtn = connDirectionPicker.querySelector('.conn-delete-btn');
@@ -561,8 +544,95 @@ export function setupConnDirectionPicker() {
     }
 }
 
+// Open connection label modal
+function openConnLabelModal() {
+    if (!connLabelModal || !connLabelModalInput) return;
+
+    connLabelModalInput.value = state.selectedConn?.label || '';
+    connLabelModal.classList.add('active');
+    connDirectionPicker.classList.remove('active');
+
+    setTimeout(() => {
+        connLabelModalInput.focus();
+        connLabelModalInput.select();
+    }, 50);
+}
+
+// Close connection label modal
+function closeConnLabelModal(save = false) {
+    if (!connLabelModal) return;
+
+    if (save && state.selectedConn) {
+        state.selectedConn.label = connLabelModalInput.value.trim();
+        updateConnectionLabel(state.selectedConn);
+        eventBus.emit(Events.STATE_SAVE);
+        eventBus.emit(Events.AUTOSAVE_TRIGGER);
+    }
+
+    connLabelModal.classList.remove('active');
+    deselectConnection();
+}
+
+// Deselect connection and clear selection state
+export function deselectConnection() {
+    if (state.selectedConn) {
+        state.selectedConn.el.classList.remove('selected');
+        if (state.selectedConn.arrow) state.selectedConn.arrow.classList.remove('selected');
+        if (state.selectedConn.labelEl) state.selectedConn.labelEl.classList.remove('selected');
+        state.setSelectedConn(null);
+    }
+}
+
+// Setup label modal event handlers
+function setupConnLabelModal() {
+    if (!connLabelModal) return;
+
+    const confirmBtn = $('connLabelModalConfirm');
+    const cancelBtn = $('connLabelModalCancel');
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            closeConnLabelModal(true);
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            closeConnLabelModal(false);
+        });
+    }
+
+    // Close on background click
+    connLabelModal.addEventListener('click', e => {
+        if (e.target === connLabelModal) {
+            closeConnLabelModal(false);
+        }
+    });
+
+    // Handle Enter and Escape keys
+    connLabelModalInput.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            closeConnLabelModal(true);
+        } else if (e.key === 'Escape') {
+            closeConnLabelModal(false);
+        }
+    });
+
+    // Prevent clicks inside modal from closing
+    const modalBox = connLabelModal.querySelector('.conn-label-modal-box');
+    if (modalBox) {
+        modalBox.addEventListener('click', e => {
+            e.stopPropagation();
+        });
+    }
+}
+
 // Show connection context menu
 function showConnectionContextMenu(conn, e) {
+    hideMenus(); // Close other context menus first
     deselectAll();
     state.setSelectedConn(conn);
     conn.el.classList.add('selected');

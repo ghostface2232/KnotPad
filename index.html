@@ -153,9 +153,19 @@
         <button data-dir="backward" title="Backward"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <button data-dir="both" title="Both ways"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l-5-5 5-5M17 7l5 5-5 5M2 12h20"/></svg></button>
         <span class="picker-sep"></span>
-        <input type="text" class="conn-label-input" id="connLabelInput" placeholder="Label..." maxlength="30">
+        <button class="conn-label-btn" id="connLabelBtn" title="Add/Edit Label">Aa</button>
         <span class="picker-sep"></span>
         <button class="conn-delete-btn" data-action="delete" title="Delete connection"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+
+    <div class="conn-label-modal" id="connLabelModal">
+        <div class="conn-label-modal-box">
+            <input type="text" class="conn-label-modal-input" id="connLabelModalInput" placeholder="Enter label..." maxlength="30">
+            <div class="conn-label-modal-actions">
+                <button class="conn-label-modal-btn cancel" id="connLabelModalCancel">Cancel</button>
+                <button class="conn-label-modal-btn confirm" id="connLabelModalConfirm">Confirm</button>
+            </div>
+        </div>
     </div>
 
 

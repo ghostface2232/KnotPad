@@ -1164,6 +1164,8 @@ export function deselectAll() {
 // Hide all menus
 function hideMenus() {
     $('contextMenu').classList.remove('active');
+    $('canvasContextMenu').classList.remove('active');
+    $('connectionContextMenu').classList.remove('active');
     $('filterDropdown').classList.remove('active');
     $('colorDropdown').classList.remove('active');
     $('connDirectionPicker').classList.remove('active');
