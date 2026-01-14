@@ -160,7 +160,7 @@ input, textarea, button { font-family: inherit; }
     right: 0;
     height: 3px;
     background: var(--tag-color);
-    z-index: 15;
+    z-index: 5;
     pointer-events: none;
 }
 .canvas-item:hover { border-color: var(--border-active); box-shadow: var(--shadow-lg); }
