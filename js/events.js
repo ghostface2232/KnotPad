@@ -4,7 +4,7 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, setZoom, throttledMinimap, startPan, updateMinimap } from './viewport.js';
 import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading } from './items.js';
-import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo } from './connections.js';
+import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo, deselectConnection } from './connections.js';
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
@@ -506,8 +506,9 @@ export function setupDocumentClickHandler() {
             $('connectionContextMenu').classList.remove('active');
             $('canvasContextMenu').classList.remove('active');
         }
-        if (!e.target.closest('.conn-direction-picker') && !e.target.closest('.connection-line')) {
+        if (!e.target.closest('.conn-direction-picker') && !e.target.closest('.connection-line') && !e.target.closest('.conn-label-modal')) {
             $('connDirectionPicker').classList.remove('active');
+            deselectConnection();
         }
         if (!e.target.closest('.child-type-picker') && !e.target.closest('.add-child-btn')) {
             $('childTypePicker').classList.remove('active');

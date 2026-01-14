@@ -483,14 +483,73 @@ input, textarea, button { font-family: inherit; }
 .conn-direction-picker .conn-delete-btn { background: var(--danger); color: white; }
 .conn-direction-picker .conn-delete-btn:hover { background: #dc2626; }
 .conn-direction-picker .picker-sep { width: 1px; height: 20px; background: var(--border-subtle); flex-shrink: 0; }
-.conn-label-input {
-    width: 100px; height: 28px; padding: 0 10px;
-    border: 1px solid var(--border-subtle); border-radius: 9999px;
-    background: var(--bg-card); color: var(--text-primary);
-    font-size: 12px; outline: none;
+.conn-label-btn {
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 36px;
 }
-.conn-label-input:focus { border-color: var(--accent); }
-.conn-label-input::placeholder { color: var(--text-placeholder); }
+.conn-label-btn.has-label {
+    background: var(--accent);
+    color: white;
+}
+
+/* Connection Label Modal */
+.conn-label-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 9, 11, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    backdrop-filter: blur(2px);
+}
+:root.light .conn-label-modal { background: rgba(0, 0, 0, 0.3); }
+.conn-label-modal.active { display: flex; }
+.conn-label-modal-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    width: 280px;
+    box-shadow: var(--shadow-lg);
+}
+.conn-label-modal-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+}
+.conn-label-modal-input:focus { border-color: var(--accent); }
+.conn-label-modal-input::placeholder { color: var(--text-placeholder); }
+.conn-label-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+.conn-label-modal-btn {
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.conn-label-modal-btn.cancel {
+    background: transparent;
+    color: var(--text-secondary);
+}
+.conn-label-modal-btn.cancel:hover { color: var(--text-primary); }
+.conn-label-modal-btn.confirm {
+    background: var(--accent);
+    color: white;
+}
+.conn-label-modal-btn.confirm:hover { filter: brightness(1.1); }
 
 .context-menu {
     position: fixed; background: var(--bg-secondary);

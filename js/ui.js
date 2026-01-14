@@ -1146,6 +1146,7 @@ export function setupMinimapClick() {
 // ============ Context Menu ============
 
 export function showContextMenu(x, y, item) {
+    hideMenus(); // Close other context menus first
     contextMenu.querySelector('[data-action="lock"]').textContent = item.locked ? 'Unlock' : 'Lock to Back';
     contextMenu.style.left = x + 'px';
     contextMenu.style.top = y + 'px';
@@ -1184,6 +1185,7 @@ let canvasContextX = 0;
 let canvasContextY = 0;
 
 export function showCanvasContextMenu(clientX, clientY, canvasX, canvasY) {
+    hideMenus(); // Close other context menus first
     canvasContextX = canvasX;
     canvasContextY = canvasY;
 
