@@ -797,10 +797,10 @@ input, textarea, button { font-family: inherit; }
     color: var(--text-secondary); flex-shrink: 0; cursor: pointer;
 }
 .canvas-item-entry .canvas-icon:hover { transform: scale(1.1); }
-.canvas-item-entry.active .canvas-icon:not(.colored) { background: var(--accent); color: white; }
+.canvas-item-entry.active .canvas-icon:not(.colored) { border: 2px solid var(--accent); }
 .canvas-item-entry .canvas-icon .icon-letter { font-size: 14px; font-weight: 700; text-transform: uppercase; }
 .canvas-item-entry .canvas-icon.colored { border: 2px solid transparent; }
-.canvas-item-entry.active .canvas-icon.colored { border-color: rgba(255,255,255,0.3); }
+.canvas-item-entry.active .canvas-icon.colored { border-color: var(--accent); }
 .canvas-item-entry .canvas-info { flex: 1; min-width: 0; }
 .canvas-item-entry .canvas-name { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .canvas-item-entry .canvas-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
