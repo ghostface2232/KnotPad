@@ -9,6 +9,21 @@ import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
 
+// ============ Favicon Fallback ============
+// Globe icon SVG as data URI for when favicon fails to load
+const FALLBACK_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cpath d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/%3E%3C/svg%3E";
+
+// Setup favicon error handler - show fallback globe icon when favicon fails to load
+function setupFaviconErrorHandler(imgElement) {
+    imgElement.onerror = () => {
+        imgElement.onerror = null; // Prevent infinite loop
+        imgElement.src = FALLBACK_FAVICON;
+    };
+}
+
+// Export for use in ui.js
+export { FALLBACK_FAVICON, setupFaviconErrorHandler };
+
 // ============ Global Event Delegation for Memo Toolbars ============
 // Single document-level listener instead of per-item listeners (prevents memory leaks)
 let memoToolbarDelegationInitialized = false;
@@ -248,6 +263,10 @@ export function createItem(cfg, loading = false) {
     } else if (cfg.type === 'video' && cfg.content?.startsWith('media_')) {
         const videoEl = el.querySelector('.item-video');
         if (videoEl) setupMediaErrorHandler(videoEl, cfg.content);
+    } else if (cfg.type === 'link') {
+        // Setup favicon fallback for link items
+        const faviconEl = el.querySelector('.link-favicon');
+        if (faviconEl) setupFaviconErrorHandler(faviconEl);
     }
 
     const item = {

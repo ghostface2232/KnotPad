@@ -5,7 +5,7 @@ import { $, esc, generateId, showToast } from './utils.js';
 import * as state from './state.js';
 import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
-import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus } from './items.js';
+import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus, setupFaviconErrorHandler } from './items.js';
 import { addConnection, updateConnectionArrow, updateConnectionLabel, updateAllConnections, addChildNode } from './connections.js';
 import {
     fsDirectoryHandle,
@@ -1762,7 +1762,9 @@ export function setupLinkModal() {
                 };
                 // Update the DOM
                 const el = editingLinkItem.el;
-                el.querySelector('.link-favicon').src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                const faviconEl = el.querySelector('.link-favicon');
+                faviconEl.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                setupFaviconErrorHandler(faviconEl);
                 el.querySelector('.link-title').textContent = title;
                 const linkUrlEl = el.querySelector('.link-url');
                 linkUrlEl.textContent = editingLinkItem.content.display;
