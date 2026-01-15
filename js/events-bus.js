@@ -134,7 +134,10 @@ export const Events = {
     UI_SHOW_CONTEXT_MENU: 'ui:showContextMenu',
 
     // Item events
-    ITEMS_ADD_CHILD_NODE: 'items:addChildNode'
+    ITEMS_ADD_CHILD_NODE: 'items:addChildNode',
+
+    // Link events
+    LINK_EDIT: 'link:edit'
 };
 
 export default eventBus;

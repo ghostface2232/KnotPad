@@ -412,7 +412,7 @@ input, textarea, button { font-family: inherit; }
     box-sizing: border-box;
 }
 
-.item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
+.item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; cursor: pointer; }
 .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); }
 .link-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
 .link-url { font-size: 12px; color: var(--text-secondary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1570,11 +1570,11 @@ input, textarea, button { font-family: inherit; }
     font-size: 13px;
 }
 .font-size-preview .preview-text.size-medium {
-    font-size: 14px;
-}
-.font-size-preview .preview-text.size-large {
     font-size: 15px;
 }
+.font-size-preview .preview-text.size-large {
+    font-size: 18px;
+}
 .font-size-preview .preview-text.size-xlarge {
-    font-size: 16px;
+    font-size: 22px;
 }

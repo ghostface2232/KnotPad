@@ -1710,7 +1710,27 @@ export function setupNewNodePicker() {
 
 // ============ Link Modal ============
 
-export function openLinkModal() {
+let editingLinkItem = null; // Track link being edited
+
+export function openLinkModal(itemToEdit = null) {
+    editingLinkItem = itemToEdit;
+    const modalTitle = linkModal.querySelector('h3');
+    const submitBtn = $('linkSubmit');
+
+    if (itemToEdit) {
+        // Edit mode
+        modalTitle.textContent = 'Edit Link';
+        submitBtn.textContent = 'Save';
+        $('linkTitle').value = itemToEdit.content.title || '';
+        $('linkUrl').value = itemToEdit.content.url || '';
+    } else {
+        // Add mode
+        modalTitle.textContent = 'Add Link';
+        submitBtn.textContent = 'Add';
+        $('linkTitle').value = '';
+        $('linkUrl').value = '';
+    }
+
     linkModal.classList.add('active');
     setTimeout(() => $('linkUrl').focus(), 100);
 }
