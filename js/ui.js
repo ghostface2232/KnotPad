@@ -1739,50 +1739,88 @@ export function closeLinkModal() {
     linkModal.classList.remove('active');
     $('linkTitle').value = '';
     $('linkUrl').value = '';
-    editingLinkItem = null;
+    hideLinkModalError();
+}
+
+function isValidUrl(string) {
+    // Add protocol if missing for validation
+    let urlString = string;
+    if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
+        urlString = 'https://' + urlString;
+    }
+    try {
+        const url = new URL(urlString);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function showLinkModalError(message) {
+    const errorEl = $('linkModalError');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.add('visible');
+    }
+}
+
+function hideLinkModalError() {
+    const errorEl = $('linkModalError');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.remove('visible');
+    }
+}
+
+function submitLinkModal() {
+    const urlInput = $('linkUrl');
+    let url = urlInput.value.trim();
+
+    if (!url) {
+        showLinkModalError('Please enter a URL.');
+        urlInput.focus();
+        return;
+    }
+
+    if (!isValidUrl(url)) {
+        showLinkModalError('Please enter a valid URL.');
+        urlInput.focus();
+        return;
+    }
+
+    if (!url.startsWith('http')) url = 'https://' + url;
+    const x = (innerWidth / 2 - state.offsetX) / state.scale - 130;
+    const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
+    addLink(url, $('linkTitle').value.trim(), x, y);
+    eventBus.emit(Events.STATE_SAVE);
+    closeLinkModal();
 }
 
 export function setupLinkModal() {
     linkModal.addEventListener('click', e => { if (e.target === linkModal) closeLinkModal(); });
     linkModal.querySelector('[data-close]').addEventListener('click', closeLinkModal);
 
-    $('linkSubmit').addEventListener('click', () => {
-        let url = $('linkUrl').value.trim();
-        if (url) {
-            if (!url.startsWith('http')) url = 'https://' + url;
+    // Submit on button click
+    $('linkSubmit').addEventListener('click', submitLinkModal);
 
-            if (editingLinkItem) {
-                // Edit existing link
-                const domain = new URL(url).hostname;
-                const title = $('linkTitle').value.trim() || domain;
-                editingLinkItem.content = {
-                    url,
-                    title,
-                    display: url.replace(/^https?:\/\//, '').replace(/\/$/, '')
-                };
-                // Update the DOM
-                const el = editingLinkItem.el;
-                el.querySelector('.link-favicon').src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-                el.querySelector('.link-title').textContent = title;
-                const linkUrlEl = el.querySelector('.link-url');
-                linkUrlEl.textContent = editingLinkItem.content.display;
-                linkUrlEl.href = url;
-                eventBus.emit(Events.STATE_SAVE);
-            } else {
-                // Add new link
-                const x = (innerWidth / 2 - state.offsetX) / state.scale - 130;
-                const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
-                addLink(url, $('linkTitle').value.trim(), x, y);
-                eventBus.emit(Events.STATE_SAVE);
-            }
-            closeLinkModal();
+    // Submit on Enter key in URL input
+    $('linkUrl').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitLinkModal();
         }
     });
 
-    // Listen for link edit events
-    eventBus.on(Events.LINK_EDIT, item => {
-        openLinkModal(item);
+    // Submit on Enter key in title input
+    $('linkTitle').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitLinkModal();
+        }
     });
+
+    // Clear error when user starts typing
+    $('linkUrl').addEventListener('input', hideLinkModalError);
 }
 
 // ============ Settings Modal ============
