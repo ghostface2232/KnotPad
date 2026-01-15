@@ -20,7 +20,9 @@ import {
     saveMediaToFileSystem,
     selectStorageFolder,
     disconnectStorageFolder,
-    updateStorageIndicator
+    updateStorageIndicator,
+    getMediaByIds,
+    saveMediaBatch
 } from './storage.js';
 import eventBus, { Events } from './events-bus.js';
 
@@ -1918,17 +1920,47 @@ async function exportAllCanvases() {
         await saveCurrentCanvas();
 
         const allData = {
-            version: 1,
+            version: 2,
             exportedAt: new Date().toISOString(),
             canvases: state.canvases.map(c => ({ ...c })),
-            data: {}
+            data: {},
+            media: {}
         };
 
-        // Collect all canvas data
+        // Collect all canvas data and media IDs
+        const mediaIds = new Set();
         for (const canvas of state.canvases) {
             const savedData = localStorage.getItem('knotpad-data-' + canvas.id);
             if (savedData) {
-                allData.data[canvas.id] = JSON.parse(savedData);
+                const canvasData = JSON.parse(savedData);
+                allData.data[canvas.id] = canvasData;
+
+                // Collect media IDs from items
+                if (canvasData.items) {
+                    for (const item of canvasData.items) {
+                        if ((item.type === 'image' || item.type === 'video') && item.content?.startsWith('media_')) {
+                            mediaIds.add(item.content);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Export media blobs as base64
+        if (mediaIds.size > 0) {
+            showToast('Exporting media...', 'info');
+            const mediaBlobs = await getMediaByIds([...mediaIds]);
+
+            for (const [id, blob] of Object.entries(mediaBlobs)) {
+                try {
+                    const base64 = await blobToBase64(blob);
+                    allData.media[id] = {
+                        type: blob.type,
+                        data: base64
+                    };
+                } catch (e) {
+                    console.warn('Failed to export media:', id, e);
+                }
             }
         }
 
@@ -1939,11 +1971,35 @@ async function exportAllCanvases() {
         a.download = `knotpad-all-canvases-${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast('All canvases exported successfully');
+
+        const mediaCount = Object.keys(allData.media).length;
+        showToast(`Exported ${state.canvases.length} canvas(es)${mediaCount > 0 ? ` with ${mediaCount} media file(s)` : ''}`);
     } catch (e) {
         console.error('Export failed:', e);
         showToast('Export failed', 'error');
     }
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+function base64ToBlob(base64, mimeType) {
+    const byteChars = atob(base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
 }
 
 async function importAllCanvases(e) {
@@ -1963,10 +2019,35 @@ async function importAllCanvases(e) {
 
         // Confirm with user
         const canvasCount = allData.canvases.length;
-        const confirmed = confirm(`This will import ${canvasCount} canvas(es). Existing canvases with the same ID will be overwritten. Continue?`);
+        const mediaCount = allData.media ? Object.keys(allData.media).length : 0;
+        const mediaInfo = mediaCount > 0 ? ` and ${mediaCount} media file(s)` : '';
+        const confirmed = confirm(`This will import ${canvasCount} canvas(es)${mediaInfo}. Existing canvases with the same ID will be overwritten. Continue?`);
         if (!confirmed) {
             e.target.value = '';
             return;
+        }
+
+        // Import media first (if present)
+        if (allData.media && Object.keys(allData.media).length > 0) {
+            showToast('Importing media...', 'info');
+            const mediaEntries = [];
+
+            for (const [id, mediaData] of Object.entries(allData.media)) {
+                try {
+                    const blob = base64ToBlob(mediaData.data, mediaData.type);
+                    mediaEntries.push({ id, blob });
+
+                    // Also save to file system if connected
+                    if (fsDirectoryHandle) {
+                        await saveMediaToFileSystem(id, blob);
+                    }
+                } catch (err) {
+                    console.warn('Failed to import media:', id, err);
+                }
+            }
+
+            // Save all media to IndexedDB in batch
+            await saveMediaBatch(mediaEntries);
         }
 
         // Import canvases
@@ -1984,11 +2065,19 @@ async function importAllCanvases(e) {
             // Import canvas data
             if (allData.data[canvas.id]) {
                 localStorage.setItem('knotpad-data-' + canvas.id, JSON.stringify(allData.data[canvas.id]));
+
+                // Also save to file system if connected
+                if (fsDirectoryHandle) {
+                    await saveCanvasToFileSystem(canvas.id, allData.data[canvas.id]);
+                }
             }
         }
 
         // Save updated canvas list
         localStorage.setItem(CANVASES_KEY, JSON.stringify(state.canvases));
+        if (fsDirectoryHandle) {
+            await saveCanvasesListToFileSystem();
+        }
 
         // Refresh sidebar
         renderCanvasList();
@@ -1998,7 +2087,8 @@ async function importAllCanvases(e) {
             await switchCanvas(state.currentCanvasId);
         }
 
-        showToast(`Imported ${canvasCount} canvas(es) successfully`);
+        const importedMediaCount = allData.media ? Object.keys(allData.media).length : 0;
+        showToast(`Imported ${canvasCount} canvas(es)${importedMediaCount > 0 ? ` with ${importedMediaCount} media file(s)` : ''}`);
     } catch (err) {
         console.error('Import failed:', err);
         showToast('Import failed', 'error');
