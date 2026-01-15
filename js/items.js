@@ -944,6 +944,50 @@ function setupItemEvents(item) {
             document.execCommand('insertText', false, cleanText);
         });
     }
+
+    // Link item click and double-click handlers
+    if (item.type === 'link') {
+        const itemLink = el.querySelector('.item-link');
+        let clickStartX = 0;
+        let clickStartY = 0;
+        let clickStartTime = 0;
+        const DRAG_THRESHOLD = 5; // pixels
+        const CLICK_TIMEOUT = 300; // ms
+
+        // Track mousedown position to distinguish click from drag
+        itemLink.addEventListener('mousedown', e => {
+            clickStartX = e.clientX;
+            clickStartY = e.clientY;
+            clickStartTime = Date.now();
+        });
+
+        // Single click to open link (but not if it was a drag)
+        itemLink.addEventListener('click', e => {
+            // Don't open link if clicking on control buttons
+            if (e.target.closest('.delete-btn') || e.target.closest('.color-btn') ||
+                e.target.closest('.color-picker') || e.target.closest('.resize-handle')) {
+                return;
+            }
+
+            const dx = Math.abs(e.clientX - clickStartX);
+            const dy = Math.abs(e.clientY - clickStartY);
+            const elapsed = Date.now() - clickStartTime;
+
+            // Only open if it was a quick click without much movement (not a drag)
+            if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD && elapsed < CLICK_TIMEOUT) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(item.content.url, '_blank');
+            }
+        });
+
+        // Double-click to edit link
+        itemLink.addEventListener('dblclick', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            eventBus.emit(Events.LINK_EDIT, item);
+        });
+    }
 }
 
 // Set paragraph alignment (left, center, right)
