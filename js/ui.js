@@ -1757,13 +1757,13 @@ function submitLinkModal() {
     let url = urlInput.value.trim();
 
     if (!url) {
-        showLinkModalError('URL을 입력해 주세요.');
+        showLinkModalError('Please enter a URL.');
         urlInput.focus();
         return;
     }
 
     if (!isValidUrl(url)) {
-        showLinkModalError('올바른 URL 형식이 아닙니다.');
+        showLinkModalError('Please enter a valid URL.');
         urlInput.focus();
         return;
     }
