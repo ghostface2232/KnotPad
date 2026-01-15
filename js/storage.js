@@ -59,6 +59,46 @@ export function deleteMedia(id) {
     tx.objectStore(MEDIA_STORE).delete(id);
 }
 
+export function getMediaByIds(ids) {
+    return new Promise((resolve) => {
+        if (!mediaDB || !ids || ids.length === 0) { resolve({}); return; }
+        const result = {};
+        const tx = mediaDB.transaction(MEDIA_STORE, 'readonly');
+        const store = tx.objectStore(MEDIA_STORE);
+        let pending = ids.length;
+
+        ids.forEach(id => {
+            const req = store.get(id);
+            req.onsuccess = () => {
+                if (req.result?.blob) {
+                    result[id] = req.result.blob;
+                }
+                pending--;
+                if (pending === 0) resolve(result);
+            };
+            req.onerror = () => {
+                pending--;
+                if (pending === 0) resolve(result);
+            };
+        });
+    });
+}
+
+export function saveMediaBatch(mediaEntries) {
+    return new Promise((resolve, reject) => {
+        if (!mediaDB || !mediaEntries || mediaEntries.length === 0) { resolve(); return; }
+        const tx = mediaDB.transaction(MEDIA_STORE, 'readwrite');
+        const store = tx.objectStore(MEDIA_STORE);
+
+        mediaEntries.forEach(({ id, blob }) => {
+            store.put({ id, blob });
+        });
+
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 // ============ Persistent Storage Functions ============
 
 // Request persistent storage to prevent browser from clearing data
