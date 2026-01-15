@@ -1739,7 +1739,61 @@ export function closeLinkModal() {
     linkModal.classList.remove('active');
     $('linkTitle').value = '';
     $('linkUrl').value = '';
-    editingLinkItem = null;
+    hideLinkModalError();
+}
+
+function isValidUrl(string) {
+    // Add protocol if missing for validation
+    let urlString = string;
+    if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
+        urlString = 'https://' + urlString;
+    }
+    try {
+        const url = new URL(urlString);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function showLinkModalError(message) {
+    const errorEl = $('linkModalError');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.add('visible');
+    }
+}
+
+function hideLinkModalError() {
+    const errorEl = $('linkModalError');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.remove('visible');
+    }
+}
+
+function submitLinkModal() {
+    const urlInput = $('linkUrl');
+    let url = urlInput.value.trim();
+
+    if (!url) {
+        showLinkModalError('Please enter a URL.');
+        urlInput.focus();
+        return;
+    }
+
+    if (!isValidUrl(url)) {
+        showLinkModalError('Please enter a valid URL.');
+        urlInput.focus();
+        return;
+    }
+
+    if (!url.startsWith('http')) url = 'https://' + url;
+    const x = (innerWidth / 2 - state.offsetX) / state.scale - 130;
+    const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
+    addLink(url, $('linkTitle').value.trim(), x, y);
+    eventBus.emit(Events.STATE_SAVE);
+    closeLinkModal();
 }
 
 export function setupLinkModal() {
@@ -1781,10 +1835,16 @@ export function setupLinkModal() {
         }
     });
 
-    // Listen for link edit events
-    eventBus.on(Events.LINK_EDIT, item => {
-        openLinkModal(item);
+    // Submit on Enter key in title input
+    $('linkTitle').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitLinkModal();
+        }
     });
+
+    // Clear error when user starts typing
+    $('linkUrl').addEventListener('input', hideLinkModalError);
 }
 
 // ============ Settings Modal ============
