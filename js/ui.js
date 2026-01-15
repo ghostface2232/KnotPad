@@ -166,6 +166,7 @@ export function saveState() {
             content: JSON.parse(JSON.stringify(i.content)),
             color: i.color,
             fontSize: i.fontSize,
+            wrapMode: i.wrapMode,
             locked: i.locked,
             manuallyResized: i.manuallyResized,
             z: parseInt(i.el.style.zIndex)
@@ -296,6 +297,7 @@ export async function saveCurrentCanvas() {
             content: i.content,
             color: i.color,
             fontSize: i.fontSize,
+            wrapMode: i.wrapMode,
             locked: i.locked,
             manuallyResized: i.manuallyResized,
             z: parseInt(i.el.style.zIndex)
@@ -1262,6 +1264,13 @@ function updateFontSizePreview(size) {
     }
 }
 
+function updateWrapModePreview(mode) {
+    const previewWrapText = $('previewWrapText');
+    if (previewWrapText) {
+        previewWrapText.className = 'preview-text-wrap' + (mode === 'character' ? ' wrap-character' : '');
+    }
+}
+
 function updateSettingsUI() {
     // Update font size buttons
     const fontSizeGroup = $('defaultFontSize');
@@ -1273,6 +1282,17 @@ function updateSettingsUI() {
 
     // Update font size preview
     updateFontSizePreview(state.defaultFontSize);
+
+    // Update wrap mode buttons
+    const wrapModeGroup = $('noteWrapMode');
+    if (wrapModeGroup) {
+        wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === state.noteWrapMode);
+        });
+    }
+
+    // Update wrap mode preview
+    updateWrapModePreview(state.noteWrapMode);
 
     // Update invert wheel zoom toggle
     const invertWheelZoomCheckbox = $('invertWheelZoom');
@@ -1362,6 +1382,19 @@ export function setupSettingsModal() {
         });
     }
 
+    // Note wrap mode
+    const wrapModeGroup = $('noteWrapMode');
+    if (wrapModeGroup) {
+        wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.setNoteWrapMode(btn.dataset.value);
+                updateWrapModePreview(btn.dataset.value);
+            });
+        });
+    }
+
     // Invert wheel zoom
     const invertWheelZoomCheckbox = $('invertWheelZoom');
     if (invertWheelZoomCheckbox) {
@@ -1442,6 +1475,7 @@ function saveToLocalStorageSync() {
                 content: i.content,
                 color: i.color,
                 fontSize: i.fontSize,
+                wrapMode: i.wrapMode,
                 locked: i.locked,
                 manuallyResized: i.manuallyResized,
                 z: parseInt(i.el.style.zIndex)

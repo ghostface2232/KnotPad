@@ -218,6 +218,10 @@ export function createItem(cfg, loading = false) {
         el.classList.add('font-size-' + cfg.fontSize);
     }
 
+    if (cfg.wrapMode === 'character' && cfg.type === 'memo') {
+        el.classList.add('wrap-mode-character');
+    }
+
     const isMemo = cfg.type === 'memo';
     const fontSizeBtn = isMemo
         ? `<button class="font-size-btn" title="Font Size"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></button>`
@@ -254,6 +258,7 @@ export function createItem(cfg, loading = false) {
         content: cfg.content,
         color: cfg.color || null,
         fontSize: cfg.fontSize || null,
+        wrapMode: cfg.wrapMode || null,
         locked: cfg.locked || false,
         manuallyResized: cfg.manuallyResized || false
     };
@@ -1018,7 +1023,8 @@ export function duplicateItem(item) {
         h: item.h,
         content: JSON.parse(JSON.stringify(item.content)),
         color: item.color,
-        fontSize: item.fontSize
+        fontSize: item.fontSize,
+        wrapMode: item.wrapMode
     });
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
@@ -1034,7 +1040,8 @@ function duplicateItemForDrag(item) {
         h: item.h,
         content: JSON.parse(JSON.stringify(item.content)),
         color: item.color,
-        fontSize: item.fontSize
+        fontSize: item.fontSize,
+        wrapMode: item.wrapMode
     });
 }
 
@@ -1104,6 +1111,8 @@ export function addMemo(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
     // Apply default font size setting
     const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
+    // Apply default wrap mode setting
+    const wrapMode = state.noteWrapMode !== 'word' ? state.noteWrapMode : null;
 
     // Calculate size based on text content if provided
     const calculatedSize = text ? calculateMemoSizeForText(text, fontSize) : null;
@@ -1118,7 +1127,8 @@ export function addMemo(text = '', x, y, color = null) {
         h: calculatedSize ? calculatedSize.h : defaultH,
         content: text,
         color,
-        fontSize
+        fontSize,
+        wrapMode
     });
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
     return item;
