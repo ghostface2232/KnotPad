@@ -1719,23 +1719,88 @@ export function closeLinkModal() {
     linkModal.classList.remove('active');
     $('linkTitle').value = '';
     $('linkUrl').value = '';
+    hideLinkModalError();
+}
+
+function isValidUrl(string) {
+    // Add protocol if missing for validation
+    let urlString = string;
+    if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
+        urlString = 'https://' + urlString;
+    }
+    try {
+        const url = new URL(urlString);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function showLinkModalError(message) {
+    const errorEl = $('linkModalError');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.add('visible');
+    }
+}
+
+function hideLinkModalError() {
+    const errorEl = $('linkModalError');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.remove('visible');
+    }
+}
+
+function submitLinkModal() {
+    const urlInput = $('linkUrl');
+    let url = urlInput.value.trim();
+
+    if (!url) {
+        showLinkModalError('URL을 입력해 주세요.');
+        urlInput.focus();
+        return;
+    }
+
+    if (!isValidUrl(url)) {
+        showLinkModalError('올바른 URL 형식이 아닙니다.');
+        urlInput.focus();
+        return;
+    }
+
+    if (!url.startsWith('http')) url = 'https://' + url;
+    const x = (innerWidth / 2 - state.offsetX) / state.scale - 130;
+    const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
+    addLink(url, $('linkTitle').value.trim(), x, y);
+    eventBus.emit(Events.STATE_SAVE);
+    closeLinkModal();
 }
 
 export function setupLinkModal() {
     linkModal.addEventListener('click', e => { if (e.target === linkModal) closeLinkModal(); });
     linkModal.querySelector('[data-close]').addEventListener('click', closeLinkModal);
 
-    $('linkSubmit').addEventListener('click', () => {
-        let url = $('linkUrl').value.trim();
-        if (url) {
-            if (!url.startsWith('http')) url = 'https://' + url;
-            const x = (innerWidth / 2 - state.offsetX) / state.scale - 130;
-            const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
-            addLink(url, $('linkTitle').value.trim(), x, y);
-            eventBus.emit(Events.STATE_SAVE);
-            closeLinkModal();
+    // Submit on button click
+    $('linkSubmit').addEventListener('click', submitLinkModal);
+
+    // Submit on Enter key in URL input
+    $('linkUrl').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitLinkModal();
         }
     });
+
+    // Submit on Enter key in title input
+    $('linkTitle').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitLinkModal();
+        }
+    });
+
+    // Clear error when user starts typing
+    $('linkUrl').addEventListener('input', hideLinkModalError);
 }
 
 // ============ Settings Modal ============
