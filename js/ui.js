@@ -769,6 +769,8 @@ export function renderCanvasList() {
         entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
         entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
         entry.querySelector('.canvas-icon').addEventListener('click', e => { e.stopPropagation(); openIconPicker(id, entry); });
+        // Double-click on canvas name to rename
+        entry.querySelector('.canvas-name')?.addEventListener('dblclick', e => { e.stopPropagation(); startRename(entry, id); });
 
         // Drag and drop for canvases
         setupCanvasDragDrop(entry, id);
@@ -799,6 +801,11 @@ export function renderCanvasList() {
         header.querySelector('.group-action-btn.delete')?.addEventListener('click', e => {
             e.stopPropagation();
             deleteGroup(groupId);
+        });
+        // Double-click on group name to rename
+        header.querySelector('.group-name')?.addEventListener('dblclick', e => {
+            e.stopPropagation();
+            startGroupRename(header, groupId);
         });
 
         // Drag drop for groups
