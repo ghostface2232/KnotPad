@@ -43,7 +43,8 @@ import {
     setupSettingsModal,
     setupCanvasContextMenu,
     setupSidebarResize,
-    handleFile
+    handleFile,
+    applyWrapMode
 } from './ui.js';
 import {
     setupMouseEvents,
@@ -326,6 +327,7 @@ async function init() {
     setupNewNodePicker();
     setupLinkModal();
     setupSettingsModal();
+    applyWrapMode(state.noteWrapMode);
     setupMouseEvents();
     setupTouchEvents();
     setupKeyboardEvents();
