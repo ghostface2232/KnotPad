@@ -517,16 +517,9 @@ export function setupDocumentClickHandler() {
             $('connDirectionPicker').classList.remove('active');
             deselectConnection();
         }
-        if (!e.target.closest('.child-type-picker') && !e.target.closest('.add-child-btn')) {
-            $('childTypePicker').classList.remove('active');
-        }
         if (!e.target.closest('.canvas-icon-picker') && !e.target.closest('.canvas-icon')) {
             $('canvasIconPicker').classList.remove('active');
             state.setIconPickerTarget(null);
-        }
-        if (!e.target.closest('.new-node-picker')) {
-            $('newNodePicker').classList.remove('active');
-            state.setNewNodePickerData(null);
         }
     });
 }
