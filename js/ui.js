@@ -1905,6 +1905,18 @@ function updateFontSizePreview(size) {
     }
 }
 
+function updateWrapModePreview(mode) {
+    const previewWrapText = $('previewWrapText');
+    if (previewWrapText) {
+        previewWrapText.className = 'preview-text-wrap' + (mode === 'character' ? ' wrap-character' : '');
+    }
+}
+
+// Apply wrap mode globally via body class
+export function applyWrapMode(mode) {
+    document.body.classList.toggle('wrap-mode-character', mode === 'character');
+}
+
 function updateSettingsUI() {
     // Update font size buttons
     const fontSizeGroup = $('defaultFontSize');
@@ -1916,6 +1928,17 @@ function updateSettingsUI() {
 
     // Update font size preview
     updateFontSizePreview(state.defaultFontSize);
+
+    // Update wrap mode buttons
+    const wrapModeGroup = $('noteWrapMode');
+    if (wrapModeGroup) {
+        wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === state.noteWrapMode);
+        });
+    }
+
+    // Update wrap mode preview
+    updateWrapModePreview(state.noteWrapMode);
 
     // Update invert wheel zoom toggle
     const invertWheelZoomCheckbox = $('invertWheelZoom');
@@ -2009,6 +2032,20 @@ export function setupSettingsModal() {
                 btn.classList.add('active');
                 state.setDefaultFontSize(btn.dataset.value);
                 updateFontSizePreview(btn.dataset.value);
+            });
+        });
+    }
+
+    // Note wrap mode
+    const wrapModeGroup = $('noteWrapMode');
+    if (wrapModeGroup) {
+        wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.setNoteWrapMode(btn.dataset.value);
+                updateWrapModePreview(btn.dataset.value);
+                applyWrapMode(btn.dataset.value);
             });
         });
     }
