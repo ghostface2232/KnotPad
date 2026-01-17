@@ -1255,7 +1255,21 @@ function hideSidebarContextMenus() {
 function positionContextMenu(menu, x, y) {
     // Ensure menu stays within viewport
     const menuWidth = 180;
-    const menuHeight = menu.offsetHeight || 200;
+
+    // Temporarily show menu off-screen to measure actual height
+    const wasActive = menu.classList.contains('active');
+    if (!wasActive) {
+        menu.style.visibility = 'hidden';
+        menu.style.left = '-9999px';
+        menu.classList.add('active');
+    }
+
+    const menuHeight = menu.offsetHeight;
+
+    if (!wasActive) {
+        menu.classList.remove('active');
+        menu.style.visibility = '';
+    }
 
     if (x + menuWidth > window.innerWidth) {
         x = window.innerWidth - menuWidth - 8;
