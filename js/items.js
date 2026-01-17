@@ -341,6 +341,7 @@ function setupItemEvents(item) {
             state.setDraggedItem(duplicated);
             duplicated.el.classList.add('dragging');
             canvas.classList.add('dragging-item');
+            document.body.classList.add('is-dragging');
             return;
         }
 
@@ -360,6 +361,7 @@ function setupItemEvents(item) {
         state.setDraggedItem(item);
         state.selectedItems.forEach(i => i.el.classList.add('dragging'));
         canvas.classList.add('dragging-item');
+        document.body.classList.add('is-dragging');
     });
 
     el.querySelector('.resize-handle').addEventListener('mousedown', e => {
@@ -501,6 +503,7 @@ function setupItemEvents(item) {
                     state.setDraggedItem(item);
                     state.selectedItems.forEach(i => i.el.classList.add('dragging'));
                     canvas.classList.add('dragging-item');
+                    document.body.classList.add('is-dragging');
                 }
             }
         });

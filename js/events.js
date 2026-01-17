@@ -8,7 +8,7 @@ import { updateAllConnections, cancelConnection, deleteConnection, updateTempLin
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
-    saveCurrentCanvas, showCanvasContextMenu
+    saveCurrentCanvas, showCanvasContextMenu, closeSettingsModal
 } from './ui.js';
 
 const app = $('app');
@@ -257,6 +257,7 @@ export function setupMouseEvents() {
             if (state.draggedItem) {
                 state.selectedItems.forEach(i => i.el.classList.remove('dragging'));
                 canvas.classList.remove('dragging-item');
+                document.body.classList.remove('is-dragging');
                 saveState();
                 state.setDraggedItem(null);
             }
@@ -363,6 +364,7 @@ export function setupKeyboardEvents() {
             cancelConnection(true); // with fade effect
             closeLinkModal();
             closeSearch();
+            closeSettingsModal();
             deselectAll();
         }
         if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input,textarea,[contenteditable="true"]')) {
@@ -448,6 +450,11 @@ export function setupPasteEvents() {
         // Allow default paste behavior in input, textarea, and contenteditable elements
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]')) return;
+
+        // Also check document.activeElement for cases where focus is in contenteditable but e.target differs
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+        if (activeEl && (activeEl.matches('[contenteditable="true"]') || activeEl.closest('[contenteditable="true"]'))) return;
 
         e.preventDefault();
         const cd = e.clipboardData;
