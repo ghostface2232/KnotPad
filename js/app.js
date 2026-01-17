@@ -4,7 +4,7 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
-import { createItem, addMemo, setFilter, setItemColor, sortByColor } from './items.js';
+import { createItem, addMemo, addKeyword, setFilter, setItemColor, sortByColor } from './items.js';
 import {
     setupConnDirectionPicker,
     setupConnectionContextMenu,
@@ -42,6 +42,7 @@ import {
     setupLinkModal,
     setupSettingsModal,
     setupCanvasContextMenu,
+    setupSidebarContextMenus,
     setupSidebarResize,
     handleFile,
     applyWrapMode
@@ -51,8 +52,10 @@ import {
     setupTouchEvents,
     setupKeyboardEvents,
     setupDragDropEvents,
+    setupCopyEvents,
     setupPasteEvents,
-    setupDocumentClickHandler
+    setupDocumentClickHandler,
+    setupGlobalContextMenuBlock
 } from './events.js';
 import eventBus, { Events } from './events-bus.js';
 
@@ -85,6 +88,13 @@ function setupToolbarEvents() {
         const x = (innerWidth / 2 - state.offsetX) / state.scale - 90;
         const y = (innerHeight / 2 - state.offsetY) / state.scale - 50;
         addMemo('', x, y);
+        saveState();
+    });
+
+    $('addKeywordBtn').addEventListener('click', () => {
+        const x = (innerWidth / 2 - state.offsetX) / state.scale - 60;
+        const y = (innerHeight / 2 - state.offsetY) / state.scale - 22;
+        addKeyword('', x, y);
         saveState();
     });
 
@@ -213,7 +223,8 @@ function setupImportExportEvents() {
                 fh: c.fh,
                 to: c.to.id,
                 th: c.th,
-                dir: c.dir
+                dir: c.dir,
+                label: c.label || ''
             })),
             name: canvasName
         };
@@ -259,7 +270,7 @@ function setupImportExportEvents() {
         try {
             const text = await file.text();
             const data = JSON.parse(text);
-            const { addConnection, updateConnectionArrow } = await import('./connections.js');
+            const { addConnection, updateConnectionArrow, updateConnectionLabel } = await import('./connections.js');
             const { updateMinimap } = await import('./ui.js');
 
             state.connections.forEach(c => { c.el.remove(); if (c.arrow) c.arrow.remove(); });
@@ -267,7 +278,24 @@ function setupImportExportEvents() {
             state.items.forEach(i => i.el.remove());
             state.items.length = 0;
             state.selectedItems.clear();
-            state.setItemId(1);
+
+            // Calculate maximum item ID from imported items to prevent ID collisions
+            let maxImportedItemId = 0;
+            if (data.items && data.items.length > 0) {
+                data.items.forEach(d => {
+                    if (d.id) {
+                        const match = d.id.match(/^i(\d+)$/);
+                        if (match) {
+                            const idNum = parseInt(match[1], 10);
+                            if (idNum > maxImportedItemId) {
+                                maxImportedItemId = idNum;
+                            }
+                        }
+                    }
+                });
+            }
+            // Set itemId to the maximum imported ID to prevent collisions
+            state.setItemId(maxImportedItemId);
             state.setHighestZ(1);
 
             const map = {};
@@ -277,10 +305,15 @@ function setupImportExportEvents() {
             });
 
             data.connections.forEach(d => {
-                if (map[d.from] && map[d.to]) {
-                    const c = addConnection(map[d.from], d.fh, map[d.to], d.th, true);
+                const fromItem = map[d.from];
+                const toItem = map[d.to];
+                // Validate: both items must exist and must not be the same item (prevent self-connections)
+                if (fromItem && toItem && fromItem !== toItem) {
+                    const c = addConnection(fromItem, d.fh, toItem, d.th, true);
                     c.dir = d.dir || 'none';
+                    c.label = d.label || '';
                     updateConnectionArrow(c);
+                    updateConnectionLabel(c);
                 }
             });
 
@@ -323,6 +356,7 @@ async function init() {
     setupMinimapClick();
     setupContextMenu();
     setupCanvasContextMenu();
+    setupSidebarContextMenus();
     setupChildTypePicker();
     setupNewNodePicker();
     setupLinkModal();
@@ -332,8 +366,10 @@ async function init() {
     setupTouchEvents();
     setupKeyboardEvents();
     setupDragDropEvents();
+    setupCopyEvents();
     setupPasteEvents();
     setupDocumentClickHandler();
+    setupGlobalContextMenuBlock();
 
     // Initialize IndexedDB and load canvases
     try {

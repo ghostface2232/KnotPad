@@ -3,8 +3,8 @@
 import { $ } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, setZoom, throttledMinimap, startPan, updateMinimap } from './viewport.js';
-import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink } from './items.js';
-import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo } from './connections.js';
+import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading } from './items.js';
+import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo, deselectConnection } from './connections.js';
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
@@ -184,8 +184,32 @@ export function setupMouseEvents() {
                 y = Math.round(y / state.GRID_SIZE) * state.GRID_SIZE;
             }
 
-            state.resizingItem.w = Math.max(140, x - state.resizingItem.x);
-            state.resizingItem.h = Math.max(80, y - state.resizingItem.y);
+            let newW = Math.max(140, x - state.resizingItem.x);
+            let newH = Math.max(80, y - state.resizingItem.y);
+
+            // Keyword node: horizontal resize only, fixed height
+            if (state.resizingItem.type === 'keyword') {
+                newW = Math.max(100, x - state.resizingItem.x);
+                newH = 56; // Fixed height for pill shape
+            }
+            // Shift key: maintain aspect ratio (proportional resize) - not for keyword nodes
+            else if (e.shiftKey && state.resizingItem.initialAspectRatio) {
+                const aspectRatio = state.resizingItem.initialAspectRatio;
+                // Calculate height based on width to maintain ratio
+                const hFromW = newW / aspectRatio;
+                // Calculate width based on height to maintain ratio
+                const wFromH = newH * aspectRatio;
+
+                // Choose the dimension that fits within the drag bounds
+                if (hFromW <= newH) {
+                    newH = Math.max(80, hFromW);
+                } else {
+                    newW = Math.max(140, wFromH);
+                }
+            }
+
+            state.resizingItem.w = newW;
+            state.resizingItem.h = newH;
             state.resizingItem.el.style.width = state.resizingItem.w + 'px';
             state.resizingItem.el.style.height = state.resizingItem.h + 'px';
             updateAllConnections();
@@ -318,6 +342,23 @@ export function setupKeyboardEvents() {
                 return;
             }
         }
+        // Ctrl+I for italic in contenteditable
+        if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+            if (e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]')) {
+                e.preventDefault();
+                document.execCommand('italic', false, null);
+                return;
+            }
+        }
+        // Ctrl+H for heading toggle in contenteditable
+        if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+            const editableEl = e.target.matches('[contenteditable="true"]') ? e.target : e.target.closest('[contenteditable="true"]');
+            if (editableEl) {
+                e.preventDefault();
+                toggleHeading(editableEl);
+                return;
+            }
+        }
         if (e.key === 'Escape') {
             cancelConnection(true); // with fade effect
             closeLinkModal();
@@ -381,6 +422,25 @@ export function setupDragDropEvents() {
     });
 }
 
+// ============ Copy Events ============
+
+export function setupCopyEvents() {
+    window.addEventListener('copy', e => {
+        // Only intercept copy from contenteditable elements within the app
+        if (!e.target.matches('[contenteditable="true"]') && !e.target.closest('[contenteditable="true"]')) return;
+
+        const sel = window.getSelection();
+        if (!sel.rangeCount || sel.isCollapsed) return;
+
+        // Get plain text from selection
+        const plainText = sel.toString();
+        if (!plainText) return;
+
+        e.preventDefault();
+        e.clipboardData.setData('text/plain', plainText);
+    });
+}
+
 // ============ Paste Events ============
 
 export function setupPasteEvents() {
@@ -417,6 +477,17 @@ export function setupPasteEvents() {
     });
 }
 
+// ============ Global Context Menu Block ============
+
+export function setupGlobalContextMenuBlock() {
+    // Block browser's default context menu globally
+    // Custom context menus (items, connections, sidebar) use stopPropagation(),
+    // so they won't bubble up here and will work normally
+    document.addEventListener('contextmenu', e => {
+        e.preventDefault();
+    });
+}
+
 // ============ Document Click Handler ============
 
 export function setupDocumentClickHandler() {
@@ -435,8 +506,9 @@ export function setupDocumentClickHandler() {
             $('connectionContextMenu').classList.remove('active');
             $('canvasContextMenu').classList.remove('active');
         }
-        if (!e.target.closest('.conn-direction-picker') && !e.target.closest('.connection-line')) {
+        if (!e.target.closest('.conn-direction-picker') && !e.target.closest('.connection-line') && !e.target.closest('.conn-label-modal')) {
             $('connDirectionPicker').classList.remove('active');
+            deselectConnection();
         }
         if (!e.target.closest('.child-type-picker') && !e.target.closest('.add-child-btn')) {
             $('childTypePicker').classList.remove('active');

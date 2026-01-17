@@ -4,13 +4,16 @@ import { COLOR_MAP } from './constants.js';
 import { $, curvePath, getHandlePos } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap } from './viewport.js';
-import { addMemo, deselectAll } from './items.js';
+import { addMemo, deselectAll, hideMenus } from './items.js';
 import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
 const connectionsSvg = $('connectionsSvg');
 const connDirectionPicker = $('connDirectionPicker');
 const connectionContextMenu = $('connectionContextMenu');
+const connLabelModal = $('connLabelModal');
+const connLabelModalInput = $('connLabelModalInput');
+const connLabelBtn = $('connLabelBtn');
 
 // Note: External function calls are now handled via eventBus
 // Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
@@ -81,6 +84,12 @@ export function cancelConnection(withFade = false) {
 
 // Add a connection between two items
 export function addConnection(from, fh, to, th, loading = false) {
+    // Validate: prevent self-connections (same item connected to itself)
+    if (from === to) {
+        console.warn('Prevented self-connection: same item cannot be connected to itself');
+        return null;
+    }
+
     const conn = {
         id: `c${Date.now()}`,
         from,
@@ -90,7 +99,9 @@ export function addConnection(from, fh, to, th, loading = false) {
         el: null,
         hitArea: null,
         arrow: null,
-        dir: 'none'
+        dir: 'none',
+        label: '',
+        labelEl: null
     };
 
     // Create invisible hit area for easier clicking (wider stroke)
@@ -154,6 +165,99 @@ export function updateConnection(c) {
     }
 
     updateConnectionArrow(c);
+    updateConnectionLabel(c);
+}
+
+// Update connection label position and visibility
+export function updateConnectionLabel(c) {
+    // Remove existing label if empty
+    if (!c.label) {
+        if (c.labelEl) {
+            c.labelEl.remove();
+            c.labelEl = null;
+        }
+        return;
+    }
+
+    // Create label element if needed
+    if (!c.labelEl) {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.classList.add('connection-label');
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.classList.add('connection-label-bg');
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.classList.add('connection-label-text');
+
+        g.appendChild(rect);
+        g.appendChild(text);
+
+        // Make label clickable to select connection
+        g.addEventListener('click', e => {
+            e.stopPropagation();
+            selectConnection(c, e);
+        });
+
+        connectionsSvg.appendChild(g);
+        c.labelEl = g;
+    }
+
+    // Update label text
+    const text = c.labelEl.querySelector('text');
+    text.textContent = c.label;
+
+    // Get midpoint of the connection path
+    const fp = getHandlePos(c.from, c.fh);
+    const tp = getHandlePos(c.to, c.th);
+    const midPoint = getPathMidpoint(c.el);
+
+    // Calculate approximate text width (for centering)
+    const charWidth = 7;
+    const textWidth = c.label.length * charWidth;
+    const paddingX = 12;
+    const paddingY = 4;
+    const height = 22;
+    const width = Math.max(textWidth + paddingX * 2, 40);
+
+    // Position text at center
+    text.setAttribute('x', midPoint.x);
+    text.setAttribute('y', midPoint.y + 5);
+    text.setAttribute('text-anchor', 'middle');
+
+    // Position and size the background pill
+    const rect = c.labelEl.querySelector('rect');
+    rect.setAttribute('x', midPoint.x - width / 2);
+    rect.setAttribute('y', midPoint.y - height / 2);
+    rect.setAttribute('width', width);
+    rect.setAttribute('height', height);
+    rect.setAttribute('rx', height / 2);
+
+    // Apply color from source node
+    if (c.from.color && COLOR_MAP[c.from.color]) {
+        rect.style.fill = COLOR_MAP[c.from.color];
+    } else {
+        rect.style.fill = '';
+    }
+
+    // Add selected class if connection is selected
+    if (state.selectedConn === c) {
+        c.labelEl.classList.add('selected');
+    } else {
+        c.labelEl.classList.remove('selected');
+    }
+}
+
+// Get the midpoint of a path element
+function getPathMidpoint(pathEl) {
+    try {
+        const totalLength = pathEl.getTotalLength();
+        const midPoint = pathEl.getPointAtLength(totalLength / 2);
+        return { x: midPoint.x, y: midPoint.y };
+    } catch (e) {
+        // Fallback if path is invalid
+        return { x: 10000, y: 10000 };
+    }
 }
 
 // Calculate point on cubic Bezier curve at parameter t
@@ -362,15 +466,18 @@ export function deleteConnection(c, save = true, withFade = true) {
             c.el.classList.add('deleting');
             if (c.hitArea) c.hitArea.classList.add('deleting');
             if (c.arrow) c.arrow.classList.add('deleting');
+            if (c.labelEl) c.labelEl.classList.add('deleting');
             c.el.addEventListener('animationend', () => {
                 c.el.remove();
                 if (c.hitArea) c.hitArea.remove();
                 if (c.arrow) c.arrow.remove();
+                if (c.labelEl) c.labelEl.remove();
             }, { once: true });
         } else {
             c.el.remove();
             if (c.hitArea) c.hitArea.remove();
             if (c.arrow) c.arrow.remove();
+            if (c.labelEl) c.labelEl.remove();
         }
 
         if (save) {
@@ -385,9 +492,13 @@ export function deleteConnection(c, save = true, withFade = true) {
 function showConnDirectionPicker(x, y, conn) {
     connDirectionPicker.style.left = x + 'px';
     connDirectionPicker.style.top = y + 'px';
-    connDirectionPicker.querySelectorAll('button').forEach(b =>
+    connDirectionPicker.querySelectorAll('button[data-dir]').forEach(b =>
         b.classList.toggle('active', b.dataset.dir === conn.dir)
     );
+    // Update label button state
+    if (connLabelBtn) {
+        connLabelBtn.classList.toggle('has-label', !!conn.label);
+    }
     connDirectionPicker.classList.add('active');
 }
 
@@ -403,8 +514,22 @@ export function setupConnDirectionPicker() {
                 eventBus.emit(Events.AUTOSAVE_TRIGGER);
             }
             connDirectionPicker.classList.remove('active');
+            deselectConnection();
         });
     });
+
+    // Label button handler - opens modal
+    if (connLabelBtn) {
+        connLabelBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            if (state.selectedConn) {
+                openConnLabelModal();
+            }
+        });
+    }
+
+    // Setup label modal
+    setupConnLabelModal();
 
     // Delete button handler
     const deleteBtn = connDirectionPicker.querySelector('.conn-delete-btn');
@@ -419,8 +544,95 @@ export function setupConnDirectionPicker() {
     }
 }
 
+// Open connection label modal
+function openConnLabelModal() {
+    if (!connLabelModal || !connLabelModalInput) return;
+
+    connLabelModalInput.value = state.selectedConn?.label || '';
+    connLabelModal.classList.add('active');
+    connDirectionPicker.classList.remove('active');
+
+    setTimeout(() => {
+        connLabelModalInput.focus();
+        connLabelModalInput.select();
+    }, 50);
+}
+
+// Close connection label modal
+function closeConnLabelModal(save = false) {
+    if (!connLabelModal) return;
+
+    if (save && state.selectedConn) {
+        state.selectedConn.label = connLabelModalInput.value.trim();
+        updateConnectionLabel(state.selectedConn);
+        eventBus.emit(Events.STATE_SAVE);
+        eventBus.emit(Events.AUTOSAVE_TRIGGER);
+    }
+
+    connLabelModal.classList.remove('active');
+    deselectConnection();
+}
+
+// Deselect connection and clear selection state
+export function deselectConnection() {
+    if (state.selectedConn) {
+        state.selectedConn.el.classList.remove('selected');
+        if (state.selectedConn.arrow) state.selectedConn.arrow.classList.remove('selected');
+        if (state.selectedConn.labelEl) state.selectedConn.labelEl.classList.remove('selected');
+        state.setSelectedConn(null);
+    }
+}
+
+// Setup label modal event handlers
+function setupConnLabelModal() {
+    if (!connLabelModal) return;
+
+    const confirmBtn = $('connLabelModalConfirm');
+    const cancelBtn = $('connLabelModalCancel');
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            closeConnLabelModal(true);
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            closeConnLabelModal(false);
+        });
+    }
+
+    // Close on background click
+    connLabelModal.addEventListener('click', e => {
+        if (e.target === connLabelModal) {
+            closeConnLabelModal(false);
+        }
+    });
+
+    // Handle Enter and Escape keys
+    connLabelModalInput.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            closeConnLabelModal(true);
+        } else if (e.key === 'Escape') {
+            closeConnLabelModal(false);
+        }
+    });
+
+    // Prevent clicks inside modal from closing
+    const modalBox = connLabelModal.querySelector('.conn-label-modal-box');
+    if (modalBox) {
+        modalBox.addEventListener('click', e => {
+            e.stopPropagation();
+        });
+    }
+}
+
 // Show connection context menu
 function showConnectionContextMenu(conn, e) {
+    hideMenus(); // Close other context menus first
     deselectAll();
     state.setSelectedConn(conn);
     conn.el.classList.add('selected');
@@ -469,8 +681,8 @@ export function completeConnectionWithNewMemo(canvasX, canvasY) {
     return newMemo;
 }
 
-// Add child node connected to parent
-export function addChildNode(parent, dir, type = 'memo') {
+// Add child node connected to parent (always creates memo)
+export function addChildNode(parent, dir) {
     const gap = 100;
     const cw = 220;
     const ch = 140;
@@ -491,13 +703,13 @@ export function addChildNode(parent, dir, type = 'memo') {
             break;
         case 'left':
             x = parent.x - cw - gap;
-            y = parent.y;
+            y = parent.y + (parent.h - ch) / 2;
             fh = 'left';
             th = 'right';
             break;
         case 'right':
             x = parent.x + parent.w + gap;
-            y = parent.y;
+            y = parent.y + (parent.h - ch) / 2;
             fh = 'right';
             th = 'left';
             break;
