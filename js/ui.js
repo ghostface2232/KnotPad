@@ -44,6 +44,7 @@ export {
     setupCanvasListEvents,
     setupCanvasListDropZone,
     setupCanvasIconPicker,
+    setSidebarContextMenuCallbacks,
     updateMinimap,
     setupMinimapClick,
     duplicateCanvas,

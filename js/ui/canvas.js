@@ -535,9 +535,47 @@ export function renderCanvasList() {
     // Event delegation is set up once in setupCanvasListEvents
 }
 
+// Context menu callbacks (set by menus.js to avoid circular imports)
+let showSidebarCanvasContextMenuFn = null;
+let showSidebarGroupContextMenuFn = null;
+let showSidebarEmptyContextMenuFn = null;
+
+export function setSidebarContextMenuCallbacks(canvasFn, groupFn, emptyFn) {
+    showSidebarCanvasContextMenuFn = canvasFn;
+    showSidebarGroupContextMenuFn = groupFn;
+    showSidebarEmptyContextMenuFn = emptyFn;
+}
+
 // Event delegation for canvas list - called once at init
 export function setupCanvasListEvents() {
     if (!canvasList) return;
+
+    // Context menu event delegation (right-click)
+    canvasList.addEventListener('contextmenu', (e) => {
+        const entry = e.target.closest('.canvas-item-entry');
+        const header = e.target.closest('.canvas-group-header');
+        const groupContent = e.target.closest('.canvas-group-content');
+
+        if (entry) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (showSidebarCanvasContextMenuFn) {
+                showSidebarCanvasContextMenuFn(entry.dataset.id, e.clientX, e.clientY);
+            }
+        } else if (header) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (showSidebarGroupContextMenuFn) {
+                showSidebarGroupContextMenuFn(header.dataset.groupId, e.clientX, e.clientY);
+            }
+        } else if (!groupContent) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (showSidebarEmptyContextMenuFn) {
+                showSidebarEmptyContextMenuFn(e.clientX, e.clientY);
+            }
+        }
+    });
 
     // Single click handler for all canvas list interactions
     canvasList.addEventListener('click', async (e) => {

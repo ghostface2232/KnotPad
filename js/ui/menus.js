@@ -34,7 +34,8 @@ import {
     saveCanvasesList,
     duplicateCanvas,
     collapseAllGroups,
-    expandAllGroups
+    expandAllGroups,
+    setSidebarContextMenuCallbacks
 } from './canvas.js';
 
 // DOM Elements
@@ -259,6 +260,13 @@ function showSidebarEmptyContextMenu(x, y) {
 }
 
 export function setupSidebarContextMenus() {
+    // Register context menu callbacks with canvas module (avoids circular imports)
+    setSidebarContextMenuCallbacks(
+        showSidebarCanvasContextMenu,
+        showSidebarGroupContextMenu,
+        showSidebarEmptyContextMenu
+    );
+
     if (!sidebarCanvasContextMenu || !sidebarGroupContextMenu || !sidebarEmptyContextMenu) return;
 
     // Close menus on outside click

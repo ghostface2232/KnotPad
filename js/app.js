@@ -32,6 +32,7 @@ import {
     openLinkModal,
     setupSearchEvents,
     setupCanvasIconPicker,
+    setupCanvasListEvents,
     setupCanvasListDropZone,
     setupMinimapClick,
     setupContextMenu,
@@ -350,6 +351,7 @@ async function init() {
     setupImportExportEvents();
     setupSearchEvents();
     setupCanvasIconPicker();
+    setupCanvasListEvents();
     setupCanvasListDropZone();
     setupConnDirectionPicker();
     setupConnectionContextMenu();
