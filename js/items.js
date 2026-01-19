@@ -236,6 +236,10 @@ export function createItem(cfg, loading = false) {
         el.classList.add('font-size-' + cfg.fontSize);
     }
 
+    if (cfg.textAlign && cfg.type === 'memo') {
+        el.classList.add('text-align-' + cfg.textAlign);
+    }
+
     const isMemo = cfg.type === 'memo';
     const isKeyword = cfg.type === 'keyword';
     const fontSizeBtn = isMemo
@@ -280,6 +284,7 @@ export function createItem(cfg, loading = false) {
         content: cfg.content,
         color: cfg.color || null,
         fontSize: cfg.fontSize || null,
+        textAlign: cfg.textAlign || null,
         locked: cfg.locked || false,
         manuallyResized: cfg.manuallyResized || false
     };
@@ -1302,7 +1307,8 @@ export function duplicateItem(item) {
         h: item.h,
         content: JSON.parse(JSON.stringify(item.content)),
         color: item.color,
-        fontSize: item.fontSize
+        fontSize: item.fontSize,
+        textAlign: item.textAlign
     });
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
@@ -1318,7 +1324,8 @@ function duplicateItemForDrag(item) {
         h: item.h,
         content: JSON.parse(JSON.stringify(item.content)),
         color: item.color,
-        fontSize: item.fontSize
+        fontSize: item.fontSize,
+        textAlign: item.textAlign
     });
 }
 
@@ -1388,6 +1395,8 @@ export function addMemo(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
     // Apply default font size setting
     const fontSize = state.defaultFontSize !== 'small' ? state.defaultFontSize : null;
+    // Apply default text alignment setting
+    const textAlign = state.defaultTextAlign !== 'left' ? state.defaultTextAlign : null;
 
     // Calculate size based on text content if provided
     const calculatedSize = text ? calculateMemoSizeForText(text, fontSize) : null;
@@ -1402,7 +1411,8 @@ export function addMemo(text = '', x, y, color = null) {
         h: calculatedSize ? calculatedSize.h : defaultH,
         content: text,
         color,
-        fontSize
+        fontSize,
+        textAlign
     });
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
     return item;

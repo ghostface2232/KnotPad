@@ -14,6 +14,7 @@ const localStorageProps = {
     sidebarOpen: 'knotpad-sidebar-open',
     defaultFontSize: 'knotpad-default-font-size',
     noteWrapMode: 'knotpad-note-wrap-mode',
+    defaultTextAlign: 'knotpad-default-text-align',
     invertWheelZoom: 'knotpad-invert-wheel-zoom',
     gridSnap: 'knotpad-grid-snap'
 };
@@ -155,6 +156,7 @@ const initialState = {
     // Settings (loaded from localStorage)
     defaultFontSize: localStorage.getItem('knotpad-default-font-size') || 'small',
     noteWrapMode: localStorage.getItem('knotpad-note-wrap-mode') || 'word',
+    defaultTextAlign: localStorage.getItem('knotpad-default-text-align') || 'left',
     invertWheelZoom: localStorage.getItem('knotpad-invert-wheel-zoom') === 'true',
     gridSnap: localStorage.getItem('knotpad-grid-snap') === 'true'
 };
@@ -325,6 +327,7 @@ export let searchIndex = state.searchIndex;
 export let zoomAnimationFrame = state.zoomAnimationFrame;
 export let defaultFontSize = state.defaultFontSize;
 export let noteWrapMode = state.noteWrapMode;
+export let defaultTextAlign = state.defaultTextAlign;
 export let invertWheelZoom = state.invertWheelZoom;
 export let gridSnap = state.gridSnap;
 
@@ -370,5 +373,6 @@ export function setSearchIndex(val) { state.searchIndex = val; searchIndex = val
 export function setZoomAnimationFrame(val) { state.zoomAnimationFrame = val; zoomAnimationFrame = val; }
 export function setDefaultFontSize(val) { state.defaultFontSize = val; defaultFontSize = val; }
 export function setNoteWrapMode(val) { state.noteWrapMode = val; noteWrapMode = val; }
+export function setDefaultTextAlign(val) { state.defaultTextAlign = val; defaultTextAlign = val; }
 export function setInvertWheelZoom(val) { state.invertWheelZoom = val; invertWheelZoom = val; }
 export function setGridSnap(val) { state.gridSnap = val; gridSnap = val; }
