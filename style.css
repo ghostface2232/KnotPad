@@ -327,6 +327,10 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 .canvas-item.font-size-large .memo-body { font-size: 18px; }
 .canvas-item.font-size-xlarge .memo-body { font-size: 22px; }
 
+/* Text alignment variants */
+.canvas-item.text-align-center .memo-body { text-align: center; }
+.canvas-item.text-align-right .memo-body { text-align: right; }
+
 /* Global word wrap mode - applied via body class */
 body.wrap-mode-character .memo-body { word-break: break-all; }
 
@@ -1581,32 +1585,4 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
 }
 .font-size-preview .preview-text.size-xlarge {
     font-size: 22px;
-}
-
-/* Word Wrap Mode Preview */
-.wrap-mode-preview {
-    margin-top: 16px;
-    padding: 16px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-}
-.wrap-mode-preview .preview-label {
-    display: block;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-placeholder);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 10px;
-}
-.wrap-mode-preview .preview-text-wrap {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    font-size: 13px;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-}
-.wrap-mode-preview .preview-text-wrap.wrap-character {
-    word-break: break-all;
 }

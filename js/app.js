@@ -216,6 +216,7 @@ function setupImportExportEvents() {
                 content: i.content,
                 color: i.color,
                 fontSize: i.fontSize,
+                textAlign: i.textAlign,
                 locked: i.locked
             })),
             connections: state.connections.map(c => ({

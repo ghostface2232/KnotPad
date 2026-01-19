@@ -341,6 +341,7 @@ export async function saveCurrentCanvas() {
             content: i.content,
             color: i.color,
             fontSize: i.fontSize,
+            textAlign: i.textAlign,
             locked: i.locked,
             manuallyResized: i.manuallyResized,
             z: parseInt(i.el.style.zIndex)
@@ -1919,13 +1920,6 @@ function updateFontSizePreview(size) {
     }
 }
 
-function updateWrapModePreview(mode) {
-    const previewWrapText = $('previewWrapText');
-    if (previewWrapText) {
-        previewWrapText.className = 'preview-text-wrap' + (mode === 'character' ? ' wrap-character' : '');
-    }
-}
-
 // Apply wrap mode globally via body class
 export function applyWrapMode(mode) {
     document.body.classList.toggle('wrap-mode-character', mode === 'character');
@@ -1951,8 +1945,13 @@ function updateSettingsUI() {
         });
     }
 
-    // Update wrap mode preview
-    updateWrapModePreview(state.noteWrapMode);
+    // Update text align buttons
+    const textAlignGroup = $('defaultTextAlign');
+    if (textAlignGroup) {
+        textAlignGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === state.defaultTextAlign);
+        });
+    }
 
     // Update invert wheel zoom toggle
     const invertWheelZoomCheckbox = $('invertWheelZoom');
@@ -2058,8 +2057,19 @@ export function setupSettingsModal() {
                 wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 state.setNoteWrapMode(btn.dataset.value);
-                updateWrapModePreview(btn.dataset.value);
                 applyWrapMode(btn.dataset.value);
+            });
+        });
+    }
+
+    // Default text alignment
+    const textAlignGroup = $('defaultTextAlign');
+    if (textAlignGroup) {
+        textAlignGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                textAlignGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.setDefaultTextAlign(btn.dataset.value);
             });
         });
     }
