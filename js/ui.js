@@ -389,9 +389,10 @@ async function loadCanvasData(id) {
             data = JSON.parse(saved);
         }
 
-        // Calculate the maximum item ID from loaded items to prevent ID collisions
+        // Calculate the maximum item ID and z-index from loaded items
         // Item IDs are in format "i{number}" (e.g., "i1", "i25")
         let maxLoadedItemId = 0;
+        let maxLoadedZ = 0;
         if (data.items && data.items.length > 0) {
             data.items.forEach(d => {
                 if (d.id) {
@@ -403,6 +404,10 @@ async function loadCanvasData(id) {
                         }
                     }
                 }
+                // Track max z-index to ensure highestZ is always >= all item z-indexes
+                if (d.z !== undefined && d.z > maxLoadedZ) {
+                    maxLoadedZ = d.z;
+                }
             });
         }
 
@@ -410,7 +415,9 @@ async function loadCanvasData(id) {
         // This prevents ID collisions when creating new items
         const savedItemId = data.itemId || 0;
         state.setItemId(Math.max(savedItemId, maxLoadedItemId));
-        state.setHighestZ(data.highestZ || 1);
+        // Set highestZ to the maximum of: saved highestZ, max loaded z-index
+        // This ensures clicking an item always brings it above all others
+        state.setHighestZ(Math.max(data.highestZ || 1, maxLoadedZ));
 
         if (data.view) {
             state.setScale(data.view.scale);
