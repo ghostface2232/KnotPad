@@ -119,6 +119,10 @@ const initialState = {
     // Filter state
     activeFilter: 'all',
 
+    // Color group mode state
+    colorGroupModeActive: false,
+    originalPositions: new Map(), // Stores original positions before color grouping
+
     // Auto-save timer
     autoSaveTimer: null,
 
@@ -330,6 +334,8 @@ export let noteWrapMode = state.noteWrapMode;
 export let defaultTextAlign = state.defaultTextAlign;
 export let invertWheelZoom = state.invertWheelZoom;
 export let gridSnap = state.gridSnap;
+export let colorGroupModeActive = state.colorGroupModeActive;
+export let originalPositions = state.originalPositions;
 
 // ============ Legacy Setter Functions (for backward compatibility) ============
 // These update both the reactive state AND the exported primitives to maintain
@@ -356,6 +362,8 @@ export function setConnectSource(val) { state.connectSource = val; connectSource
 export function setConnectHandle(val) { state.connectHandle = val; connectHandle = val; }
 export function setTempLine(val) { state.tempLine = val; tempLine = val; }
 export function setActiveFilter(val) { state.activeFilter = val; activeFilter = val; }
+export function setColorGroupModeActive(val) { state.colorGroupModeActive = val; colorGroupModeActive = val; }
+export function setOriginalPositions(val) { state.originalPositions = val; originalPositions = val; }
 export function setAutoSaveTimer(val) { state.autoSaveTimer = val; autoSaveTimer = val; }
 export function setCanvases(val) { state.canvases = val; canvases = val; }
 export function setCurrentCanvasId(val) { state.currentCanvasId = val; currentCanvasId = val; }
