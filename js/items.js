@@ -373,6 +373,8 @@ function setupItemEvents(item) {
 
     el.querySelector('.resize-handle').addEventListener('mousedown', e => {
         if (item.locked) return;
+        // Bring item to top before stopPropagation
+        el.style.zIndex = state.incrementHighestZ();
         e.stopPropagation();
         // Store initial aspect ratio for proportional resize (Shift key)
         item.initialAspectRatio = item.w / item.h;
@@ -426,6 +428,8 @@ function setupItemEvents(item) {
 
     el.querySelectorAll('.connection-handle').forEach(h => {
         h.addEventListener('mousedown', e => {
+            // Bring item to top before stopPropagation
+            el.style.zIndex = state.incrementHighestZ();
             e.stopPropagation();
             if (state.connectSource) {
                 eventBus.emit(Events.CONNECTIONS_COMPLETE, item, h.dataset.h);
