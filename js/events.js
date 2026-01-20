@@ -262,6 +262,7 @@ export function setupMouseEvents() {
                 state.setDraggedItem(null);
             }
             if (state.resizingItem) {
+                document.body.classList.remove('is-dragging');
                 saveState();
                 state.setResizingItem(null);
             }
