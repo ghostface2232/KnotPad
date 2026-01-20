@@ -200,7 +200,9 @@ function setupMediaErrorHandler(mediaElement, mediaId) {
 export function createItem(cfg, loading = false) {
     const el = document.createElement('div');
     el.className = 'canvas-item' + (loading ? '' : ' new');
-    el.style.cssText = `left:${cfg.x}px;top:${cfg.y}px;width:${cfg.w}px;height:${cfg.h}px;z-index:${state.incrementHighestZ()}`;
+    // When loading, use saved z-index if available; otherwise get new highest z-index
+    const zIndex = (loading && cfg.z !== undefined) ? cfg.z : state.incrementHighestZ();
+    el.style.cssText = `left:${cfg.x}px;top:${cfg.y}px;width:${cfg.w}px;height:${cfg.h}px;z-index:${zIndex}`;
 
     let html = '';
     let mediaSrc = '';
@@ -375,6 +377,8 @@ function setupItemEvents(item) {
         // Store initial aspect ratio for proportional resize (Shift key)
         item.initialAspectRatio = item.w / item.h;
         state.setResizingItem(item);
+        // Prevent text selection during resize
+        document.body.classList.add('is-dragging');
     });
 
     el.querySelector('.delete-btn').addEventListener('click', e => {
@@ -880,12 +884,19 @@ function setupItemEvents(item) {
                         toggleHeading(mb);
                         break;
                     case 'align-left':
+                        // Remove item-level text-align class so block-level styles take effect
+                        el.classList.remove('text-align-center', 'text-align-right');
+                        item.textAlign = null;
                         setAlignment(mb, 'left');
                         break;
                     case 'align-center':
+                        el.classList.remove('text-align-center', 'text-align-right');
+                        item.textAlign = null;
                         setAlignment(mb, 'center');
                         break;
                     case 'align-right':
+                        el.classList.remove('text-align-center', 'text-align-right');
+                        item.textAlign = null;
                         setAlignment(mb, 'right');
                         break;
                 }
@@ -1214,6 +1225,8 @@ export function selectItem(item, accumulate = false) {
     if (!accumulate) deselectAll();
     state.selectedItems.add(item);
     item.el.classList.add('selected');
+    // Always bring selected item to top (z-index)
+    item.el.style.zIndex = state.incrementHighestZ();
     window.selectedItem = item;
 }
 
