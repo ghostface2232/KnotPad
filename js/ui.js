@@ -2370,6 +2370,9 @@ export function setupSidebarResize() {
     let startWidth = 0;
 
     resizeHandle.addEventListener('mousedown', e => {
+        // Don't allow resize when sidebar is hidden
+        if (!sidebar.classList.contains('open')) return;
+
         isResizing = true;
         startX = e.clientX;
         startWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 280;
