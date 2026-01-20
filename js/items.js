@@ -305,6 +305,10 @@ export function createItem(cfg, loading = false) {
                 item.el.classList.add('filtered-out');
             }
         }
+        // If color group mode is active, position the new item in the appropriate color group
+        if (state.colorGroupModeActive) {
+            positionNewItemInColorGroup(item);
+        }
     }
 
     setTimeout(() => el.classList.remove('new'), 200);
@@ -1204,6 +1208,12 @@ export function setItemColor(targetItem, color) {
         state.connections.filter(c => c.from === item).forEach(c => eventBus.emit(Events.CONNECTIONS_UPDATE, c));
     });
     throttledMinimap();
+
+    // If color group mode is active, re-arrange all items to reflect the color change
+    if (state.colorGroupModeActive) {
+        arrangeByColor();
+    }
+
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
@@ -1307,6 +1317,11 @@ export function deleteItem(item, update = true, withFade = true) {
     }
 
     if (update) {
+        // If color group mode is active, re-arrange items to fill the gap
+        if (state.colorGroupModeActive) {
+            // Delay slightly to allow DOM updates
+            setTimeout(() => arrangeByColor(), 50);
+        }
         eventBus.emit(Events.STATE_SAVE);
         throttledMinimap();
         eventBus.emit(Events.AUTOSAVE_TRIGGER);
@@ -1504,12 +1519,60 @@ export function setFilter(color) {
     throttledMinimap();
 }
 
-// Sort items by color tag and arrange in grid
-export function sortByColor() {
-    if (state.items.length === 0) return;
+// Toggle color group mode - arranges items by color and can restore original positions
+export function toggleColorGroupMode() {
+    const btn = $('sortByColorBtn');
 
+    if (state.colorGroupModeActive) {
+        // Deactivate mode - restore original positions
+        restoreOriginalPositions();
+        state.setColorGroupModeActive(false);
+        state.setOriginalPositions(new Map());
+        btn.classList.remove('active');
+    } else {
+        // Activate mode - save positions and arrange by color
+        if (state.items.length === 0) return;
+        saveOriginalPositions();
+        arrangeByColor();
+        state.setColorGroupModeActive(true);
+        btn.classList.add('active');
+    }
+}
+
+// Save original positions of all items before arranging
+function saveOriginalPositions() {
+    const positions = new Map();
+    state.items.forEach(item => {
+        positions.set(item.id, { x: item.x, y: item.y });
+    });
+    state.setOriginalPositions(positions);
+}
+
+// Restore items to their original positions
+function restoreOriginalPositions() {
+    state.items.forEach(item => {
+        const original = state.originalPositions.get(item.id);
+        if (original) {
+            item.x = original.x;
+            item.y = original.y;
+            item.el.style.left = item.x + 'px';
+            item.el.style.top = item.y + 'px';
+        }
+    });
+    eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
+    updateMinimap();
+    eventBus.emit(Events.STATE_SAVE);
+    eventBus.emit(Events.AUTOSAVE_TRIGGER);
+}
+
+// Arrange items by color - called when activating color group mode
+function arrangeByColor() {
     // Color order: red, orange, yellow, green, blue, purple, pink, then no color (null)
     const colorOrder = [...COLORS, null];
+    const MAX_ROWS = 5; // Maximum items per column before creating new column
+    const horizontalGap = 48; // Horizontal spacing between color groups
+    const verticalGap = 24;   // Vertical spacing between items
+    const subColumnGap = 24;  // Gap between sub-columns within same color group
 
     // Group items by color
     const groups = {};
@@ -1525,7 +1588,6 @@ export function sortByColor() {
     });
 
     // Sort items within each color group by connection proximity
-    // Connected items should be placed closer together
     Object.keys(groups).forEach(key => {
         const items = groups[key];
         if (items.length <= 1) return;
@@ -1552,7 +1614,6 @@ export function sortByColor() {
             if (visited.has(item)) return;
             visited.add(item);
             sorted.push(item);
-            // Add connected items next
             const connected = connectionMap.get(item);
             connected.forEach(connectedItem => {
                 if (!visited.has(connectedItem)) {
@@ -1578,60 +1639,143 @@ export function sortByColor() {
         groups[key] = sorted;
     });
 
-    // Calculate layout parameters
-    const horizontalGap = 48; // Horizontal spacing between columns
-    const verticalGap = 24;   // Vertical spacing between items (smaller since same color)
-
     // Get active colors (colors that have items)
     const activeColors = colorOrder.filter(c => {
         const key = c === null ? 'none' : c;
         return groups[key].length > 0;
     });
 
-    // Calculate max width and total height for each column
-    const columnData = activeColors.map(color => {
+    // Build column layout data with multi-column support for groups > MAX_ROWS
+    const colorGroupData = activeColors.map(color => {
         const key = color === null ? 'none' : color;
         const items = groups[key];
-        const maxWidth = Math.max(...items.map(item => item.w));
-        const totalHeight = items.reduce((sum, item, idx) => {
-            return sum + item.h + (idx < items.length - 1 ? verticalGap : 0);
+
+        // Split items into sub-columns of max MAX_ROWS each
+        const subColumns = [];
+        for (let i = 0; i < items.length; i += MAX_ROWS) {
+            subColumns.push(items.slice(i, i + MAX_ROWS));
+        }
+
+        // Calculate dimensions for each sub-column
+        const subColumnData = subColumns.map(subItems => {
+            const maxWidth = Math.max(...subItems.map(item => item.w));
+            const totalHeight = subItems.reduce((sum, item, idx) => {
+                return sum + item.h + (idx < subItems.length - 1 ? verticalGap : 0);
+            }, 0);
+            return { items: subItems, maxWidth, totalHeight };
+        });
+
+        // Total width for this color group (sum of sub-columns + gaps between them)
+        const groupWidth = subColumnData.reduce((sum, sc, idx) => {
+            return sum + sc.maxWidth + (idx < subColumnData.length - 1 ? subColumnGap : 0);
         }, 0);
-        return { color, key, items, maxWidth, totalHeight };
+
+        // Max height among sub-columns
+        const groupHeight = Math.max(...subColumnData.map(sc => sc.totalHeight));
+
+        return { color, key, subColumnData, groupWidth, groupHeight };
     });
 
-    // Calculate total width and max column height
-    const totalWidth = columnData.reduce((sum, col, idx) => {
-        return sum + col.maxWidth + (idx < columnData.length - 1 ? horizontalGap : 0);
+    // Calculate total width and max height
+    const totalWidth = colorGroupData.reduce((sum, group, idx) => {
+        return sum + group.groupWidth + (idx < colorGroupData.length - 1 ? horizontalGap : 0);
     }, 0);
-    const maxColumnHeight = Math.max(...columnData.map(col => col.totalHeight));
+    const maxGroupHeight = Math.max(...colorGroupData.map(group => group.groupHeight));
 
-    // Find the visible area center (don't change viewport, just calculate center point)
+    // Find the visible area center
     const viewCenterX = (innerWidth / 2 - state.offsetX) / state.scale;
     const viewCenterY = (innerHeight / 2 - state.offsetY) / state.scale;
 
     // Calculate start position to center the grid
     const startX = viewCenterX - totalWidth / 2;
-    const startY = viewCenterY - maxColumnHeight / 2;
+    const startY = viewCenterY - maxGroupHeight / 2;
 
-    // Place items in columns by color - columns top-aligned, items horizontally centered
-    let currentX = startX;
-    columnData.forEach(col => {
-        let currentY = startY;
+    // Place items - iterate through color groups, then sub-columns, then items
+    let currentGroupX = startX;
+    colorGroupData.forEach(group => {
+        let currentSubColX = currentGroupX;
 
-        col.items.forEach(item => {
-            // Center each item horizontally within the column
-            const itemOffsetX = (col.maxWidth - item.w) / 2;
-            item.x = currentX + itemOffsetX;
-            item.y = currentY;
-            item.el.style.left = item.x + 'px';
-            item.el.style.top = item.y + 'px';
-            currentY += item.h + verticalGap;
+        group.subColumnData.forEach((subCol, subIdx) => {
+            let currentY = startY;
+
+            subCol.items.forEach(item => {
+                // Center each item horizontally within its sub-column
+                const itemOffsetX = (subCol.maxWidth - item.w) / 2;
+                item.x = currentSubColX + itemOffsetX;
+                item.y = currentY;
+                item.el.style.left = item.x + 'px';
+                item.el.style.top = item.y + 'px';
+                currentY += item.h + verticalGap;
+            });
+
+            currentSubColX += subCol.maxWidth + subColumnGap;
         });
-        currentX += col.maxWidth + horizontalGap;
+
+        currentGroupX += group.groupWidth + horizontalGap;
     });
 
     eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
     updateMinimap();
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
+}
+
+// Position a new item within the color group layout (called when adding items during color group mode)
+export function positionNewItemInColorGroup(newItem) {
+    if (!state.colorGroupModeActive) return;
+
+    const colorOrder = [...COLORS, null];
+    const MAX_ROWS = 5;
+    const horizontalGap = 48;
+    const verticalGap = 24;
+    const subColumnGap = 24;
+
+    // Find the color group for the new item
+    const newItemColor = newItem.color || 'none';
+
+    // Group all items by color
+    const groups = {};
+    colorOrder.forEach(c => groups[c === null ? 'none' : c] = []);
+
+    state.items.forEach(item => {
+        const key = item.color || 'none';
+        if (groups[key]) {
+            groups[key].push(item);
+        } else {
+            groups['none'].push(item);
+        }
+    });
+
+    // Get the items in the same color group (excluding the new item for positioning calculation)
+    const sameColorItems = groups[newItemColor].filter(item => item !== newItem);
+
+    if (sameColorItems.length === 0) {
+        // This is the first item of this color - re-arrange all items
+        arrangeByColor();
+        return;
+    }
+
+    // Find the last item in the color group to position after it
+    const lastItem = sameColorItems[sameColorItems.length - 1];
+    const lastRowIndex = sameColorItems.length % MAX_ROWS;
+
+    if (lastRowIndex === 0) {
+        // Start a new sub-column - position to the right of the last sub-column
+        const maxWidthInLastSubCol = Math.max(...sameColorItems.slice(-MAX_ROWS).map(i => i.w));
+        newItem.x = lastItem.x + maxWidthInLastSubCol / 2 - newItem.w / 2 + subColumnGap + newItem.w / 2;
+
+        // Find the topmost Y position among same color items
+        const topY = Math.min(...sameColorItems.map(i => i.y));
+        newItem.y = topY;
+    } else {
+        // Add to current sub-column - position below the last item
+        newItem.x = lastItem.x + lastItem.w / 2 - newItem.w / 2; // Center align with last item
+        newItem.y = lastItem.y + lastItem.h + verticalGap;
+    }
+
+    newItem.el.style.left = newItem.x + 'px';
+    newItem.el.style.top = newItem.y + 'px';
+
+    eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
+    updateMinimap();
 }

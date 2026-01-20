@@ -522,6 +522,14 @@ export async function switchCanvas(id) {
     }
     updateUndoRedoButtons();
     setFilter('all');
+
+    // Reset color group mode when switching canvas
+    if (state.colorGroupModeActive) {
+        state.setColorGroupModeActive(false);
+        state.setOriginalPositions(new Map());
+        $('sortByColorBtn').classList.remove('active');
+    }
+
     updateMinimap();
     renderCanvasList();
     updateTopbarCanvasName();

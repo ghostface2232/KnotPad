@@ -4,7 +4,7 @@ import { $ } from './utils.js';
 import * as state from './state.js';
 import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
-import { createItem, addMemo, addKeyword, setFilter, setItemColor, sortByColor } from './items.js';
+import { createItem, addMemo, addKeyword, setFilter, setItemColor, toggleColorGroupMode, positionNewItemInColorGroup } from './items.js';
 import {
     setupConnDirectionPicker,
     setupConnectionContextMenu,
@@ -111,7 +111,7 @@ function setupToolbarEvents() {
     $('themeToggle').addEventListener('click', toggleTheme);
 
     $('sortByColorBtn').addEventListener('click', () => {
-        sortByColor();
+        toggleColorGroupMode();
     });
 
     $('fileInput').addEventListener('change', e => {
