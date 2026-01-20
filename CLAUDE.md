@@ -25,6 +25,9 @@ const CACHE_VERSION = 'v15.2';  // <-- Increment this!
 - CSS/styling changes: bump patch version
 - New assets added: bump patch version
 
+**Maintenance commitment**:
+- For every feature addition or bug-fix maintenance commit, update the `sw.js` cache version and keep the relevant guide sections in this document accurate (feature locations, module responsibilities, and storage keys).
+
 ---
 
 ## File Structure
@@ -162,15 +165,15 @@ KnotPad/
 
 ### CSS Structure (style.css)
 
-| Section | Line Range (approx) | Content |
+| Section | Keywords (examples) | Content |
 |---------|---------------------|---------|
-| Variables | Top | CSS custom properties, theme colors |
-| Base | Early | Body, app container, canvas |
-| Items | Middle | `.canvas-item`, `.item-memo`, `.item-keyword`, `.item-link` |
-| Connections | Middle | `.connection-line`, `.connection-arrow` |
-| UI Components | Middle-Late | Toolbar, sidebar, modals, context menus |
-| Animations | Late | Keyframes, transitions |
-| Dark theme | Late | `[data-theme="dark"]` overrides |
+| Variables | `:root`, `--` | CSS custom properties, theme colors |
+| Base | `body`, `#app`, `.canvas` | Body, app container, canvas |
+| Items | `.canvas-item`, `.item-memo`, `.item-keyword`, `.item-link` | Item styling |
+| Connections | `.connection-line`, `.connection-arrow` | Connection styling |
+| UI Components | `.toolbar`, `.sidebar`, `.modal`, `.context-menu` | Toolbar, sidebar, modals, context menus |
+| Animations | `@keyframes`, `transition` | Keyframes, transitions |
+| Dark theme | `[data-theme="dark"]` | Theme overrides |
 
 ### Theme System
 
@@ -250,6 +253,12 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 - Event communication: Use `eventBus.emit()` instead of direct function calls
 - State changes: Always use setter functions from state.js
 - Async operations: Storage functions return Promises
+
+### Behavior Flow Guide (High Level)
+
+- **Item creation**: `events.js` (input) → `items.js` (create/add) → `state.js` (state update) → `viewport.js`/`ui.js` (render/minimap refresh).
+- **Connections**: `items.js` (start) → `connections.js` (update/complete) → `events-bus.js` (emit updates) → `ui.js` (re-render labels/lines).
+- **Persistence**: `ui.js` (save triggers) → `storage.js` (IndexedDB/File System) → `state.js` (restore on load).
 
 ### Debugging Tips
 
