@@ -728,6 +728,10 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
     cursor: ew-resize; z-index: 210;
     background: transparent;
 }
+.sidebar:not(.open) .sidebar-resize-handle {
+    pointer-events: none;
+    cursor: default;
+}
 .sidebar-resize-handle:hover,
 .sidebar-resize-handle.active {
     background: var(--accent);
