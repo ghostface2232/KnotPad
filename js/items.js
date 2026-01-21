@@ -478,13 +478,18 @@ function setupItemEvents(item) {
             // Only handle left mouse button
             if (e.button !== 0) return;
 
-            const mbRect = mb.getBoundingClientRect();
+            // Use fixed border zone from canvas-item edges for consistent drag area
+            // This ensures edges are always draggable regardless of scrollbar or content
+            const EDGE_ZONE = 10; // pixels from each edge that are always draggable
+            const itemRect = el.getBoundingClientRect();
             const x = e.clientX;
             const y = e.clientY;
 
-            // Check if click is outside memo-body (in padding/border area)
-            const isInPaddingArea = x < mbRect.left || x > mbRect.right ||
-                                    y < mbRect.top || y > mbRect.bottom;
+            // Check if click is within the edge zone (fixed pixel border from item edges)
+            const isInPaddingArea = x < itemRect.left + EDGE_ZONE ||
+                                    x > itemRect.right - EDGE_ZONE ||
+                                    y < itemRect.top + EDGE_ZONE ||
+                                    y > itemRect.bottom - EDGE_ZONE;
 
             if (isInPaddingArea) {
                 e.preventDefault();  // Prevent text focus
@@ -508,9 +513,11 @@ function setupItemEvents(item) {
                         state.selectedItems.add(item);
                         item.el.classList.add('selected');
                     }
-                } else {
+                } else if (!state.selectedItems.has(item)) {
+                    // Only deselect others if this item wasn't already selected
                     selectItem(item, false);
                 }
+                // If item is already selected, keep selection as-is for multi-drag
 
                 // Setup drag if not locked
                 if (!item.locked) {
