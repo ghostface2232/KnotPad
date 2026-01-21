@@ -1,3 +1,5 @@
+> **IMPORTANT**: After any code modification, update this file if the change affects: feature locations, module responsibilities, storage keys, or configuration. Keep this document in sync with the codebase.
+
 # KnotPad Project Guide
 
 > **For AI Agents & Coding Assistants**: Read this file first to understand the project structure.
@@ -16,12 +18,12 @@ KnotPad is a web-based infinite canvas note-taking application. It supports crea
 
 ```javascript
 // sw.js:1
-const CACHE_VERSION = 'v15.2';  // <-- Increment this!
+const CACHE_VERSION = 'v15.3';  // <-- Increment this!
 ```
 
 **When to update**:
-- Major feature additions: bump minor version (v15.2 -> v16.0)
-- Bug fixes / minor changes: bump patch version (v15.2 -> v15.3)
+- Major feature additions: bump minor version (v15.3 -> v16.0)
+- Bug fixes / minor changes: bump patch version (v15.3 -> v15.4)
 - CSS/styling changes: bump patch version
 - New assets added: bump patch version
 
