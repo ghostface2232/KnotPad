@@ -1,3 +1,5 @@
+> **IMPORTANT**: After any code modification, update this file if the change affects: feature locations, module responsibilities, storage keys, or configuration. Keep this document in sync with the codebase.
+
 # KnotPad Project Guide
 
 > **For AI Agents & Coding Assistants**: Read this file first to understand the project structure.
@@ -12,21 +14,20 @@ KnotPad is a web-based infinite canvas note-taking application. It supports crea
 
 ## Critical: Cache Version Update
 
-**IMPORTANT**: When making significant changes, update the cache version in `sw.js`:
+**IMPORTANT**: When making changes, update the cache version in `sw.js`:
 
 ```javascript
 // sw.js:1
-const CACHE_VERSION = 'v15.2';  // <-- Increment this!
+const CACHE_VERSION = 'v15.3.0';  // <-- Increment this!
 ```
 
-**When to update**:
-- Major feature additions: bump minor version (v15.2 -> v16.0)
-- Bug fixes / minor changes: bump patch version (v15.2 -> v15.3)
-- CSS/styling changes: bump patch version
-- New assets added: bump patch version
+**Version format**: `vMAJOR.MINOR.PATCH`
 
-**Maintenance commitment**:
-- For every feature addition or bug-fix maintenance commit, update the `sw.js` cache version and keep the relevant guide sections in this document accurate (feature locations, module responsibilities, and storage keys).
+| Level | When to bump | Example |
+|-------|--------------|---------|
+| **MAJOR** | Breaking changes, architecture overhaul | v15.3.0 → v16.0.0 |
+| **MINOR** | New features, significant enhancements | v15.3.0 → v15.4.0 |
+| **PATCH** | Bug fixes, minor tweaks, CSS/styling changes, new assets | v15.3.0 → v15.3.1 |
 
 ---
 
