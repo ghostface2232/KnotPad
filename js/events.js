@@ -8,7 +8,7 @@ import { updateAllConnections, cancelConnection, deleteConnection, updateTempLin
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
-    saveCurrentCanvas, showCanvasContextMenu, closeSettingsModal
+    saveCurrentCanvas, showCanvasContextMenu, closeSettingsModal, copyItemToClipboard
 } from './ui.js';
 
 const app = $('app');
@@ -429,8 +429,24 @@ export function setupDragDropEvents() {
 
 export function setupCopyEvents() {
     window.addEventListener('copy', e => {
-        // Only intercept copy from contenteditable elements within the app
-        if (!e.target.matches('[contenteditable="true"]') && !e.target.closest('[contenteditable="true"]')) return;
+        // Check if there are selected link/image items and not editing text
+        const isEditing = e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]');
+
+        if (!isEditing && state.selectedItems.size > 0) {
+            // Get first selected item that is link or image
+            const copyableItem = [...state.selectedItems].find(item =>
+                item.type === 'link' || item.type === 'image'
+            );
+
+            if (copyableItem) {
+                e.preventDefault();
+                copyItemToClipboard(copyableItem);
+                return;
+            }
+        }
+
+        // Original contenteditable copy behavior
+        if (!isEditing) return;
 
         const sel = window.getSelection();
         if (!sel.rangeCount || sel.isCollapsed) return;
