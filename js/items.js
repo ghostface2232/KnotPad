@@ -516,8 +516,10 @@ function setupItemEvents(item) {
                 } else if (!state.selectedItems.has(item)) {
                     // Only deselect others if this item wasn't already selected
                     selectItem(item, false);
+                } else {
+                    // Item already selected - update window.selectedItem for context menu
+                    window.selectedItem = item;
                 }
-                // If item is already selected, keep selection as-is for multi-drag
 
                 // Setup drag if not locked
                 if (!item.locked) {
@@ -1210,6 +1212,16 @@ export function setItemColor(targetItem, color) {
             } else {
                 item.el.classList.toggle('filtered-out', item.color !== state.activeFilter);
             }
+            // Update connection filtering for connections to/from this item
+            state.connections.filter(c => c.from === item || c.to === item).forEach(c => {
+                const fromFiltered = c.from.el.classList.contains('filtered-out');
+                const toFiltered = c.to.el.classList.contains('filtered-out');
+                const isFiltered = fromFiltered || toFiltered;
+                c.el.classList.toggle('filtered-out', isFiltered);
+                if (c.hitArea) c.hitArea.classList.toggle('filtered-out', isFiltered);
+                if (c.arrow) c.arrow.classList.toggle('filtered-out', isFiltered);
+                if (c.labelEl) c.labelEl.classList.toggle('filtered-out', isFiltered);
+            });
         }
         // Update connections from this node
         state.connections.filter(c => c.from === item).forEach(c => eventBus.emit(Events.CONNECTIONS_UPDATE, c));
@@ -1524,23 +1536,16 @@ export function setFilter(color) {
         item.el.classList.toggle('filtered-out', isFilteredOut);
     });
 
-    // Also filter connections by their source node's color
-    state.connections.forEach(conn => {
-        const connColor = conn.from.color;
-        let isFilteredOut = false;
-        if (color === 'all') {
-            isFilteredOut = false;
-        } else if (color === 'none') {
-            // Show only connections without a color (source has no color)
-            isFilteredOut = connColor !== null;
-        } else {
-            // Show only connections with the specified color
-            isFilteredOut = connColor !== color;
-        }
-        conn.el.classList.toggle('filtered-out', isFilteredOut);
-        if (conn.hitArea) conn.hitArea.classList.toggle('filtered-out', isFilteredOut);
-        if (conn.arrow) conn.arrow.classList.toggle('filtered-out', isFilteredOut);
-        if (conn.labelEl) conn.labelEl.classList.toggle('filtered-out', isFilteredOut);
+    // Also apply filtering to connections (when either endpoint is filtered)
+    // This ensures connections to/from invisible items are also hidden
+    state.connections.forEach(c => {
+        const fromFiltered = c.from.el.classList.contains('filtered-out');
+        const toFiltered = c.to.el.classList.contains('filtered-out');
+        const isFiltered = fromFiltered || toFiltered;
+        c.el.classList.toggle('filtered-out', isFiltered);
+        if (c.hitArea) c.hitArea.classList.toggle('filtered-out', isFiltered);
+        if (c.arrow) c.arrow.classList.toggle('filtered-out', isFiltered);
+        if (c.labelEl) c.labelEl.classList.toggle('filtered-out', isFiltered);
     });
 
     throttledMinimap();
