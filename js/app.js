@@ -177,7 +177,7 @@ function setupFilterColorEvents() {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             setFilter(opt.dataset.color);
-            filterDropdown.classList.remove('active');
+            // Keep filter dropdown open for continuous filter selection
         });
     });
 

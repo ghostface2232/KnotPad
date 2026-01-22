@@ -1537,6 +1537,7 @@ export function setFilter(color) {
     });
 
     // Also apply filtering to connections (when either endpoint is filtered)
+    // This ensures connections to/from invisible items are also hidden
     state.connections.forEach(c => {
         const fromFiltered = c.from.el.classList.contains('filtered-out');
         const toFiltered = c.to.el.classList.contains('filtered-out');
@@ -1579,8 +1580,12 @@ function saveOriginalPositions() {
     state.setOriginalPositions(positions);
 }
 
-// Restore items to their original positions
+// Restore items to their original positions with animation
 function restoreOriginalPositions() {
+    // Add animation class to all items
+    state.items.forEach(item => item.el.classList.add('color-group-animating'));
+
+    // Apply position changes (will animate due to CSS transition)
     state.items.forEach(item => {
         const original = state.originalPositions.get(item.id);
         if (original) {
@@ -1590,8 +1595,23 @@ function restoreOriginalPositions() {
             item.el.style.top = item.y + 'px';
         }
     });
-    eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
-    updateMinimap();
+
+    // Update connections during animation
+    const animateConnections = () => {
+        eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
+        updateMinimap();
+    };
+    const animationDuration = 400;
+    const frames = 10;
+    for (let i = 0; i <= frames; i++) {
+        setTimeout(animateConnections, (animationDuration / frames) * i);
+    }
+
+    // Remove animation class after animation completes
+    setTimeout(() => {
+        state.items.forEach(item => item.el.classList.remove('color-group-animating'));
+    }, animationDuration + 50);
+
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
@@ -1604,6 +1624,9 @@ function arrangeByColor() {
     const horizontalGap = 48; // Horizontal spacing between color groups
     const verticalGap = 24;   // Vertical spacing between items
     const subColumnGap = 24;  // Gap between sub-columns within same color group
+
+    // Add animation class to all items
+    state.items.forEach(item => item.el.classList.add('color-group-animating'));
 
     // Group items by color
     const groups = {};
@@ -1745,8 +1768,22 @@ function arrangeByColor() {
         currentGroupX += group.groupWidth + horizontalGap;
     });
 
-    eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
-    updateMinimap();
+    // Update connections during animation
+    const animateConnections = () => {
+        eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
+        updateMinimap();
+    };
+    const animationDuration = 400;
+    const frames = 10;
+    for (let i = 0; i <= frames; i++) {
+        setTimeout(animateConnections, (animationDuration / frames) * i);
+    }
+
+    // Remove animation class after animation completes
+    setTimeout(() => {
+        state.items.forEach(item => item.el.classList.remove('color-group-animating'));
+    }, animationDuration + 50);
+
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
