@@ -1596,21 +1596,58 @@ function restoreOriginalPositions() {
         }
     });
 
-    // Update connections during animation
+    const animationDuration = 400;
+    const fadeOutDuration = 150;
+    const fadeInDuration = 250;
+
+    // Helper to apply class to all connection elements
+    const applyToConnections = (addClass, removeClass) => {
+        const svg = document.getElementById('connectionsSvg');
+        if (!svg) return;
+        const elements = svg.querySelectorAll('.connection-line, .connection-hit-area, .connection-arrow, .connection-label');
+        elements.forEach(el => {
+            if (removeClass) {
+                if (Array.isArray(removeClass)) {
+                    removeClass.forEach(cls => el.classList.remove(cls));
+                } else {
+                    el.classList.remove(removeClass);
+                }
+            }
+            if (addClass) el.classList.add(addClass);
+        });
+    };
+
+    // Step 1: Fade out connections
+    applyToConnections('color-group-fade-out', null);
+
+    // Step 2: After fade-out, hide connections and update positions silently
+    setTimeout(() => {
+        applyToConnections('color-group-hidden', 'color-group-fade-out');
+    }, fadeOutDuration);
+
+    // Update connections during animation (they're hidden, so this is silent)
     const animateConnections = () => {
         eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
         updateMinimap();
     };
-    const animationDuration = 400;
     const frames = 10;
     for (let i = 0; i <= frames; i++) {
-        setTimeout(animateConnections, (animationDuration / frames) * i);
+        setTimeout(animateConnections, fadeOutDuration + (animationDuration / frames) * i);
     }
 
-    // Remove animation class after animation completes
+    // Step 3: After animation completes, fade connections back in
+    setTimeout(() => {
+        // Final position update
+        eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
+        // Remove hidden, add fade-in
+        applyToConnections('color-group-fade-in', 'color-group-hidden');
+    }, fadeOutDuration + animationDuration);
+
+    // Step 4: Clean up all animation classes
     setTimeout(() => {
         state.items.forEach(item => item.el.classList.remove('color-group-animating'));
-    }, animationDuration + 50);
+        applyToConnections(null, ['color-group-fade-in', 'color-group-hidden', 'color-group-fade-out']);
+    }, fadeOutDuration + animationDuration + fadeInDuration + 50);
 
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
@@ -1768,21 +1805,58 @@ function arrangeByColor() {
         currentGroupX += group.groupWidth + horizontalGap;
     });
 
-    // Update connections during animation
+    const animationDuration = 400;
+    const fadeOutDuration = 150;
+    const fadeInDuration = 250;
+
+    // Helper to apply class to all connection elements
+    const applyToConnections = (addClass, removeClass) => {
+        const svg = document.getElementById('connectionsSvg');
+        if (!svg) return;
+        const elements = svg.querySelectorAll('.connection-line, .connection-hit-area, .connection-arrow, .connection-label');
+        elements.forEach(el => {
+            if (removeClass) {
+                if (Array.isArray(removeClass)) {
+                    removeClass.forEach(cls => el.classList.remove(cls));
+                } else {
+                    el.classList.remove(removeClass);
+                }
+            }
+            if (addClass) el.classList.add(addClass);
+        });
+    };
+
+    // Step 1: Fade out connections
+    applyToConnections('color-group-fade-out', null);
+
+    // Step 2: After fade-out, hide connections and update positions silently
+    setTimeout(() => {
+        applyToConnections('color-group-hidden', 'color-group-fade-out');
+    }, fadeOutDuration);
+
+    // Update connections during animation (they're hidden, so this is silent)
     const animateConnections = () => {
         eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
         updateMinimap();
     };
-    const animationDuration = 400;
     const frames = 10;
     for (let i = 0; i <= frames; i++) {
-        setTimeout(animateConnections, (animationDuration / frames) * i);
+        setTimeout(animateConnections, fadeOutDuration + (animationDuration / frames) * i);
     }
 
-    // Remove animation class after animation completes
+    // Step 3: After animation completes, fade connections back in
+    setTimeout(() => {
+        // Final position update
+        eventBus.emit(Events.CONNECTIONS_UPDATE_ALL);
+        // Remove hidden, add fade-in
+        applyToConnections('color-group-fade-in', 'color-group-hidden');
+    }, fadeOutDuration + animationDuration);
+
+    // Step 4: Clean up all animation classes
     setTimeout(() => {
         state.items.forEach(item => item.el.classList.remove('color-group-animating'));
-    }, animationDuration + 50);
+        applyToConnections(null, ['color-group-fade-in', 'color-group-hidden', 'color-group-fade-out']);
+    }, fadeOutDuration + animationDuration + fadeInDuration + 50);
 
     eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
