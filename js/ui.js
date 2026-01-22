@@ -1170,6 +1170,69 @@ export function setupMinimapClick() {
 
 // ============ Context Menu ============
 
+// Copy item content to clipboard (for link and image items)
+export async function copyItemToClipboard(item) {
+    if (!item) return;
+
+    try {
+        if (item.type === 'link') {
+            // Copy URL to clipboard
+            await navigator.clipboard.writeText(item.content.url);
+            showToast('Link copied to clipboard');
+        } else if (item.type === 'image') {
+            // Copy image to clipboard
+            let blob = null;
+            if (item.content?.startsWith('media_')) {
+                // Load from storage
+                if (fsDirectoryHandle) {
+                    blob = await loadMediaFromFileSystem(item.content);
+                }
+                if (!blob) {
+                    blob = await loadMedia(item.content);
+                }
+            } else if (item.content?.startsWith('blob:') || item.content?.startsWith('http')) {
+                // External URL - fetch as blob
+                const response = await fetch(item.content);
+                blob = await response.blob();
+            }
+
+            if (blob) {
+                // Convert to PNG if necessary for better clipboard compatibility
+                let clipboardBlob = blob;
+                if (blob.type !== 'image/png') {
+                    // Convert to PNG using canvas
+                    const img = new Image();
+                    const blobUrl = URL.createObjectURL(blob);
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = blobUrl;
+                    });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    URL.revokeObjectURL(blobUrl);
+                    clipboardBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                }
+
+                await navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': clipboardBlob })
+                ]);
+                showToast('Image copied to clipboard');
+            } else {
+                showToast('Failed to load image');
+            }
+        } else {
+            showToast('This item type cannot be copied');
+        }
+    } catch (err) {
+        console.error('Copy failed:', err);
+        showToast('Copy failed');
+    }
+}
+
 export function showContextMenu(x, y, item) {
     hideMenus(); // Close other context menus first
     contextMenu.querySelector('[data-action="lock"]').textContent = item.locked ? 'Unlock' : 'Lock to Back';
@@ -1183,6 +1246,9 @@ export function setupContextMenu() {
         el.addEventListener('click', () => {
             if (window.selectedItem) {
                 switch (el.dataset.action) {
+                    case 'copy':
+                        copyItemToClipboard(window.selectedItem);
+                        break;
                     case 'duplicate':
                         duplicateItem(window.selectedItem);
                         break;
