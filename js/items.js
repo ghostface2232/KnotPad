@@ -1130,14 +1130,8 @@ function setAlignment(el, alignment) {
 
     // Apply alignment to all found blocks
     blocksToAlign.forEach(block => {
-        if (alignment === 'left') {
-            block.style.textAlign = '';
-            if (!block.getAttribute('style')) {
-                block.removeAttribute('style');
-            }
-        } else {
-            block.style.textAlign = alignment;
-        }
+        // Always set textAlign explicitly to ensure it overrides any CSS inheritance
+        block.style.textAlign = alignment;
     });
 
     // If no blocks found, create a div wrapper for the entire content

@@ -2318,6 +2318,7 @@ function saveToLocalStorageSync() {
                 content: i.content,
                 color: i.color,
                 fontSize: i.fontSize,
+                textAlign: i.textAlign,
                 locked: i.locked,
                 manuallyResized: i.manuallyResized,
                 z: parseInt(i.el.style.zIndex)
