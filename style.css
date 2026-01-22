@@ -115,12 +115,17 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 .connection-arrow { fill: var(--conn-default); pointer-events: none; }
 .connection-arrow.selected { fill: var(--accent); }
 
+/* Filtered-out connections */
+.connection-line.filtered-out,
+.connection-arrow.filtered-out,
+.connection-label.filtered-out { opacity: 0.15; pointer-events: none; }
+
 /* Connection Labels */
 .connection-label { pointer-events: auto; cursor: pointer; }
 .connection-label-bg {
-    fill: var(--bg-secondary);
+    fill: var(--bg-primary);
     stroke: var(--border-subtle);
-    stroke-width: 1;
+    stroke-width: 2;
 }
 .connection-label-text {
     fill: var(--text-primary);
@@ -130,7 +135,7 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 }
 .connection-label.selected .connection-label-bg {
     stroke: var(--accent);
-    stroke-width: 2;
+    stroke-width: 2.5;
 }
 .connection-label.deleting {
     animation: labelDeleteFade 0.15s ease-out forwards;
@@ -168,6 +173,10 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 .canvas-item:hover { border-color: var(--border-active); box-shadow: var(--shadow-lg); }
 .canvas-item.selected { outline: 2px solid var(--accent); outline-offset: -1px; box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-glow); }
 .canvas-item.dragging { opacity: 0.9; }
+.canvas-item.color-group-animating {
+    transition: left 0.4s cubic-bezier(0.32, 0.72, 0, 1),
+                top 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
 .canvas-item.connect-target { border-color: var(--accent); }
 .canvas-item.filtered-out { opacity: 0.15; pointer-events: none; }
 .canvas-item.locked { opacity: 0.7; }
@@ -511,17 +520,25 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
 .conn-label-modal {
     position: fixed;
     inset: 0;
-    background: rgba(9, 9, 11, 0.6);
+    background: rgba(9, 9, 11, 0);
     display: none;
-    align-items: center;
-    justify-content: center;
     z-index: 10001;
+    transition: background 0.2s ease, backdrop-filter 0.2s ease;
+}
+:root.light .conn-label-modal { background: rgba(0, 0, 0, 0); }
+.conn-label-modal.active { display: block; }
+.conn-label-modal.active.animate-in {
+    background: rgba(9, 9, 11, 0.6);
     backdrop-filter: blur(2px);
 }
-:root.light .conn-label-modal { background: rgba(0, 0, 0, 0.3); }
-.conn-label-modal.active { display: flex; }
+:root.light .conn-label-modal.active.animate-in { background: rgba(0, 0, 0, 0.3); }
 .conn-label-modal-box {
+    position: absolute;
     background: var(--bg-secondary);
+    transform-origin: top left;
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+                width 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+                opacity 0.15s ease;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     padding: 16px;

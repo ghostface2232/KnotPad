@@ -233,11 +233,11 @@ export function updateConnectionLabel(c) {
     rect.setAttribute('height', height);
     rect.setAttribute('rx', height / 2);
 
-    // Apply color from source node
+    // Apply color from source node to border (not fill for better contrast)
     if (c.from.color && COLOR_MAP[c.from.color]) {
-        rect.style.fill = COLOR_MAP[c.from.color];
+        rect.style.stroke = COLOR_MAP[c.from.color];
     } else {
-        rect.style.fill = '';
+        rect.style.stroke = '';
     }
 
     // Add selected class if connection is selected
@@ -544,21 +544,39 @@ export function setupConnDirectionPicker() {
     }
 }
 
-// Open connection label modal
+// Open connection label modal with animation from picker position
 function openConnLabelModal() {
     if (!connLabelModal || !connLabelModalInput) return;
 
     connLabelModalInput.value = state.selectedConn?.label || '';
+
+    // Get picker position for animation start point
+    const pickerRect = connDirectionPicker.getBoundingClientRect();
+    const modalBox = connLabelModal.querySelector('.conn-label-modal-box');
+
+    // Position modal box at picker location initially
+    modalBox.style.left = pickerRect.left + 'px';
+    modalBox.style.top = pickerRect.top + 'px';
+    modalBox.style.transform = 'scale(0.85)';
+    modalBox.style.opacity = '0';
+
     connLabelModal.classList.add('active');
     connDirectionPicker.classList.remove('active');
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+        connLabelModal.classList.add('animate-in');
+        modalBox.style.transform = 'scale(1)';
+        modalBox.style.opacity = '1';
+    });
 
     setTimeout(() => {
         connLabelModalInput.focus();
         connLabelModalInput.select();
-    }, 50);
+    }, 100);
 }
 
-// Close connection label modal
+// Close connection label modal with animation
 function closeConnLabelModal(save = false) {
     if (!connLabelModal) return;
 
@@ -569,7 +587,20 @@ function closeConnLabelModal(save = false) {
         eventBus.emit(Events.AUTOSAVE_TRIGGER);
     }
 
-    connLabelModal.classList.remove('active');
+    const modalBox = connLabelModal.querySelector('.conn-label-modal-box');
+
+    // Animate out
+    connLabelModal.classList.remove('animate-in');
+    modalBox.style.transform = 'scale(0.9)';
+    modalBox.style.opacity = '0';
+
+    setTimeout(() => {
+        connLabelModal.classList.remove('active');
+        // Reset styles
+        modalBox.style.transform = '';
+        modalBox.style.opacity = '';
+    }, 150);
+
     deselectConnection();
 }
 
