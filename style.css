@@ -170,6 +170,10 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 .canvas-item.dragging { opacity: 0.9; }
 .canvas-item.connect-target { border-color: var(--accent); }
 .canvas-item.filtered-out { opacity: 0.15; pointer-events: none; }
+.connection-hit-area.filtered-out,
+.connection-line.filtered-out,
+.connection-arrow.filtered-out,
+.connection-label.filtered-out { opacity: 0.15; pointer-events: none; }
 .canvas-item.locked { opacity: 0.7; }
 .canvas-item.search-highlight { box-shadow: var(--shadow-lg), 0 0 0 4px var(--tag-yellow); }
 .canvas-item.new { animation: appear 0.2s ease-out; }
