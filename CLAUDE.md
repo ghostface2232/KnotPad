@@ -18,7 +18,7 @@ KnotPad is a web-based infinite canvas note-taking application. It supports crea
 
 ```javascript
 // sw.js:1
-const CACHE_VERSION = 'v15.3.0';  // <-- Increment this!
+const CACHE_VERSION = 'vnn.n.n';  // <-- Increment this!
 ```
 
 **Version format**: `vMAJOR.MINOR.PATCH`
