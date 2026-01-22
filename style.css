@@ -103,6 +103,51 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
     100% { opacity: 0; filter: blur(3px); }
 }
 
+/* Color grouping transition fade effects */
+.connection-line.color-group-fade-out,
+.connection-hit-area.color-group-fade-out {
+    animation: colorGroupFadeOut 0.15s ease-out forwards;
+    pointer-events: none;
+}
+.connection-arrow.color-group-fade-out,
+.connection-label.color-group-fade-out {
+    animation: colorGroupArrowFadeOut 0.15s ease-out forwards;
+    pointer-events: none;
+}
+@keyframes colorGroupFadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@keyframes colorGroupArrowFadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.connection-line.color-group-hidden,
+.connection-hit-area.color-group-hidden,
+.connection-arrow.color-group-hidden,
+.connection-label.color-group-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.connection-line.color-group-fade-in,
+.connection-hit-area.color-group-fade-in {
+    animation: colorGroupFadeIn 0.25s ease-out forwards;
+}
+.connection-arrow.color-group-fade-in,
+.connection-label.color-group-fade-in {
+    animation: colorGroupArrowFadeIn 0.25s ease-out forwards;
+}
+@keyframes colorGroupFadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes colorGroupArrowFadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
 .canvas-item.deleting {
     animation: itemDeleteFade 0.15s ease-out forwards;
     pointer-events: none;
