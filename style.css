@@ -1167,7 +1167,7 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
 .settings-modal-box {
     max-width: 560px;
     padding: 0;
-    height: 520px;
+    height: 580px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
