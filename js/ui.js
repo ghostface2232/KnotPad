@@ -2065,6 +2065,22 @@ function updateShortcutsScrollGradient() {
     wrapper.classList.toggle('can-scroll-down', canScrollDown);
 }
 
+function updateStorageScrollGradient() {
+    const wrapper = settingsModal?.querySelector('.storage-scroll-wrapper');
+    if (!wrapper) return;
+
+    const scrollTop = wrapper.scrollTop;
+    const scrollHeight = wrapper.scrollHeight;
+    const clientHeight = wrapper.clientHeight;
+    const threshold = 5;
+
+    const canScrollUp = scrollTop > threshold;
+    const canScrollDown = scrollTop + clientHeight < scrollHeight - threshold;
+
+    wrapper.classList.toggle('can-scroll-up', canScrollUp);
+    wrapper.classList.toggle('can-scroll-down', canScrollDown);
+}
+
 export function setupSettingsModal() {
     const settingsBtn = $('settingsBtn');
     if (settingsBtn) {
@@ -2084,9 +2100,11 @@ export function setupSettingsModal() {
                 tab.classList.add('active');
                 const panel = settingsModal.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`);
                 if (panel) panel.classList.add('active');
-                // Update shortcuts scroll gradient when switching to shortcuts tab
+                // Update scroll gradient when switching tabs
                 if (tab.dataset.tab === 'shortcuts') {
                     setTimeout(updateShortcutsScrollGradient, 0);
+                } else if (tab.dataset.tab === 'storage') {
+                    setTimeout(updateStorageScrollGradient, 0);
                 }
             });
         });
@@ -2097,6 +2115,14 @@ export function setupSettingsModal() {
             shortcutsWrapper.addEventListener('scroll', updateShortcutsScrollGradient);
             // Initial check
             setTimeout(updateShortcutsScrollGradient, 0);
+        }
+
+        // Storage scroll gradient
+        const storageWrapper = settingsModal.querySelector('.storage-scroll-wrapper');
+        if (storageWrapper) {
+            storageWrapper.addEventListener('scroll', updateStorageScrollGradient);
+            // Initial check (storage is the default active tab)
+            setTimeout(updateStorageScrollGradient, 0);
         }
     }
 
