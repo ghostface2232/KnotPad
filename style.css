@@ -711,7 +711,7 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
 .modal-input:focus { outline: none; border-color: var(--accent); }
 .modal-input::placeholder { color: var(--text-placeholder); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-.modal-btn { padding: 10px 18px; border-radius: var(--radius-sm); border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
+.modal-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: var(--radius-sm); border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
 .modal-btn-cancel { background: transparent; color: var(--text-secondary); }
 .modal-btn-cancel:hover { color: var(--text-primary); }
 .modal-btn-submit { background: var(--accent); color: white; }
@@ -1263,6 +1263,7 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
 }
 .settings-section:last-child {
     margin-bottom: 0;
+    padding-bottom: 8px;
 }
 .settings-section.flex-grow {
     flex: 1;
@@ -1416,6 +1417,80 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
     font-size: 13px;
     font-weight: 600;
     color: var(--text-secondary);
+}
+
+/* Shortcuts Scroll Wrapper with Gradient */
+.shortcuts-scroll-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+    transition: -webkit-mask-image 0.2s, mask-image 0.2s;
+}
+.shortcuts-scroll-wrapper::-webkit-scrollbar { width: 4px; }
+.shortcuts-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+
+/* Gradient states based on scroll position */
+.shortcuts-scroll-wrapper.can-scroll-up {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+}
+.shortcuts-scroll-wrapper.can-scroll-down {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 24px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 24px),
+        transparent 100%
+    );
+}
+.shortcuts-scroll-wrapper.can-scroll-up.can-scroll-down {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 24px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 24px),
+        transparent 100%
+    );
 }
 
 /* Storage Location Cards */
