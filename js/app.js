@@ -45,7 +45,8 @@ import {
     setupSidebarContextMenus,
     setupSidebarResize,
     handleFile,
-    applyWrapMode
+    applyWrapMode,
+    applyColorDisplayMode
 } from './ui.js';
 import {
     setupMouseEvents,
@@ -363,6 +364,7 @@ async function init() {
     setupLinkModal();
     setupSettingsModal();
     applyWrapMode(state.noteWrapMode);
+    applyColorDisplayMode(state.colorDisplayMode);
     setupMouseEvents();
     setupTouchEvents();
     setupKeyboardEvents();

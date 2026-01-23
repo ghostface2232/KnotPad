@@ -481,6 +481,72 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
     box-sizing: border-box;
 }
 
+/* Color Fill Mode - applies background color to item instead of top bar */
+/* Only for memo, keyword, link items (via data-item-type attribute) */
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"] .item-content::before,
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"] .item-content::before,
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"] .item-content::before {
+    display: none;
+}
+
+/* Dark theme fill colors - muted, darker tones */
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="red"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="red"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="red"] { background-color: rgba(239, 68, 68, 0.15); }
+
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="orange"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="orange"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="orange"] { background-color: rgba(249, 115, 22, 0.15); }
+
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="yellow"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="yellow"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="yellow"] { background-color: rgba(234, 179, 8, 0.12); }
+
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="green"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="green"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="green"] { background-color: rgba(34, 197, 94, 0.12); }
+
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="blue"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="blue"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="blue"] { background-color: rgba(59, 130, 246, 0.15); }
+
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="purple"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="purple"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="purple"] { background-color: rgba(139, 92, 246, 0.15); }
+
+body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="pink"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="pink"],
+body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="pink"] { background-color: rgba(236, 72, 153, 0.15); }
+
+/* Light theme fill colors - bright pastel tones */
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="red"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="red"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="red"] { background-color: rgba(239, 68, 68, 0.12); }
+
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="orange"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="orange"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="orange"] { background-color: rgba(249, 115, 22, 0.12); }
+
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="yellow"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="yellow"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="yellow"] { background-color: rgba(234, 179, 8, 0.10); }
+
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="green"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="green"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="green"] { background-color: rgba(34, 197, 94, 0.10); }
+
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="blue"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="blue"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="blue"] { background-color: rgba(59, 130, 246, 0.12); }
+
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="purple"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="purple"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="purple"] { background-color: rgba(139, 92, 246, 0.12); }
+
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="pink"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="pink"],
+:root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="pink"] { background-color: rgba(236, 72, 153, 0.12); }
+
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; cursor: pointer; }
 .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); }
 .link-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }

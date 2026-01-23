@@ -304,4 +304,5 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 | `knotpad-default-text-align` | Default text alignment |
 | `knotpad-invert-wheel-zoom` | Zoom direction preference |
 | `knotpad-grid-snap` | Grid snap toggle |
+| `knotpad-color-display-mode` | Color display mode (bar/fill) |
 | `knotpad-fs-enabled` | File System API enabled |
