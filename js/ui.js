@@ -2008,6 +2008,10 @@ export function applyWrapMode(mode) {
     document.body.classList.toggle('wrap-mode-character', mode === 'character');
 }
 
+export function applyColorDisplayMode(mode) {
+    document.body.classList.toggle('color-mode-fill', mode === 'fill');
+}
+
 function updateSettingsUI() {
     // Update font size buttons
     const fontSizeGroup = $('defaultFontSize');
@@ -2033,6 +2037,14 @@ function updateSettingsUI() {
     if (textAlignGroup) {
         textAlignGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.value === state.defaultTextAlign);
+        });
+    }
+
+    // Update color display mode buttons
+    const colorDisplayModeGroup = $('colorDisplayMode');
+    if (colorDisplayModeGroup) {
+        colorDisplayModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === state.colorDisplayMode);
         });
     }
 
@@ -2207,6 +2219,19 @@ export function setupSettingsModal() {
                 textAlignGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 state.setDefaultTextAlign(btn.dataset.value);
+            });
+        });
+    }
+
+    // Color display mode
+    const colorDisplayModeGroup = $('colorDisplayMode');
+    if (colorDisplayModeGroup) {
+        colorDisplayModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                colorDisplayModeGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.setColorDisplayMode(btn.dataset.value);
+                applyColorDisplayMode(btn.dataset.value);
             });
         });
     }

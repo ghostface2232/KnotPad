@@ -200,6 +200,7 @@ function setupMediaErrorHandler(mediaElement, mediaId) {
 export function createItem(cfg, loading = false) {
     const el = document.createElement('div');
     el.className = 'canvas-item' + (loading ? '' : ' new');
+    el.dataset.itemType = cfg.type;
     // When loading, use saved z-index if available; otherwise get new highest z-index
     const zIndex = (loading && cfg.z !== undefined) ? cfg.z : state.incrementHighestZ();
     el.style.cssText = `left:${cfg.x}px;top:${cfg.y}px;width:${cfg.w}px;height:${cfg.h}px;z-index:${zIndex}`;
@@ -232,6 +233,7 @@ export function createItem(cfg, loading = false) {
     if (cfg.color) {
         el.style.setProperty('--tag-color', COLOR_MAP[cfg.color]);
         el.classList.add('has-color');
+        el.dataset.color = cfg.color;
     }
 
     if (cfg.fontSize && cfg.type === 'memo') {
@@ -1193,9 +1195,11 @@ export function setItemColor(targetItem, color) {
         if (color) {
             item.el.style.setProperty('--tag-color', COLOR_MAP[color]);
             item.el.classList.add('has-color');
+            item.el.dataset.color = color;
         } else {
             item.el.style.setProperty('--tag-color', 'transparent');
             item.el.classList.remove('has-color');
+            delete item.el.dataset.color;
         }
         item.el.querySelectorAll('.color-opt').forEach(o =>
             o.classList.toggle('selected', o.dataset.color === (color || ''))

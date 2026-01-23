@@ -16,7 +16,8 @@ const localStorageProps = {
     noteWrapMode: 'knotpad-note-wrap-mode',
     defaultTextAlign: 'knotpad-default-text-align',
     invertWheelZoom: 'knotpad-invert-wheel-zoom',
-    gridSnap: 'knotpad-grid-snap'
+    gridSnap: 'knotpad-grid-snap',
+    colorDisplayMode: 'knotpad-color-display-mode'
 };
 
 // Properties that are boolean in localStorage
@@ -162,7 +163,8 @@ const initialState = {
     noteWrapMode: localStorage.getItem('knotpad-note-wrap-mode') || 'word',
     defaultTextAlign: localStorage.getItem('knotpad-default-text-align') || 'left',
     invertWheelZoom: localStorage.getItem('knotpad-invert-wheel-zoom') === 'true',
-    gridSnap: localStorage.getItem('knotpad-grid-snap') === 'true'
+    gridSnap: localStorage.getItem('knotpad-grid-snap') === 'true',
+    colorDisplayMode: localStorage.getItem('knotpad-color-display-mode') || 'bar'
 };
 
 // Create the reactive state
@@ -334,6 +336,7 @@ export let noteWrapMode = state.noteWrapMode;
 export let defaultTextAlign = state.defaultTextAlign;
 export let invertWheelZoom = state.invertWheelZoom;
 export let gridSnap = state.gridSnap;
+export let colorDisplayMode = state.colorDisplayMode;
 export let colorGroupModeActive = state.colorGroupModeActive;
 export let originalPositions = state.originalPositions;
 
@@ -384,3 +387,4 @@ export function setNoteWrapMode(val) { state.noteWrapMode = val; noteWrapMode = 
 export function setDefaultTextAlign(val) { state.defaultTextAlign = val; defaultTextAlign = val; }
 export function setInvertWheelZoom(val) { state.invertWheelZoom = val; invertWheelZoom = val; }
 export function setGridSnap(val) { state.gridSnap = val; gridSnap = val; }
+export function setColorDisplayMode(val) { state.colorDisplayMode = val; colorDisplayMode = val; }
