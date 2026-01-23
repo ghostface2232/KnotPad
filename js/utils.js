@@ -10,6 +10,13 @@ export function esc(text) {
     return div.innerHTML;
 }
 
+// Strip HTML tags and return plain text
+export function stripHtml(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html || '';
+    return div.textContent || '';
+}
+
 // Generate unique ID
 export function generateId() {
     return 'c' + Date.now() + Math.random().toString(36).substr(2, 5);
