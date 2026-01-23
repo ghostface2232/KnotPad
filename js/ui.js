@@ -1,7 +1,7 @@
 // KnotPad - UI Module (Toolbar, Menus, Modals, Minimap, Search, Canvas Management)
 
 import { CANVASES_KEY, CANVAS_GROUPS_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
-import { $, esc, generateId, showToast } from './utils.js';
+import { $, esc, generateId, showToast, stripHtml } from './utils.js';
 import * as state from './state.js';
 import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
@@ -112,7 +112,7 @@ function doSearch() {
     const results = [];
     state.items.forEach(item => {
         let text = '';
-        if (item.type === 'memo') text = (item.content || '').toLowerCase();
+        if (item.type === 'memo') text = stripHtml(item.content || '').toLowerCase();
         else if (item.type === 'keyword') text = (item.content || '').toLowerCase();
         else if (item.type === 'link') text = (item.content.title + ' ' + item.content.url).toLowerCase();
         if (text.includes(q)) results.push(item);
