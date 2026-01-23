@@ -1957,6 +1957,8 @@ export function openSettingsModal() {
         updateStorageModalState();
         updateSettingsUI();
         settingsModal.classList.add('active');
+        // Update shortcuts scroll gradient
+        setTimeout(updateShortcutsScrollGradient, 0);
     }
 }
 
@@ -2047,6 +2049,22 @@ function updateSettingsUI() {
     }
 }
 
+function updateShortcutsScrollGradient() {
+    const wrapper = settingsModal?.querySelector('.shortcuts-scroll-wrapper');
+    if (!wrapper) return;
+
+    const scrollTop = wrapper.scrollTop;
+    const scrollHeight = wrapper.scrollHeight;
+    const clientHeight = wrapper.clientHeight;
+    const threshold = 5;
+
+    const canScrollUp = scrollTop > threshold;
+    const canScrollDown = scrollTop + clientHeight < scrollHeight - threshold;
+
+    wrapper.classList.toggle('can-scroll-up', canScrollUp);
+    wrapper.classList.toggle('can-scroll-down', canScrollDown);
+}
+
 export function setupSettingsModal() {
     const settingsBtn = $('settingsBtn');
     if (settingsBtn) {
@@ -2066,8 +2084,20 @@ export function setupSettingsModal() {
                 tab.classList.add('active');
                 const panel = settingsModal.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`);
                 if (panel) panel.classList.add('active');
+                // Update shortcuts scroll gradient when switching to shortcuts tab
+                if (tab.dataset.tab === 'shortcuts') {
+                    setTimeout(updateShortcutsScrollGradient, 0);
+                }
             });
         });
+
+        // Shortcuts scroll gradient
+        const shortcutsWrapper = settingsModal.querySelector('.shortcuts-scroll-wrapper');
+        if (shortcutsWrapper) {
+            shortcutsWrapper.addEventListener('scroll', updateShortcutsScrollGradient);
+            // Initial check
+            setTimeout(updateShortcutsScrollGradient, 0);
+        }
     }
 
     // Storage card selection
