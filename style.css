@@ -732,7 +732,7 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
 .search-bar {
     position: fixed; top: 80px; left: 50%;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: 9999px; padding: 10px 20px;
+    border-radius: 9999px; padding: 10px 8px 10px 16px;
     display: flex; align-items: center; gap: 12px;
     box-shadow: var(--shadow-lg); z-index: 150; min-width: 340px;
     opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.98);
