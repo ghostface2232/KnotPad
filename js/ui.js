@@ -237,7 +237,7 @@ export function redo() {
 }
 
 function restoreState(stateData) {
-    state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); });
+    state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); if (c.labelEl) c.labelEl.remove(); });
     state.connections.length = 0;
     state.items.forEach(i => i.el.remove());
     state.items.length = 0;
