@@ -1157,10 +1157,10 @@ function setupItemEvents(item) {
         // Fullscreen toggle
         fullscreenBtn.addEventListener('click', e => {
             e.stopPropagation();
-            if (document.fullscreenElement === video) {
+            if (document.fullscreenElement === videoContainer) {
                 document.exitFullscreen();
             } else {
-                video.requestFullscreen();
+                videoContainer.requestFullscreen();
             }
         });
 
