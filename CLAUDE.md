@@ -1,7 +1,5 @@
 # KnotPad Project Guide
 
-> **For AI Agents & Coding Assistants**: Read this file first to understand the project structure.
-
 > **IMPORTANT**: After any code modification, update this file if the change affects: feature locations, module responsibilities, storage keys, or configuration. Keep this document in sync with the codebase.
 
 ## Project Overview
@@ -12,7 +10,7 @@ KnotPad is a web-based infinite canvas note-taking application. It supports crea
 
 ---
 
-## Critical: Cache Version Update
+## Cache Version Update
 
 **IMPORTANT**: When making changes, update the cache version in `sw.js`:
 
