@@ -1,7 +1,6 @@
 # KnotPad Project Guide
 
-> **IMPORTANT**: After any code modification, update this file if the change affects: feature locations, module responsibilities, storage keys, or configuration. Keep this document in sync with the codebase.
-> **IMPORTANT (Codex guide)**: When updating this guide, apply the same updates to both `CLAUDE.md` and `AGENTS.md` to keep them in sync.
+> **IMPORTANT**: After any code modification, update this file if the change affects: feature locations, module responsibilities, storage keys, or configuration. Keep this document in sync with the codebase. When updating this guide, apply the same updates to both `CLAUDE.md` and `AGENTS.md` to keep them in sync.
 
 ## Project Overview
 
