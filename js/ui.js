@@ -175,6 +175,7 @@ export function saveState() {
             content: JSON.parse(JSON.stringify(i.content)),
             color: i.color,
             fontSize: i.fontSize,
+            textAlign: i.textAlign,
             locked: i.locked,
             manuallyResized: i.manuallyResized,
             z: parseInt(i.el.style.zIndex)
@@ -2476,7 +2477,8 @@ function saveToLocalStorageSync() {
                 fh: c.fh,
                 to: c.to.id,
                 th: c.th,
-                dir: c.dir
+                dir: c.dir,
+                label: c.label || ''
             })),
             view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
             itemId: state.itemId,
