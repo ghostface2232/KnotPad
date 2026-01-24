@@ -24,6 +24,64 @@ function setupFaviconErrorHandler(imgElement) {
 // Export for use in ui.js
 export { FALLBACK_FAVICON, setupFaviconErrorHandler };
 
+// ============ Link Preview ============
+// Load preview image for link items using screenshot API
+
+export function loadLinkPreviewForItem(item) {
+    if (item.type !== 'link') return;
+
+    const el = item.el;
+    const itemLink = el.querySelector('.item-link');
+    if (!itemLink) return;
+
+    // Check if preview already exists
+    if (el.querySelector('.link-preview-img')) return;
+
+    const url = item.content.url;
+    // Use microlink.io API for screenshot preview
+    const previewUrl = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url`;
+
+    fetch(previewUrl)
+        .then(response => response.json())
+        .then(data => {
+            // Check again if preview mode is still enabled
+            if (!state.linkPreviewEnabled) return;
+
+            if (data.status === 'success' && data.data?.screenshot?.url) {
+                const previewImg = document.createElement('img');
+                previewImg.className = 'link-preview-img';
+                previewImg.src = data.data.screenshot.url;
+                previewImg.alt = 'Link preview';
+                previewImg.loading = 'lazy';
+                previewImg.onerror = () => previewImg.remove();
+                itemLink.insertBefore(previewImg, itemLink.firstChild);
+                // Adjust item height if needed
+                if (!item.manuallyResized) {
+                    item.h = Math.max(item.h, 180);
+                    el.style.height = item.h + 'px';
+                }
+            }
+        })
+        .catch(() => {
+            // Silently fail - preview not available
+        });
+}
+
+export function removeLinkPreviewFromItem(item) {
+    if (item.type !== 'link') return;
+
+    const el = item.el;
+    const previewImg = el.querySelector('.link-preview-img');
+    if (previewImg) {
+        previewImg.remove();
+        // Reset height if not manually resized
+        if (!item.manuallyResized) {
+            item.h = 100;
+            el.style.height = item.h + 'px';
+        }
+    }
+}
+
 // ============ Global Event Delegation for Memo Toolbars ============
 // Single document-level listener instead of per-item listeners (prevents memory leaks)
 let memoToolbarDelegationInitialized = false;
@@ -335,6 +393,12 @@ export function createItem(cfg, loading = false) {
     }
 
     setTimeout(() => el.classList.remove('new'), 200);
+
+    // Load link preview if enabled and this is a link item
+    if (item.type === 'link' && state.linkPreviewEnabled && !loading) {
+        loadLinkPreviewForItem(item);
+    }
+
     return item;
 }
 
@@ -1059,11 +1123,11 @@ function setupItemEvents(item) {
             }
         });
 
-        // Double-click to edit link
+        // Double-click to rename link title
         itemLink.addEventListener('dblclick', e => {
             e.preventDefault();
             e.stopPropagation();
-            eventBus.emit(Events.LINK_EDIT, item);
+            eventBus.emit(Events.LINK_RENAME, item);
         });
     }
 

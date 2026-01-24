@@ -594,10 +594,30 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
 :root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="pink"] { background-color: #fde9f3; }
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; cursor: pointer; }
-.link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); }
+.link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); flex-shrink: 0; }
 .link-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.link-title.editing {
+    outline: none;
+    background: var(--bg-hover);
+    padding: 2px 6px;
+    margin: -2px -6px;
+    border-radius: 4px;
+    cursor: text;
+}
 .link-url { font-size: 12px; color: var(--text-secondary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-url:hover { color: var(--accent); }
+
+/* Link Preview Image */
+.link-preview-img {
+    width: 100%;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: var(--bg-hover);
+    flex-shrink: 0;
+}
+.link-preview-enabled .item-link { gap: 8px; }
+.link-preview-enabled .link-title { margin-top: auto; }
 
 .drop-overlay {
     position: fixed; inset: 0; background: rgba(9, 9, 11, 0.92);

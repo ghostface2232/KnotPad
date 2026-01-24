@@ -5,7 +5,7 @@ import { $, esc, generateId, showToast, stripHtml } from './utils.js';
 import * as state from './state.js';
 import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
-import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus, setupFaviconErrorHandler } from './items.js';
+import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus, setupFaviconErrorHandler, loadLinkPreviewForItem, removeLinkPreviewFromItem } from './items.js';
 import { addConnection, updateConnectionArrow, updateConnectionLabel, updateAllConnections, addChildNode } from './connections.js';
 import {
     fsDirectoryHandle,
@@ -1237,6 +1237,11 @@ export async function copyItemToClipboard(item) {
 export function showContextMenu(x, y, item) {
     hideMenus(); // Close other context menus first
     contextMenu.querySelector('[data-action="lock"]').textContent = item.locked ? 'Unlock' : 'Lock to Back';
+    // Show/hide rename option based on item type
+    const renameItem = contextMenu.querySelector('[data-action="rename"]');
+    if (renameItem) {
+        renameItem.style.display = item.type === 'link' ? '' : 'none';
+    }
     contextMenu.style.left = x + 'px';
     contextMenu.style.top = y + 'px';
     contextMenu.classList.add('active');
@@ -1252,6 +1257,11 @@ export function setupContextMenu() {
                         break;
                     case 'duplicate':
                         duplicateItem(window.selectedItem);
+                        break;
+                    case 'rename':
+                        if (window.selectedItem.type === 'link') {
+                            startLinkRename(window.selectedItem);
+                        }
                         break;
                     case 'lock':
                         window.selectedItem.locked = !window.selectedItem.locked;
@@ -1269,6 +1279,76 @@ export function setupContextMenu() {
             hideMenus();
         });
     });
+}
+
+// ============ Link Rename ============
+
+export function startLinkRename(item) {
+    if (item.type !== 'link') return;
+
+    const el = item.el;
+    const titleEl = el.querySelector('.link-title');
+    if (!titleEl) return;
+
+    // Store original title for cancel
+    const originalTitle = item.content.title;
+
+    // Make title editable
+    titleEl.contentEditable = 'true';
+    titleEl.classList.add('editing');
+    titleEl.focus();
+
+    // Select all text
+    const range = document.createRange();
+    range.selectNodeContents(titleEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    // Handle blur (save)
+    const handleBlur = () => {
+        finishLinkRename(item, titleEl, originalTitle);
+    };
+
+    // Handle keydown
+    const handleKeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            titleEl.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            titleEl.textContent = originalTitle;
+            titleEl.blur();
+        }
+    };
+
+    titleEl.addEventListener('blur', handleBlur, { once: true });
+    titleEl.addEventListener('keydown', handleKeydown);
+
+    // Store keydown handler for cleanup
+    titleEl._renameKeydownHandler = handleKeydown;
+}
+
+function finishLinkRename(item, titleEl, originalTitle) {
+    titleEl.contentEditable = 'false';
+    titleEl.classList.remove('editing');
+
+    // Remove keydown handler
+    if (titleEl._renameKeydownHandler) {
+        titleEl.removeEventListener('keydown', titleEl._renameKeydownHandler);
+        delete titleEl._renameKeydownHandler;
+    }
+
+    const newTitle = titleEl.textContent.trim();
+
+    if (newTitle && newTitle !== originalTitle) {
+        item.content.title = newTitle;
+        eventBus.emit(Events.STATE_SAVE);
+        eventBus.emit(Events.AUTOSAVE_TRIGGER);
+    } else if (!newTitle) {
+        // Restore original if empty
+        titleEl.textContent = originalTitle;
+    }
 }
 
 // ============ Canvas Context Menu ============
@@ -2013,6 +2093,18 @@ export function applyColorDisplayMode(mode) {
     document.body.classList.toggle('color-mode-fill', mode === 'fill');
 }
 
+export function applyLinkPreviewMode(enabled) {
+    document.body.classList.toggle('link-preview-enabled', enabled);
+    // Update existing link items
+    state.items.filter(item => item.type === 'link').forEach(item => {
+        if (enabled) {
+            loadLinkPreviewForItem(item);
+        } else {
+            removeLinkPreviewFromItem(item);
+        }
+    });
+}
+
 function updateSettingsUI() {
     // Update font size buttons
     const fontSizeGroup = $('defaultFontSize');
@@ -2059,6 +2151,12 @@ function updateSettingsUI() {
     const gridSnapCheckbox = $('gridSnapToggle');
     if (gridSnapCheckbox) {
         gridSnapCheckbox.checked = state.gridSnap;
+    }
+
+    // Update link preview toggle
+    const linkPreviewCheckbox = $('linkPreviewToggle');
+    if (linkPreviewCheckbox) {
+        linkPreviewCheckbox.checked = state.linkPreviewEnabled;
     }
 }
 
@@ -2250,6 +2348,15 @@ export function setupSettingsModal() {
     if (gridSnapCheckbox) {
         gridSnapCheckbox.addEventListener('change', () => {
             state.setGridSnap(gridSnapCheckbox.checked);
+        });
+    }
+
+    // Link preview
+    const linkPreviewCheckbox = $('linkPreviewToggle');
+    if (linkPreviewCheckbox) {
+        linkPreviewCheckbox.addEventListener('change', () => {
+            state.setLinkPreviewEnabled(linkPreviewCheckbox.checked);
+            applyLinkPreviewMode(linkPreviewCheckbox.checked);
         });
     }
 }

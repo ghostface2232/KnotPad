@@ -46,7 +46,9 @@ import {
     setupSidebarResize,
     handleFile,
     applyWrapMode,
-    applyColorDisplayMode
+    applyColorDisplayMode,
+    applyLinkPreviewMode,
+    startLinkRename
 } from './ui.js';
 import {
     setupMouseEvents,
@@ -81,6 +83,9 @@ eventBus.on(Events.UI_SHOW_CONTEXT_MENU, (x, y, item) => showContextMenu(x, y, i
 
 // Item events
 eventBus.on(Events.ITEMS_ADD_CHILD_NODE, (parent, direction, type) => addChildNode(parent, direction, type));
+
+// Link events
+eventBus.on(Events.LINK_RENAME, (item) => startLinkRename(item));
 
 // ============ Setup Toolbar Events ============
 
@@ -402,6 +407,9 @@ async function init() {
     }
 
     await loadCanvases();
+
+    // Apply link preview mode after items are loaded
+    applyLinkPreviewMode(state.linkPreviewEnabled);
 
     // Register Service Worker
     if ('serviceWorker' in navigator) {

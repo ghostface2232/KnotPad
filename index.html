@@ -172,6 +172,7 @@
     <div class="context-menu" id="contextMenu">
         <div class="context-menu-item" data-action="copy"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy</div>
         <div class="context-menu-item" data-action="duplicate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Duplicate</div>
+        <div class="context-menu-item link-only" data-action="rename"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Rename</div>
         <div class="context-menu-sep"></div>
         <div class="context-menu-item" data-action="lock"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Lock to Back</div>
         <div class="context-menu-sep"></div>
@@ -387,6 +388,17 @@
                         <div class="settings-option-group" id="colorDisplayMode">
                             <button class="settings-option-btn active" data-value="bar">Top Bar</button>
                             <button class="settings-option-btn" data-value="fill">Fill</button>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>Link Preview</h4>
+                        <p class="settings-description">Show preview images for link nodes when available.</p>
+                        <div class="settings-toggle-row">
+                            <span>Enable link preview</span>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="linkPreviewToggle">
+                                <span class="settings-toggle-slider"></span>
+                            </label>
                         </div>
                     </div>
                 </div>
