@@ -370,7 +370,6 @@ async function init() {
     setupSettingsModal();
     applyWrapMode(state.noteWrapMode);
     applyColorDisplayMode(state.colorDisplayMode);
-    applyLinkPreviewMode(state.linkPreviewEnabled);
     setupMouseEvents();
     setupTouchEvents();
     setupKeyboardEvents();
@@ -408,6 +407,9 @@ async function init() {
     }
 
     await loadCanvases();
+
+    // Apply link preview mode after items are loaded
+    applyLinkPreviewMode(state.linkPreviewEnabled);
 
     // Register Service Worker
     if ('serviceWorker' in navigator) {
