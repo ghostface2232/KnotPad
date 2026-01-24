@@ -1,6 +1,6 @@
 # KnotPad Project Guide
 
-> **IMPORTANT**: After any code modification, update this file if the change affects: feature locations, module responsibilities, storage keys, or configuration. Keep this document in sync with the codebase. When updating this guide, apply the same updates to both `CLAUDE.md` and `AGENTS.md` to keep them in sync.
+> **IMPORTANT**: After any code modification, update this file if the change affects: feature locations, module responsibilities, storage keys, or configuration. Keep this document in sync with the codebase. (`CLAUDE.md` is a symlink to this file.)
 
 ## Project Overview
 
@@ -37,7 +37,8 @@ KnotPad/
 ├── style.css           # All styles (theming, components, animations)
 ├── sw.js               # Service Worker (caching, offline support)
 ├── manifest.json       # PWA manifest
-├── CLAUDE.md           # This guide file
+├── AGENTS.md           # Project guide (master file)
+├── CLAUDE.md           # Symlink to AGENTS.md
 ├── js/
 │   ├── app.js          # Entry point, initialization, event bus wiring
 │   ├── state.js        # Global state management (Proxy-based reactive)
