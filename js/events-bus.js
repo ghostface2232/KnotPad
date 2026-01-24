@@ -137,7 +137,8 @@ export const Events = {
     ITEMS_ADD_CHILD_NODE: 'items:addChildNode',
 
     // Link events
-    LINK_EDIT: 'link:edit'
+    LINK_EDIT: 'link:edit',
+    LINK_RENAME: 'link:rename'
 };
 
 export default eventBus;
