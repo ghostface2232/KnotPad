@@ -1085,10 +1085,27 @@ function startRename(entry, id) {
     // Disable drag while editing to allow text selection
     entry.draggable = false;
 
-    const finish = () => {
-        entry.draggable = true; // Restore drag capability
-        renameCanvas(id, input.value.trim() || 'Untitled');
+    let finished = false;
+    const restoreDrag = () => {
+        if (entry.isConnected) {
+            entry.draggable = true;
+        }
     };
+    const finish = () => {
+        if (finished) return;
+        finished = true;
+        restoreDrag(); // Restore drag capability
+        renameCanvas(id, input.value.trim() || 'Untitled');
+        observer.disconnect();
+    };
+    const observer = new MutationObserver(() => {
+        if (!input.isConnected || !entry.isConnected) {
+            restoreDrag();
+            observer.disconnect();
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
     input.addEventListener('blur', finish);
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
@@ -1103,9 +1120,31 @@ function openIconPicker(canvasId, entry) {
     const sidebarRect = sidebar.getBoundingClientRect();
 
     // Position popup below the thumbnail entry, not covering it
-    const pickerHeight = 180; // Approximate height of the picker
+    const pickerWidth = 220; // Default picker width in CSS
+    const horizontalPadding = 12;
+    const maxPickerWidth = Math.max(0, sidebarRect.width - horizontalPadding * 2);
+    const effectivePickerWidth = Math.min(pickerWidth, maxPickerWidth);
     const spaceBelow = sidebarRect.bottom - rect.bottom;
     const spaceAbove = rect.top - sidebarRect.top;
+
+    if (effectivePickerWidth && effectivePickerWidth < pickerWidth) {
+        canvasIconPicker.style.width = `${effectivePickerWidth}px`;
+    } else {
+        canvasIconPicker.style.width = '';
+    }
+
+    const desiredLeft = rect.left - sidebarRect.left;
+    const maxLeft = Math.max(horizontalPadding, sidebarRect.width - effectivePickerWidth - horizontalPadding);
+    const left = Math.min(maxLeft, Math.max(horizontalPadding, desiredLeft));
+    canvasIconPicker.style.left = `${left}px`;
+    canvasIconPicker.style.right = '';
+
+    const wasActive = canvasIconPicker.classList.contains('active');
+    if (!wasActive) {
+        canvasIconPicker.style.visibility = 'hidden';
+        canvasIconPicker.classList.add('active');
+    }
+    const pickerHeight = canvasIconPicker.getBoundingClientRect().height || 180;
 
     if (spaceBelow >= pickerHeight || spaceBelow >= spaceAbove) {
         // Position below the entry
@@ -1128,6 +1167,7 @@ function openIconPicker(canvasId, entry) {
     );
 
     canvasIconPicker.classList.add('active');
+    canvasIconPicker.style.visibility = '';
 }
 
 function setCanvasIcon(canvasId, icon) {
