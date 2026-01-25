@@ -312,9 +312,20 @@ export function createItem(cfg, loading = false) {
         case 'keyword':
             html = `<div class="item-keyword"><div class="keyword-body" contenteditable="true" spellcheck="false" data-placeholder="Keyword">${esc(cfg.content || '')}</div></div>`;
             break;
-        case 'link':
-            html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${new URL(cfg.content.url).hostname}&sz=64"><div class="link-title">${esc(cfg.content.title)}</div><a class="link-url" href="${cfg.content.url}" target="_blank">${cfg.content.display}</a></div>`;
+        case 'link': {
+            const linkContent = cfg.content || {};
+            const linkUrl = linkContent.url || '';
+            const linkTitle = linkContent.title || 'Untitled Link';
+            const linkDisplay = linkContent.display || linkUrl || 'No URL';
+            let hostname = '';
+            try {
+                hostname = new URL(linkUrl).hostname;
+            } catch {
+                hostname = '';
+            }
+            html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${hostname}&sz=64"><div class="link-title">${esc(linkTitle)}</div><a class="link-url" href="${esc(linkUrl)}" target="_blank">${esc(linkDisplay)}</a></div>`;
             break;
+        }
     }
 
     if (cfg.color) {
@@ -1578,6 +1589,18 @@ export function deleteItem(item, update = true, withFade = true) {
         if (url) {
             URL.revokeObjectURL(url);
             state.blobURLCache.delete(item.content);
+        }
+    }
+
+    // Clean up search results if item is being deleted
+    const searchIdx = state.searchResults.indexOf(item);
+    if (searchIdx > -1) {
+        state.searchResults.splice(searchIdx, 1);
+        // Adjust search index if needed
+        if (state.searchIndex >= state.searchResults.length) {
+            state.setSearchIndex(Math.max(0, state.searchResults.length - 1));
+        } else if (state.searchIndex > searchIdx) {
+            state.setSearchIndex(state.searchIndex - 1);
         }
     }
 
