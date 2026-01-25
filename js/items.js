@@ -246,6 +246,8 @@ function setupMediaErrorHandler(mediaElement, mediaId) {
         }
     };
 
+    // Store handler reference for cleanup to prevent memory leaks
+    mediaElement._errorHandler = handleError;
     mediaElement.addEventListener('error', handleError);
 
     // Also handle case where src is empty (blob URL wasn't cached)
@@ -1531,6 +1533,15 @@ function cleanupItemEvents(item) {
     if (item._selectionChangeHandler) {
         document.removeEventListener('selectionchange', item._selectionChangeHandler);
         item._selectionChangeHandler = null;
+    }
+
+    // Remove media error handlers for image/video items
+    if (item.type === 'image' || item.type === 'video') {
+        const mediaEl = item.el.querySelector('.item-image, .item-video');
+        if (mediaEl && mediaEl._errorHandler) {
+            mediaEl.removeEventListener('error', mediaEl._errorHandler);
+            mediaEl._errorHandler = null;
+        }
     }
 }
 
