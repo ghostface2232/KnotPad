@@ -56,6 +56,8 @@ let minimapClickController;
 let linkModalController;
 let settingsModalController;
 let sidebarResizeController;
+let switchCanvasInProgress = false;
+let pendingCanvasSwitchId = null;
 
 // Note: External function calls are now handled via eventBus
 // Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
@@ -531,55 +533,72 @@ async function loadCanvasData(id) {
 }
 
 export async function switchCanvas(id) {
+    if (switchCanvasInProgress) {
+        pendingCanvasSwitchId = id;
+        return;
+    }
+
+    switchCanvasInProgress = true;
+    pendingCanvasSwitchId = null;
+
     // Save current canvas with its undo/redo history before switching
-    if (state.currentCanvasId) {
-        await saveCurrentCanvas();
+    try {
+        if (state.currentCanvasId) {
+            await saveCurrentCanvas();
+        }
+
+        state.blobURLCache.forEach(url => URL.revokeObjectURL(url));
+        state.blobURLCache.clear();
+        state.connections.forEach(c => {
+            c.el.remove();
+            if (c.hitArea) c.hitArea.remove();
+            if (c.arrow) c.arrow.remove();
+            if (c.labelEl) c.labelEl.remove();
+        });
+        state.connections.length = 0;
+        state.items.forEach(i => i.el.remove());
+        state.items.length = 0;
+        state.selectedItems.clear();
+        state.setSelectedConn(null);
+        state.setItemId(1);
+        state.setHighestZ(1);
+        state.setScale(1);
+        state.setOffsetX(0);
+        state.setOffsetY(0);
+        // Clear stacks before loading - loadCanvasData will restore per-canvas history
+        state.setUndoStack([]);
+        state.setRedoStack([]);
+        updateTransform();
+
+        state.setCurrentCanvasId(id);
+        localStorage.setItem('knotpad-active-canvas', id);
+        await loadCanvasData(id);
+
+        // Ensure at least initial state exists if no history was restored
+        if (!state.undoStack.length) {
+            state.setUndoStack([{ items: [], connections: [] }]);
+        }
+        updateUndoRedoButtons();
+        setFilter('all');
+
+        // Reset color group mode when switching canvas
+        if (state.colorGroupModeActive) {
+            state.setColorGroupModeActive(false);
+            state.setOriginalPositions(new Map());
+            $('sortByColorBtn').classList.remove('active');
+        }
+
+        updateMinimap();
+        renderCanvasList();
+        updateTopbarCanvasName();
+    } finally {
+        switchCanvasInProgress = false;
+        if (pendingCanvasSwitchId && pendingCanvasSwitchId !== state.currentCanvasId) {
+            const nextCanvasId = pendingCanvasSwitchId;
+            pendingCanvasSwitchId = null;
+            await switchCanvas(nextCanvasId);
+        }
     }
-
-    state.blobURLCache.forEach(url => URL.revokeObjectURL(url));
-    state.blobURLCache.clear();
-    state.connections.forEach(c => {
-        c.el.remove();
-        if (c.hitArea) c.hitArea.remove();
-        if (c.arrow) c.arrow.remove();
-        if (c.labelEl) c.labelEl.remove();
-    });
-    state.connections.length = 0;
-    state.items.forEach(i => i.el.remove());
-    state.items.length = 0;
-    state.selectedItems.clear();
-    state.setSelectedConn(null);
-    state.setItemId(1);
-    state.setHighestZ(1);
-    state.setScale(1);
-    state.setOffsetX(0);
-    state.setOffsetY(0);
-    // Clear stacks before loading - loadCanvasData will restore per-canvas history
-    state.setUndoStack([]);
-    state.setRedoStack([]);
-    updateTransform();
-
-    state.setCurrentCanvasId(id);
-    localStorage.setItem('knotpad-active-canvas', id);
-    await loadCanvasData(id);
-
-    // Ensure at least initial state exists if no history was restored
-    if (!state.undoStack.length) {
-        state.setUndoStack([{ items: [], connections: [] }]);
-    }
-    updateUndoRedoButtons();
-    setFilter('all');
-
-    // Reset color group mode when switching canvas
-    if (state.colorGroupModeActive) {
-        state.setColorGroupModeActive(false);
-        state.setOriginalPositions(new Map());
-        $('sortByColorBtn').classList.remove('active');
-    }
-
-    updateMinimap();
-    renderCanvasList();
-    updateTopbarCanvasName();
 }
 
 export async function createNewCanvas(groupId = null) {
