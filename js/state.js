@@ -166,7 +166,25 @@ const initialState = {
     defaultTextAlign: localStorage.getItem('knotpad-default-text-align') || 'left',
     invertWheelZoom: localStorage.getItem('knotpad-invert-wheel-zoom') === 'true',
     gridSnap: localStorage.getItem('knotpad-grid-snap') === 'true',
-    colorDisplayMode: localStorage.getItem('knotpad-color-display-mode') || 'bar',
+    colorDisplayMode: (() => {
+        // Migration: Change default from 'bar' to 'fill' for new users,
+        // while preserving existing users' experience
+        const savedMode = localStorage.getItem('knotpad-color-display-mode');
+        if (savedMode) {
+            // User has explicitly set a preference, use it
+            return savedMode;
+        }
+        // Check if user has existing canvas data (existing user)
+        const existingCanvases = localStorage.getItem('knotpad-canvases');
+        if (existingCanvases) {
+            // Existing user without explicit preference - preserve old default 'bar'
+            // Save it so this migration only runs once
+            localStorage.setItem('knotpad-color-display-mode', 'bar');
+            return 'bar';
+        }
+        // New user - use new default 'fill'
+        return 'fill';
+    })(),
     linkPreviewEnabled: localStorage.getItem('knotpad-link-preview-enabled') === 'true'
 };
 
