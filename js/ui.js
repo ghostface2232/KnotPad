@@ -252,6 +252,21 @@ export function updateUndoRedoButtons() {
     redoBtn.classList.toggle('disabled', state.redoStack.length === 0);
 }
 
+function serializeOriginalPositions() {
+    return Array.from(state.originalPositions.entries()).map(([id, position]) => ([
+        id,
+        { x: position.x, y: position.y }
+    ]));
+}
+
+function deserializeOriginalPositions(entries) {
+    if (!Array.isArray(entries)) return new Map();
+    return new Map(entries.map(([id, position]) => ([
+        id,
+        { x: position?.x ?? 0, y: position?.y ?? 0 }
+    ])));
+}
+
 export function undo() {
     if (state.undoStack.length < 2) return;
     state.pushRedo(state.popUndo());
@@ -277,6 +292,7 @@ function restoreState(stateData) {
     state.items.forEach(i => i.el.remove());
     state.items.length = 0;
     state.selectedItems.clear();
+    state.setSelectedItem(null);
     state.setSelectedConn(null);
 
     // Calculate maximum item ID to prevent ID collisions after undo/redo
@@ -401,6 +417,8 @@ export async function saveCurrentCanvas() {
         view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
         itemId: state.itemId,
         highestZ: state.highestZ,
+        colorGroupModeActive: state.colorGroupModeActive,
+        originalPositions: serializeOriginalPositions(),
         undoStack: state.undoStack,
         redoStack: state.redoStack
     };
@@ -470,6 +488,9 @@ async function loadCanvasData(id) {
             state.setOffsetY(data.view.offsetY);
             updateTransform();
         }
+
+        state.setColorGroupModeActive(Boolean(data.colorGroupModeActive));
+        state.setOriginalPositions(deserializeOriginalPositions(data.originalPositions));
 
         // Load media with retry logic for better persistence
         const mediaItems = data.items.filter(d => (d.type === 'image' || d.type === 'video') && d.content?.startsWith('media_'));
@@ -581,12 +602,15 @@ export async function switchCanvas(id) {
         state.items.forEach(i => i.el.remove());
         state.items.length = 0;
         state.selectedItems.clear();
+        state.setSelectedItem(null);
         state.setSelectedConn(null);
         state.setItemId(1);
         state.setHighestZ(1);
         state.setScale(1);
         state.setOffsetX(0);
         state.setOffsetY(0);
+        state.setColorGroupModeActive(false);
+        state.setOriginalPositions(new Map());
         // Clear stacks before loading - loadCanvasData will restore per-canvas history
         state.setUndoStack([]);
         state.setRedoStack([]);
@@ -603,12 +627,7 @@ export async function switchCanvas(id) {
         updateUndoRedoButtons();
         setFilter('all');
 
-        // Reset color group mode when switching canvas
-        if (state.colorGroupModeActive) {
-            state.setColorGroupModeActive(false);
-            state.setOriginalPositions(new Map());
-            $('sortByColorBtn').classList.remove('active');
-        }
+        $('sortByColorBtn').classList.toggle('active', state.colorGroupModeActive);
 
         updateMinimap();
         renderCanvasList();
@@ -1390,6 +1409,7 @@ export async function copyItemToClipboard(item) {
 
 export function showContextMenu(x, y, item) {
     hideMenus(); // Close other context menus first
+    state.setSelectedItem(item);
     contextMenu.querySelector('[data-action="lock"]').textContent = item.locked ? 'Unlock' : 'Lock to Back';
     // Show/hide rename option based on item type
     const renameItem = contextMenu.querySelector('[data-action="rename"]');
@@ -1408,29 +1428,30 @@ export function setupContextMenu() {
 
     contextMenu.querySelectorAll('.context-menu-item').forEach(el => {
         el.addEventListener('click', () => {
-            if (window.selectedItem) {
+            const selectedItem = state.selectedItem;
+            if (selectedItem) {
                 switch (el.dataset.action) {
                     case 'copy':
-                        copyItemToClipboard(window.selectedItem);
+                        copyItemToClipboard(selectedItem);
                         break;
                     case 'duplicate':
-                        duplicateItem(window.selectedItem);
+                        duplicateItem(selectedItem);
                         break;
                     case 'rename':
-                        if (window.selectedItem.type === 'link') {
-                            startLinkRename(window.selectedItem);
+                        if (selectedItem.type === 'link') {
+                            startLinkRename(selectedItem);
                         }
                         break;
                     case 'lock':
-                        window.selectedItem.locked = !window.selectedItem.locked;
-                        window.selectedItem.el.classList.toggle('locked', window.selectedItem.locked);
-                        if (window.selectedItem.locked) window.selectedItem.el.style.zIndex = 1;
+                        selectedItem.locked = !selectedItem.locked;
+                        selectedItem.el.classList.toggle('locked', selectedItem.locked);
+                        if (selectedItem.locked) selectedItem.el.style.zIndex = 1;
                         eventBus.emit(Events.STATE_SAVE);
                         eventBus.emit(Events.AUTOSAVE_TRIGGER);
                         break;
                     case 'delete':
                         if (state.selectedItems.size > 0) deleteSelectedItems();
-                        else deleteItem(window.selectedItem);
+                        else deleteItem(selectedItem);
                         break;
                 }
             }
@@ -2764,6 +2785,8 @@ function saveToLocalStorageSync() {
             view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
             itemId: state.itemId,
             highestZ: state.highestZ,
+            colorGroupModeActive: state.colorGroupModeActive,
+            originalPositions: serializeOriginalPositions(),
             undoStack: state.undoStack,
             redoStack: state.redoStack
         };

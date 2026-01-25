@@ -630,8 +630,8 @@ function setupItemEvents(item) {
                     // Only deselect others if this item wasn't already selected
                     selectItem(item, false);
                 } else {
-                    // Item already selected - update window.selectedItem for context menu
-                    window.selectedItem = item;
+                    // Item already selected - update selected item for context menu
+                    state.setSelectedItem(item);
                 }
 
                 // Setup drag if not locked
@@ -1493,14 +1493,14 @@ export function selectItem(item, accumulate = false) {
     item.el.classList.add('selected');
     // Always bring selected item to top (z-index)
     item.el.style.zIndex = state.incrementHighestZ();
-    window.selectedItem = item;
+    state.setSelectedItem(item);
 }
 
 // Deselect all items
 export function deselectAll() {
     state.selectedItems.forEach(i => i.el.classList.remove('selected'));
     state.selectedItems.clear();
-    window.selectedItem = null;
+    state.setSelectedItem(null);
 
     if (state.selectedConn) {
         state.selectedConn.el.classList.remove('selected');
