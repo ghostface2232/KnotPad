@@ -41,31 +41,56 @@ export function loadLinkPreviewForItem(item) {
     // Use microlink.io API for screenshot preview
     const previewUrl = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false`;
 
-    fetch(previewUrl)
+    // Add timeout for fetch
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    fetch(previewUrl, { signal: controller.signal })
         .then(response => response.json())
         .then(data => {
+            clearTimeout(timeoutId);
             // Check again if preview mode is still enabled
             if (!state.linkPreviewEnabled) return;
             // Check if element is still in DOM
             if (!el.isConnected) return;
 
             if (data.status === 'success' && data.data?.screenshot?.url) {
+                const screenshotUrl = data.data.screenshot.url;
+
+                // Validate the image before adding it
                 const previewImg = document.createElement('img');
                 previewImg.className = 'link-preview-img';
-                previewImg.src = data.data.screenshot.url;
                 previewImg.alt = 'Link preview';
-                previewImg.loading = 'lazy';
-                previewImg.onerror = () => previewImg.remove();
-                // Append preview at the end (below title and URL)
-                itemLink.appendChild(previewImg);
-                // Adjust item height for 3:2 aspect ratio preview (width ~228px inside padding, height ~152px)
-                if (!item.manuallyResized) {
-                    item.h = Math.max(item.h, 240);
-                    el.style.height = item.h + 'px';
-                }
+
+                // Validate image loads and has reasonable dimensions
+                previewImg.onload = () => {
+                    // Check if element is still in DOM and preview mode still enabled
+                    if (!el.isConnected || !state.linkPreviewEnabled) {
+                        return;
+                    }
+                    // Check for minimum dimensions to filter out broken/tiny images
+                    if (previewImg.naturalWidth < 100 || previewImg.naturalHeight < 50) {
+                        return;
+                    }
+                    // Append preview at the end (below title and URL)
+                    itemLink.appendChild(previewImg);
+                    // Adjust item height for 3:2 aspect ratio preview (width ~228px inside padding, height ~152px)
+                    if (!item.manuallyResized) {
+                        item.h = Math.max(item.h, 280);
+                        el.style.height = item.h + 'px';
+                    }
+                };
+
+                previewImg.onerror = () => {
+                    // Silently fail - image couldn't load
+                };
+
+                // Start loading the image
+                previewImg.src = screenshotUrl;
             }
         })
         .catch(() => {
+            clearTimeout(timeoutId);
             // Silently fail - preview not available
         });
 }
@@ -79,7 +104,7 @@ export function removeLinkPreviewFromItem(item) {
         previewImg.remove();
         // Reset height if not manually resized
         if (!item.manuallyResized) {
-            item.h = 100;
+            item.h = 116;
             el.style.height = item.h + 'px';
         }
     }
@@ -1168,8 +1193,10 @@ function setupItemEvents(item) {
         let clickStartX = 0;
         let clickStartY = 0;
         let clickStartTime = 0;
+        let singleClickTimer = null;
         const DRAG_THRESHOLD = 5; // pixels
         const CLICK_TIMEOUT = 300; // ms
+        const DBLCLICK_DELAY = 250; // ms to wait before opening link (to detect double-click)
 
         // Track mousedown position to distinguish click from drag
         itemLink.addEventListener('mousedown', e => {
@@ -1178,11 +1205,12 @@ function setupItemEvents(item) {
             clickStartTime = Date.now();
         }, { signal });
 
-        // Single click to open link (but not if it was a drag)
+        // Single click to open link (but not if it was a drag, and delay to allow double-click detection)
         itemLink.addEventListener('click', e => {
-            // Don't open link if clicking on control buttons
+            // Don't open link if clicking on control buttons or title during editing
             if (e.target.closest('.delete-btn') || e.target.closest('.color-btn') ||
-                e.target.closest('.color-picker') || e.target.closest('.resize-handle')) {
+                e.target.closest('.color-picker') || e.target.closest('.resize-handle') ||
+                e.target.closest('.link-title.editing')) {
                 return;
             }
 
@@ -1194,7 +1222,18 @@ function setupItemEvents(item) {
             if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD && elapsed < CLICK_TIMEOUT) {
                 e.preventDefault();
                 e.stopPropagation();
-                window.open(item.content.url, '_blank');
+
+                // Clear any existing timer
+                if (singleClickTimer) {
+                    clearTimeout(singleClickTimer);
+                    singleClickTimer = null;
+                }
+
+                // Delay opening link to allow double-click detection
+                singleClickTimer = setTimeout(() => {
+                    singleClickTimer = null;
+                    window.open(item.content.url, '_blank');
+                }, DBLCLICK_DELAY);
             }
         }, { signal });
 
@@ -1202,6 +1241,13 @@ function setupItemEvents(item) {
         itemLink.addEventListener('dblclick', e => {
             e.preventDefault();
             e.stopPropagation();
+
+            // Cancel single-click timer to prevent opening link
+            if (singleClickTimer) {
+                clearTimeout(singleClickTimer);
+                singleClickTimer = null;
+            }
+
             eventBus.emit(Events.LINK_RENAME, item);
         }, { signal });
     }
@@ -1851,7 +1897,9 @@ export function addKeyword(text = '', x, y, color = null) {
 export function addLink(url, title, x, y) {
     const domain = new URL(url).hostname;
     // Use larger height when link preview is enabled to accommodate 3:2 preview image
-    const height = state.linkPreviewEnabled ? 240 : 100;
+    // Without preview: 116px = favicon(28) + gap(10) + title(~18) + gap(10) + url(~18) + padding(32)
+    // With preview: 280px = favicon(28) + gap(6) + title(~18) + gap(6) + url(~18) + gap(6) + preview(~152) + padding(32) + buffer
+    const height = state.linkPreviewEnabled ? 280 : 116;
     const item = createItem({
         type: 'link',
         x,
