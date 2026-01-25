@@ -311,122 +311,51 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 
 ## Coding Guidelines: Common Bug Patterns to Avoid
 
-> **IMPORTANT**: This section documents recurring bugs that have been fixed in the project. When writing or modifying code, carefully review these patterns to prevent regressions.
+> 이 섹션은 프로젝트에서 반복적으로 발생했던 버그 패턴을 정리한 것입니다. 코드 작성 및 수정 시 아래 항목들을 주의하세요.
 
-### 1. Event Listener Management
+### 리소스 정리 (Cleanup)
 
-**Problem**: Event listeners not being properly cleaned up cause memory leaks.
+| 주의 항목 | 가이드라인 |
+|-----------|------------|
+| **이벤트 리스너** | 요소 삭제 전 반드시 리스너 정리. `AbortController` 활용 권장 |
+| **DOM 요소** | 부모 삭제 시 연관 요소(label, hitArea, arrow 등)도 함께 제거 |
+| **Blob URL** | 미디어 삭제/실패 시 `revokeObjectURL()` 호출 필수 |
+| **타이머** | 새 작업 시작 전 기존 타이머 취소 (`clearTimeout`) |
 
-**Solution**:
-- Use `AbortController` for element-level listeners
-- Store window/document level listeners for manual removal
-- Always call cleanup function before DOM removal in `deleteItem()`
+### 상태 관리 (State)
 
-### 2. DOM Element Cleanup
+| 주의 항목 | 가이드라인 |
+|-----------|------------|
+| **직렬화 완전성** | 새 속성 추가 시 모든 저장 함수 업데이트 (`saveState`, `saveCurrentCanvas`, `saveToLocalStorageSync`) |
+| **연관 상태 정리** | 아이템 삭제 시 `searchResults`, `selectedItems`, 연결선 참조도 정리 |
+| **Z-Index 계산** | 로드 시 저장값과 실제 아이템 값 중 최대값으로 계산 |
 
-**Problem**: DOM elements (labels, hit areas, error handlers) persist after parent deletion or undo/redo.
+### 초기화 및 타이밍
 
-**Solution**:
-- When removing connections, also remove: `labelEl`, `hitArea`, `arrowEl`
-- In `restoreState()`, clean up ALL associated elements before restoring
-- In `clearItemsAndConnections()`, iterate and remove every child element
+| 주의 항목 | 가이드라인 |
+|-----------|------------|
+| **초기화 순서** | 캔버스 로드 완료 후 UI 초기화 함수 호출 |
+| **비동기 경쟁** | 중복 실행 방지 플래그 사용, Promise 거부 처리 |
+| **Null 체크** | 외부 입력(URL 등) 처리 전 유효성 검증 |
 
-### 3. State Serialization Completeness
+### UI 및 렌더링
 
-**Problem**: Properties missing from save functions cause data loss.
+| 주의 항목 | 가이드라인 |
+|-----------|------------|
+| **CSS 속성** | 기본값에 의존하지 말고 명시적으로 설정 |
+| **HTML 처리** | 검색/표시 시 HTML 태그 제거 후 텍스트만 사용 |
+| **필터 동기화** | 아이템 필터링 시 연결선 가시성도 함께 업데이트 |
 
-**Solution**: When adding new item/connection properties, update ALL save functions:
-- `saveState()` (undo/redo)
-- `saveToLocalStorageSync()` (emergency save)
-- `saveCurrentCanvas()` (normal save)
-- `restoreState()` and `loadCanvasData()` for loading
+### 체크리스트
 
-### 4. Initialization Order
+코드 변경 시 확인:
 
-**Problem**: Features fail when called before dependencies are ready.
-
-**Solution**:
-- Call UI initialization functions AFTER `loadCanvases()` completes
-- Document initialization dependencies in function comments
-
-### 5. Null/Undefined Reference Validation
-
-**Problem**: Crashes from accessing properties on null/undefined values.
-
-**Solution**:
-- Validate inputs before processing (especially URL parsing, external data)
-- Check array/object existence before iteration
-- Validate DOM elements before manipulation
-
-### 6. Race Conditions & Async Operations
-
-**Problem**: Concurrent operations cause data corruption or memory leaks.
-
-**Solution**:
-- Cancel pending timers before starting new operations
-- Use flags to prevent duplicate operations
-- Handle Promise rejections properly
-
-### 7. Blob URL Memory Leaks
-
-**Problem**: Blob URLs not revoked cause memory to grow indefinitely.
-
-**Solution**:
-- Call `URL.revokeObjectURL()` when no longer needed
-- Clean up on: item deletion, media reload failure, app unload
-
-### 8. Related State Cleanup
-
-**Problem**: Related state (searchResults, selection) not cleaned when items are deleted.
-
-**Solution**: When deleting items, also clean:
-- `state.searchResults` (remove deleted item references)
-- `state.selectedItems` (remove from selection)
-- Connection references (delete connections to/from deleted item)
-
-### 9. Z-Index Calculation
-
-**Problem**: `highestZ` not properly calculated on load causes items to go behind.
-
-**Solution**: Calculate `highestZ` as maximum of saved value AND actual item z-indexes.
-
-### 10. CSS Property Inheritance
-
-**Problem**: CSS classes/properties not being explicitly set cause unexpected inheritance.
-
-**Solution**:
-- Set properties explicitly instead of relying on defaults (e.g., `'left'` not `''`)
-- Remove inherited classes when applying new styles
-
-### 11. HTML Content in Search/Display
-
-**Problem**: HTML tags included in search or display text cause incorrect matches.
-
-**Solution**:
-- Strip HTML when searching text content
-- Use `textContent` instead of `innerHTML` for plain text operations
-
-### 12. Filter State Synchronization
-
-**Problem**: Related elements (connections) not updated when items are filtered.
-
-**Solution**:
-- When filtering items, also update connection visibility
-- Apply filter class to all connection elements (line, arrow, label, hitArea)
-
-### Quick Reference Checklist
-
-When making changes, verify:
-
-- [ ] Event listeners have cleanup mechanism
-- [ ] DOM elements are removed when parent is deleted/restored
-- [ ] New properties are added to ALL save/restore functions
-- [ ] Initialization order respects dependencies
-- [ ] Null checks exist for external/user input
-- [ ] Timers/async operations handle cancellation
-- [ ] Blob URLs are properly revoked
-- [ ] Related state is cleaned up on deletion
-- [ ] Z-index values are properly calculated
-- [ ] CSS properties are set explicitly
-- [ ] HTML is stripped for text operations
-- [ ] Filter state propagates to related elements
+- [ ] 이벤트 리스너 정리 메커니즘 존재
+- [ ] 삭제/복원 시 연관 DOM 요소 제거
+- [ ] 새 속성이 모든 저장/복원 함수에 반영
+- [ ] 초기화 순서가 의존성 준수
+- [ ] 외부 입력에 대한 null 체크 존재
+- [ ] 타이머/비동기 작업 취소 처리
+- [ ] Blob URL 해제
+- [ ] 삭제 시 연관 상태 정리
+- [ ] 필터 상태가 연관 요소에 전파
