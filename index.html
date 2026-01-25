@@ -351,54 +351,56 @@
 
                 <!-- Node Style Tab -->
                 <div class="settings-panel" data-panel="nodeStyle">
-                    <div class="settings-section">
-                        <h4>Default Font Size</h4>
-                        <p class="settings-description">Set the default font size for new notes and memos.</p>
-                        <div class="settings-option-group" id="defaultFontSize">
-                            <button class="settings-option-btn active" data-value="small">Small</button>
-                            <button class="settings-option-btn" data-value="medium">Medium</button>
-                            <button class="settings-option-btn" data-value="large">Large</button>
-                            <button class="settings-option-btn" data-value="xlarge">X-Large</button>
+                    <div class="nodestyle-scroll-wrapper">
+                        <div class="settings-section">
+                            <h4>Default Font Size</h4>
+                            <p class="settings-description">Set the default font size for new notes and memos.</p>
+                            <div class="settings-option-group" id="defaultFontSize">
+                                <button class="settings-option-btn active" data-value="small">Small</button>
+                                <button class="settings-option-btn" data-value="medium">Medium</button>
+                                <button class="settings-option-btn" data-value="large">Large</button>
+                                <button class="settings-option-btn" data-value="xlarge">X-Large</button>
+                            </div>
+                            <div class="font-size-preview" id="fontSizePreview">
+                                <span class="preview-label">Preview</span>
+                                <div class="preview-text" id="previewText">The quick brown fox jumps over the lazy dog.</div>
+                            </div>
                         </div>
-                        <div class="font-size-preview" id="fontSizePreview">
-                            <span class="preview-label">Preview</span>
-                            <div class="preview-text" id="previewText">The quick brown fox jumps over the lazy dog.</div>
+                        <div class="settings-section">
+                            <h4>Word Wrap</h4>
+                            <p class="settings-description">Set the line break unit for all notes.</p>
+                            <div class="settings-option-group" id="noteWrapMode">
+                                <button class="settings-option-btn active" data-value="word">Word</button>
+                                <button class="settings-option-btn" data-value="character">Character</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="settings-section">
-                        <h4>Word Wrap</h4>
-                        <p class="settings-description">Set the line break unit for all notes.</p>
-                        <div class="settings-option-group" id="noteWrapMode">
-                            <button class="settings-option-btn active" data-value="word">Word</button>
-                            <button class="settings-option-btn" data-value="character">Character</button>
+                        <div class="settings-section">
+                            <h4>Default Text Alignment</h4>
+                            <p class="settings-description">Set the default text alignment for new memo nodes.</p>
+                            <div class="settings-option-group" id="defaultTextAlign">
+                                <button class="settings-option-btn active" data-value="left">Left</button>
+                                <button class="settings-option-btn" data-value="center">Center</button>
+                                <button class="settings-option-btn" data-value="right">Right</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="settings-section">
-                        <h4>Default Text Alignment</h4>
-                        <p class="settings-description">Set the default text alignment for new memo nodes.</p>
-                        <div class="settings-option-group" id="defaultTextAlign">
-                            <button class="settings-option-btn active" data-value="left">Left</button>
-                            <button class="settings-option-btn" data-value="center">Center</button>
-                            <button class="settings-option-btn" data-value="right">Right</button>
+                        <div class="settings-section">
+                            <h4>Color Display</h4>
+                            <p class="settings-description">Choose how item colors are displayed on nodes.</p>
+                            <div class="settings-option-group" id="colorDisplayMode">
+                                <button class="settings-option-btn active" data-value="bar">Top Bar</button>
+                                <button class="settings-option-btn" data-value="fill">Fill</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="settings-section">
-                        <h4>Color Display</h4>
-                        <p class="settings-description">Choose how item colors are displayed on nodes.</p>
-                        <div class="settings-option-group" id="colorDisplayMode">
-                            <button class="settings-option-btn active" data-value="bar">Top Bar</button>
-                            <button class="settings-option-btn" data-value="fill">Fill</button>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h4>Link Preview</h4>
-                        <p class="settings-description">Show preview images for link nodes when available.</p>
-                        <div class="settings-toggle-row">
-                            <span>Enable link preview</span>
-                            <label class="settings-toggle">
-                                <input type="checkbox" id="linkPreviewToggle">
-                                <span class="settings-toggle-slider"></span>
-                            </label>
+                        <div class="settings-section">
+                            <h4>Link Preview</h4>
+                            <p class="settings-description">Show preview images for link nodes when available.</p>
+                            <div class="settings-toggle-row">
+                                <span>Enable link preview</span>
+                                <label class="settings-toggle">
+                                    <input type="checkbox" id="linkPreviewToggle">
+                                    <span class="settings-toggle-slider"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

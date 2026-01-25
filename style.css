@@ -608,6 +608,11 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     border-radius: 4px;
     cursor: text;
 }
+/* Prevent link navigation while editing title */
+.item-link.editing-mode { cursor: default; }
+.item-link.editing-mode .link-url,
+.item-link.editing-mode .link-favicon,
+.item-link.editing-mode .link-preview-img { pointer-events: none; }
 .link-url { font-size: 12px; color: var(--text-secondary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; flex-shrink: 0; }
 .link-url:hover { color: var(--accent); }
 
@@ -1043,9 +1048,10 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
 .canvas-group-content .canvas-item-entry { margin-left: 8px; }
 .group-name-input {
     font-size: 12px; font-weight: 600; color: var(--text-primary);
-    background: var(--bg-card); border: 1px solid var(--accent);
-    border-radius: 4px; padding: 2px 6px; width: 100%; outline: none;
+    background: var(--bg-hover); border: none;
+    border-radius: 4px; padding: 3px 6px; width: 100%; outline: none;
     text-transform: uppercase; letter-spacing: 0.5px;
+    box-sizing: border-box;
 }
 
 /* Drag and drop states */
@@ -1111,8 +1117,9 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
 .canvas-item-entry .canvas-action-btn.delete:hover { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 .canvas-name-input {
     font-size: 13px; font-weight: 500; color: var(--text-primary);
-    background: var(--bg-card); border: 1px solid var(--accent);
-    border-radius: 4px; padding: 2px 6px; width: 100%; outline: none;
+    background: var(--bg-hover); border: none;
+    border-radius: 4px; padding: 3px 6px; width: 100%; outline: none;
+    box-sizing: border-box;
 }
 
 /* Canvas Customize Picker (Icon + Color unified) */
@@ -1881,6 +1888,81 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     );
 }
 .storage-scroll-wrapper.can-scroll-up.can-scroll-down {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 24px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 24px),
+        transparent 100%
+    );
+}
+
+/* Node Style Scroll Wrapper with Gradient */
+.nodestyle-scroll-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    padding-bottom: 24px;
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+    transition: -webkit-mask-image 0.2s, mask-image 0.2s;
+}
+.nodestyle-scroll-wrapper::-webkit-scrollbar { width: 4px; }
+.nodestyle-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+
+/* Gradient states based on scroll position */
+.nodestyle-scroll-wrapper.can-scroll-up {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 24px,
+        black calc(100% - 0px),
+        transparent 100%
+    );
+}
+.nodestyle-scroll-wrapper.can-scroll-down {
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 24px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        black 0,
+        black calc(100% - 24px),
+        transparent 100%
+    );
+}
+.nodestyle-scroll-wrapper.can-scroll-up.can-scroll-down {
     -webkit-mask-image: linear-gradient(
         to bottom,
         transparent 0,

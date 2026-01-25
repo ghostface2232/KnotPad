@@ -1472,6 +1472,10 @@ export function startLinkRename(item) {
     // Store original title for cancel
     const originalTitle = item.content.title;
 
+    // Add editing-mode class to parent to block link clicks
+    const itemLink = el.querySelector('.item-link');
+    if (itemLink) itemLink.classList.add('editing-mode');
+
     // Make title editable
     titleEl.contentEditable = 'true';
     titleEl.classList.add('editing');
@@ -1511,6 +1515,11 @@ export function startLinkRename(item) {
 function finishLinkRename(item, titleEl, originalTitle) {
     titleEl.contentEditable = 'false';
     titleEl.classList.remove('editing');
+
+    // Remove editing-mode class from parent
+    const el = item.el;
+    const itemLink = el.querySelector('.item-link');
+    if (itemLink) itemLink.classList.remove('editing-mode');
 
     // Remove keydown handler
     if (titleEl._renameKeydownHandler) {
@@ -2450,6 +2459,22 @@ function updateStorageScrollGradient() {
     wrapper.classList.toggle('can-scroll-down', canScrollDown);
 }
 
+function updateNodeStyleScrollGradient() {
+    const wrapper = settingsModal?.querySelector('.nodestyle-scroll-wrapper');
+    if (!wrapper) return;
+
+    const scrollTop = wrapper.scrollTop;
+    const scrollHeight = wrapper.scrollHeight;
+    const clientHeight = wrapper.clientHeight;
+    const threshold = 5;
+
+    const canScrollUp = scrollTop > threshold;
+    const canScrollDown = scrollTop + clientHeight < scrollHeight - threshold;
+
+    wrapper.classList.toggle('can-scroll-up', canScrollUp);
+    wrapper.classList.toggle('can-scroll-down', canScrollDown);
+}
+
 export function setupSettingsModal() {
     const settingsBtn = $('settingsBtn');
     if (settingsModalController) settingsModalController.abort();
@@ -2478,6 +2503,8 @@ export function setupSettingsModal() {
                     setTimeout(updateShortcutsScrollGradient, 0);
                 } else if (tab.dataset.tab === 'storage') {
                     setTimeout(updateStorageScrollGradient, 0);
+                } else if (tab.dataset.tab === 'nodeStyle') {
+                    setTimeout(updateNodeStyleScrollGradient, 0);
                 }
             }, { signal });
         });
@@ -2496,6 +2523,12 @@ export function setupSettingsModal() {
             storageWrapper.addEventListener('scroll', updateStorageScrollGradient, { signal });
             // Initial check (storage is the default active tab)
             setTimeout(updateStorageScrollGradient, 0);
+        }
+
+        // Node Style scroll gradient
+        const nodeStyleWrapper = settingsModal.querySelector('.nodestyle-scroll-wrapper');
+        if (nodeStyleWrapper) {
+            nodeStyleWrapper.addEventListener('scroll', updateNodeStyleScrollGradient, { signal });
         }
     }
 
