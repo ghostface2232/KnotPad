@@ -331,6 +331,13 @@ export function saveCanvasesList() {
 
 export async function saveCurrentCanvas() {
     if (!state.currentCanvasId) return;
+
+    // Cancel any pending auto-save to prevent race condition
+    if (state.autoSaveTimer) {
+        clearTimeout(state.autoSaveTimer);
+        state.setAutoSaveTimer(null);
+    }
+
     const data = {
         items: state.items.map(i => ({
             id: i.id,

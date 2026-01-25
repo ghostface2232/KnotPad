@@ -184,6 +184,12 @@ async function reloadMediaSource(mediaElement, mediaId, retryCount = 0) {
     if (retryCount >= MAX_RETRIES) {
         console.warn(`Failed to reload media after ${MAX_RETRIES} attempts:`, mediaId);
         mediaElement.closest('.canvas-item')?.classList.add('media-load-failed');
+        // Clean up invalid blob URL from cache to prevent memory leak
+        const cachedUrl = state.blobURLCache.get(mediaId);
+        if (cachedUrl) {
+            URL.revokeObjectURL(cachedUrl);
+            state.blobURLCache.delete(mediaId);
+        }
         return false;
     }
 
