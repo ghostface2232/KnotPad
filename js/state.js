@@ -103,6 +103,7 @@ const initialState = {
     items: [],
     connections: [],
     selectedItems: new Set(),
+    selectedItem: null,
     selectedConn: null,
 
     // Z-index and ID tracking
@@ -234,6 +235,7 @@ export function clearItemsAndConnections() {
     state.items.forEach(i => i.el.remove());
     state.items = [];
     state.selectedItems.clear();
+    setSelectedItem(null);
     state.selectedConn = null;
     state.undoStack = [];
     state.redoStack = [];
@@ -308,6 +310,7 @@ export let isSelectingText = state.isSelectingText;
 export let items = state.items;
 export let connections = state.connections;
 export let selectedItems = state.selectedItems;
+export let selectedItem = state.selectedItem;
 export let selectedConn = state.selectedConn;
 export let highestZ = state.highestZ;
 export let itemId = state.itemId;
@@ -359,6 +362,7 @@ export function setIsSelecting(val) { state.isSelecting = val; isSelecting = val
 export function setSelStartX(val) { state.selStartX = val; selStartX = val; }
 export function setSelStartY(val) { state.selStartY = val; selStartY = val; }
 export function setIsSelectingText(val) { state.isSelectingText = val; isSelectingText = val; }
+export function setSelectedItem(val) { state.selectedItem = val; selectedItem = val; }
 export function setSelectedConn(val) { state.selectedConn = val; selectedConn = val; }
 export function setHighestZ(val) { state.highestZ = val; highestZ = val; }
 export function setItemId(val) { state.itemId = val; itemId = val; }
