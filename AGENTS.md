@@ -311,198 +311,51 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 
 ## Coding Guidelines: Common Bug Patterns to Avoid
 
-> **IMPORTANT**: This section documents recurring bugs that have been fixed in the project. When writing or modifying code, carefully review these patterns to prevent regressions.
+> This section documents recurring bug patterns from past fixes. Be mindful of these when writing or modifying code.
 
-### 1. Event Listener Management
+### Resource Cleanup
 
-**Problem**: Event listeners not being properly cleaned up cause memory leaks.
+| Area | Guideline |
+|------|-----------|
+| **Event Listeners** | Always clean up before element removal. Use `AbortController` |
+| **DOM Elements** | Remove associated elements (label, hitArea, arrow) with parent |
+| **Blob URLs** | Call `revokeObjectURL()` on media deletion/failure |
+| **Timers** | Cancel existing timers before starting new operations |
 
-**Solution**:
-- Use `AbortController` for element-level listeners:
-  ```javascript
-  const controller = new AbortController();
-  el.addEventListener('click', handler, { signal: controller.signal });
-  // Store controller on element for cleanup
-  el._abortController = controller;
-  ```
-- Store window/document level listeners for manual removal:
-  ```javascript
-  el._windowHandlers = { seeking: handler };
-  window.addEventListener('seeking', handler);
-  // On cleanup:
-  window.removeEventListener('seeking', el._windowHandlers.seeking);
-  ```
-- Always call cleanup function before DOM removal in `deleteItem()`
+### State Management
 
-### 2. DOM Element Cleanup
+| Area | Guideline |
+|------|-----------|
+| **Serialization** | Update all save functions when adding new properties (`saveState`, `saveCurrentCanvas`, `saveToLocalStorageSync`) |
+| **Related State** | Clean up `searchResults`, `selectedItems`, connection refs on item deletion |
+| **Z-Index** | Calculate as max of saved value and actual item values on load |
 
-**Problem**: DOM elements (labels, hit areas, error handlers) persist after parent deletion or undo/redo.
+### Initialization & Timing
 
-**Solution**:
-- When removing connections, also remove: `labelEl`, `hitArea`, `arrowEl`
-- In `restoreState()`, clean up ALL associated elements before restoring
-- In `clearItemsAndConnections()`, iterate and remove every child element
-- Example pattern:
-  ```javascript
-  if (conn.labelEl) conn.labelEl.remove();
-  if (conn.hitArea) conn.hitArea.remove();
-  ```
+| Area | Guideline |
+|------|-----------|
+| **Init Order** | Call UI init functions after canvas load completes |
+| **Race Conditions** | Use flags to prevent duplicate execution, handle Promise rejections |
+| **Null Checks** | Validate external input (URLs, etc.) before processing |
 
-### 3. State Serialization Completeness
+### UI & Rendering
 
-**Problem**: Properties missing from save functions cause data loss.
+| Area | Guideline |
+|------|-----------|
+| **CSS Properties** | Set explicitly, don't rely on defaults |
+| **HTML Content** | Strip tags for search/display, use `textContent` |
+| **Filter Sync** | Update connection visibility when filtering items |
 
-**Solution**:
-- When adding new item/connection properties, update ALL save functions:
-  - `saveState()` (undo/redo)
-  - `saveToLocalStorageSync()` (emergency save on beforeunload/visibilitychange)
-  - `saveCurrentCanvas()` (normal save)
-- Checklist for new properties:
-  - [ ] Added to `saveState()` item/connection mapping
-  - [ ] Added to `saveToLocalStorageSync()`
-  - [ ] Restored properly in `restoreState()`
-  - [ ] Loaded correctly in `loadCanvasData()`
+### Checklist
 
-### 4. Initialization Order
+Verify when making changes:
 
-**Problem**: Features fail when called before dependencies are ready.
-
-**Solution**:
-- Call UI initialization functions AFTER `loadCanvases()` completes
-- Pattern:
-  ```javascript
-  await loadCanvases();
-  applyLinkPreviewMode();  // Now items exist to receive previews
-  ```
-- Document initialization dependencies in function comments
-
-### 5. Null/Undefined Reference Validation
-
-**Problem**: Crashes from accessing properties on null/undefined values.
-
-**Solution**:
-- Validate inputs before processing:
-  ```javascript
-  if (!cfg.content) return;
-  try {
-    const url = new URL(cfg.content);
-  } catch (e) {
-    // Handle invalid URL gracefully
-  }
-  ```
-- Check array/object existence before iteration
-- Validate DOM elements before manipulation
-
-### 6. Race Conditions & Async Operations
-
-**Problem**: Concurrent operations cause data corruption or memory leaks.
-
-**Solution**:
-- Cancel pending timers before starting new operations:
-  ```javascript
-  if (state.autoSaveTimer) {
-    clearTimeout(state.autoSaveTimer);
-  }
-  ```
-- Use flags to prevent duplicate operations
-- Handle Promise rejections properly
-
-### 7. Blob URL Memory Leaks
-
-**Problem**: Blob URLs not revoked cause memory to grow indefinitely.
-
-**Solution**:
-- Track blob URLs and revoke when no longer needed:
-  ```javascript
-  URL.revokeObjectURL(blobUrl);
-  ```
-- Clean up blob URLs on: item deletion, media reload failure, app unload
-- Remove invalid URLs from cache
-
-### 8. Related State Cleanup
-
-**Problem**: Related state (searchResults, selection) not cleaned when items are deleted.
-
-**Solution**:
-- When deleting items, also clean:
-  - `state.searchResults` (remove deleted item references)
-  - `state.selectedItems` (remove from selection)
-  - Connection references (delete connections to/from deleted item)
-- Pattern:
-  ```javascript
-  state.searchResults = state.searchResults.filter(r => r.item.id !== id);
-  ```
-
-### 9. Z-Index Calculation
-
-**Problem**: `highestZ` not properly calculated on load causes items to go behind instead of in front.
-
-**Solution**:
-- Calculate `highestZ` as maximum of saved value AND actual item z-indexes:
-  ```javascript
-  const maxItemZ = items.reduce((max, item) =>
-    Math.max(max, item.zIndex || 0), 0);
-  state.highestZ = Math.max(savedHighestZ || 1, maxItemZ);
-  ```
-
-### 10. CSS Property Inheritance
-
-**Problem**: CSS classes/properties not being explicitly set cause unexpected inheritance.
-
-**Solution**:
-- Set properties explicitly instead of relying on defaults:
-  ```javascript
-  // Wrong: el.style.textAlign = '';
-  // Right: el.style.textAlign = 'left';
-  ```
-- When overriding container CSS, set explicit values
-- Remove inherited classes when applying new styles
-
-### 11. HTML Content in Search/Display
-
-**Problem**: HTML tags included in search or display text cause incorrect matches.
-
-**Solution**:
-- Strip HTML when searching text content:
-  ```javascript
-  function stripHtml(html) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || '';
-  }
-  ```
-- Use `textContent` instead of `innerHTML` for plain text operations
-
-### 12. Filter State Synchronization
-
-**Problem**: Related elements (connections) not updated when items are filtered.
-
-**Solution**:
-- When filtering items, also update connection visibility:
-  ```javascript
-  connections.forEach(conn => {
-    const fromFiltered = isFiltered(conn.from);
-    const toFiltered = isFiltered(conn.to);
-    if (fromFiltered || toFiltered) {
-      conn.el.classList.add('filtered-out');
-    }
-  });
-  ```
-- Apply filter class to all connection elements (line, arrow, label, hitArea)
-
-### Quick Reference Checklist
-
-When making changes, verify:
-
-- [ ] Event listeners have cleanup mechanism (AbortController or stored reference)
-- [ ] DOM elements are removed when parent is deleted/restored
-- [ ] New properties are added to ALL save/restore functions
+- [ ] Event listeners have cleanup mechanism
+- [ ] Associated DOM elements removed on delete/restore
+- [ ] New properties added to all save/restore functions
 - [ ] Initialization order respects dependencies
-- [ ] Null checks exist for external/user input
+- [ ] Null checks for external input
 - [ ] Timers/async operations handle cancellation
-- [ ] Blob URLs are properly revoked
-- [ ] Related state is cleaned up on deletion
-- [ ] Z-index values are properly calculated
-- [ ] CSS properties are set explicitly
-- [ ] HTML is stripped for text operations
+- [ ] Blob URLs revoked
+- [ ] Related state cleaned on deletion
 - [ ] Filter state propagates to related elements
