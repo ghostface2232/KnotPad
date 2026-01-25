@@ -318,20 +318,8 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 **Problem**: Event listeners not being properly cleaned up cause memory leaks.
 
 **Solution**:
-- Use `AbortController` for element-level listeners:
-  ```javascript
-  const controller = new AbortController();
-  el.addEventListener('click', handler, { signal: controller.signal });
-  // Store controller on element for cleanup
-  el._abortController = controller;
-  ```
-- Store window/document level listeners for manual removal:
-  ```javascript
-  el._windowHandlers = { seeking: handler };
-  window.addEventListener('seeking', handler);
-  // On cleanup:
-  window.removeEventListener('seeking', el._windowHandlers.seeking);
-  ```
+- Use `AbortController` for element-level listeners
+- Store window/document level listeners for manual removal
 - Always call cleanup function before DOM removal in `deleteItem()`
 
 ### 2. DOM Element Cleanup
@@ -342,26 +330,16 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 - When removing connections, also remove: `labelEl`, `hitArea`, `arrowEl`
 - In `restoreState()`, clean up ALL associated elements before restoring
 - In `clearItemsAndConnections()`, iterate and remove every child element
-- Example pattern:
-  ```javascript
-  if (conn.labelEl) conn.labelEl.remove();
-  if (conn.hitArea) conn.hitArea.remove();
-  ```
 
 ### 3. State Serialization Completeness
 
 **Problem**: Properties missing from save functions cause data loss.
 
-**Solution**:
-- When adding new item/connection properties, update ALL save functions:
-  - `saveState()` (undo/redo)
-  - `saveToLocalStorageSync()` (emergency save on beforeunload/visibilitychange)
-  - `saveCurrentCanvas()` (normal save)
-- Checklist for new properties:
-  - [ ] Added to `saveState()` item/connection mapping
-  - [ ] Added to `saveToLocalStorageSync()`
-  - [ ] Restored properly in `restoreState()`
-  - [ ] Loaded correctly in `loadCanvasData()`
+**Solution**: When adding new item/connection properties, update ALL save functions:
+- `saveState()` (undo/redo)
+- `saveToLocalStorageSync()` (emergency save)
+- `saveCurrentCanvas()` (normal save)
+- `restoreState()` and `loadCanvasData()` for loading
 
 ### 4. Initialization Order
 
@@ -369,11 +347,6 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 
 **Solution**:
 - Call UI initialization functions AFTER `loadCanvases()` completes
-- Pattern:
-  ```javascript
-  await loadCanvases();
-  applyLinkPreviewMode();  // Now items exist to receive previews
-  ```
 - Document initialization dependencies in function comments
 
 ### 5. Null/Undefined Reference Validation
@@ -381,15 +354,7 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 **Problem**: Crashes from accessing properties on null/undefined values.
 
 **Solution**:
-- Validate inputs before processing:
-  ```javascript
-  if (!cfg.content) return;
-  try {
-    const url = new URL(cfg.content);
-  } catch (e) {
-    // Handle invalid URL gracefully
-  }
-  ```
+- Validate inputs before processing (especially URL parsing, external data)
 - Check array/object existence before iteration
 - Validate DOM elements before manipulation
 
@@ -398,12 +363,7 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 **Problem**: Concurrent operations cause data corruption or memory leaks.
 
 **Solution**:
-- Cancel pending timers before starting new operations:
-  ```javascript
-  if (state.autoSaveTimer) {
-    clearTimeout(state.autoSaveTimer);
-  }
-  ```
+- Cancel pending timers before starting new operations
 - Use flags to prevent duplicate operations
 - Handle Promise rejections properly
 
@@ -412,50 +372,30 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 **Problem**: Blob URLs not revoked cause memory to grow indefinitely.
 
 **Solution**:
-- Track blob URLs and revoke when no longer needed:
-  ```javascript
-  URL.revokeObjectURL(blobUrl);
-  ```
-- Clean up blob URLs on: item deletion, media reload failure, app unload
-- Remove invalid URLs from cache
+- Call `URL.revokeObjectURL()` when no longer needed
+- Clean up on: item deletion, media reload failure, app unload
 
 ### 8. Related State Cleanup
 
 **Problem**: Related state (searchResults, selection) not cleaned when items are deleted.
 
-**Solution**:
-- When deleting items, also clean:
-  - `state.searchResults` (remove deleted item references)
-  - `state.selectedItems` (remove from selection)
-  - Connection references (delete connections to/from deleted item)
-- Pattern:
-  ```javascript
-  state.searchResults = state.searchResults.filter(r => r.item.id !== id);
-  ```
+**Solution**: When deleting items, also clean:
+- `state.searchResults` (remove deleted item references)
+- `state.selectedItems` (remove from selection)
+- Connection references (delete connections to/from deleted item)
 
 ### 9. Z-Index Calculation
 
-**Problem**: `highestZ` not properly calculated on load causes items to go behind instead of in front.
+**Problem**: `highestZ` not properly calculated on load causes items to go behind.
 
-**Solution**:
-- Calculate `highestZ` as maximum of saved value AND actual item z-indexes:
-  ```javascript
-  const maxItemZ = items.reduce((max, item) =>
-    Math.max(max, item.zIndex || 0), 0);
-  state.highestZ = Math.max(savedHighestZ || 1, maxItemZ);
-  ```
+**Solution**: Calculate `highestZ` as maximum of saved value AND actual item z-indexes.
 
 ### 10. CSS Property Inheritance
 
 **Problem**: CSS classes/properties not being explicitly set cause unexpected inheritance.
 
 **Solution**:
-- Set properties explicitly instead of relying on defaults:
-  ```javascript
-  // Wrong: el.style.textAlign = '';
-  // Right: el.style.textAlign = 'left';
-  ```
-- When overriding container CSS, set explicit values
+- Set properties explicitly instead of relying on defaults (e.g., `'left'` not `''`)
 - Remove inherited classes when applying new styles
 
 ### 11. HTML Content in Search/Display
@@ -463,14 +403,7 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 **Problem**: HTML tags included in search or display text cause incorrect matches.
 
 **Solution**:
-- Strip HTML when searching text content:
-  ```javascript
-  function stripHtml(html) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || '';
-  }
-  ```
+- Strip HTML when searching text content
 - Use `textContent` instead of `innerHTML` for plain text operations
 
 ### 12. Filter State Synchronization
@@ -478,23 +411,14 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 **Problem**: Related elements (connections) not updated when items are filtered.
 
 **Solution**:
-- When filtering items, also update connection visibility:
-  ```javascript
-  connections.forEach(conn => {
-    const fromFiltered = isFiltered(conn.from);
-    const toFiltered = isFiltered(conn.to);
-    if (fromFiltered || toFiltered) {
-      conn.el.classList.add('filtered-out');
-    }
-  });
-  ```
+- When filtering items, also update connection visibility
 - Apply filter class to all connection elements (line, arrow, label, hitArea)
 
 ### Quick Reference Checklist
 
 When making changes, verify:
 
-- [ ] Event listeners have cleanup mechanism (AbortController or stored reference)
+- [ ] Event listeners have cleanup mechanism
 - [ ] DOM elements are removed when parent is deleted/restored
 - [ ] New properties are added to ALL save/restore functions
 - [ ] Initialization order respects dependencies
