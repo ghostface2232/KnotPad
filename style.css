@@ -611,17 +611,22 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
 .link-url { font-size: 12px; color: var(--text-secondary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-url:hover { color: var(--accent); }
 
-/* Link Preview Image */
+/* Link Preview Image - 3:2 aspect ratio like browser tab hover */
 .link-preview-img {
     width: 100%;
-    height: 90px;
+    aspect-ratio: 3 / 2;
     object-fit: cover;
     border-radius: 6px;
     background: var(--bg-hover);
     flex-shrink: 0;
+    margin-top: 4px;
 }
-.link-preview-enabled .item-link { gap: 8px; }
-.link-preview-enabled .link-title { margin-top: auto; }
+.link-preview-enabled .item-link { gap: 6px; }
+/* Keep favicon and title at top, preview at bottom */
+.link-preview-enabled .link-favicon { order: 1; }
+.link-preview-enabled .link-title { order: 2; }
+.link-preview-enabled .link-url { order: 3; }
+.link-preview-enabled .link-preview-img { order: 4; }
 
 .drop-overlay {
     position: fixed; inset: 0; background: rgba(9, 9, 11, 0.92);
