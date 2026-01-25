@@ -39,7 +39,7 @@ export function loadLinkPreviewForItem(item) {
 
     const url = item.content.url;
     // Use microlink.io API for screenshot preview
-    const previewUrl = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url`;
+    const previewUrl = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false`;
 
     fetch(previewUrl)
         .then(response => response.json())
