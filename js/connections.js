@@ -83,7 +83,7 @@ export function cancelConnection(withFade = false) {
 }
 
 // Add a connection between two items
-export function addConnection(from, fh, to, th, loading = false) {
+export function addConnection(from, fh, to, th, loading = false, savedId = null) {
     // Validate: prevent self-connections (same item connected to itself)
     if (from === to) {
         console.warn('Prevented self-connection: same item cannot be connected to itself');
@@ -91,7 +91,7 @@ export function addConnection(from, fh, to, th, loading = false) {
     }
 
     const conn = {
-        id: `c${Date.now()}`,
+        id: savedId || `c${Date.now()}`,
         from,
         fh,
         to,

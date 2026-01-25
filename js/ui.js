@@ -342,7 +342,7 @@ function restoreState(stateData) {
         const toItem = map[d.to];
         // Validate: both items must exist and must not be the same item (prevent self-connections)
         if (fromItem && toItem && fromItem !== toItem) {
-            const c = addConnection(fromItem, d.fh, toItem, d.th, true);
+            const c = addConnection(fromItem, d.fh, toItem, d.th, true, d.id);
             c.dir = d.dir || 'none';
             c.label = d.label || '';
             updateConnectionArrow(c);
@@ -542,7 +542,7 @@ async function loadCanvasData(id) {
             const toItem = map[d.to];
             // Validate: both items must exist and must not be the same item (prevent self-connections)
             if (fromItem && toItem && fromItem !== toItem) {
-                const c = addConnection(fromItem, d.fh, toItem, d.th, true);
+                const c = addConnection(fromItem, d.fh, toItem, d.th, true, d.id);
                 c.dir = d.dir || 'none';
                 c.label = d.label || '';
                 updateConnectionArrow(c);
