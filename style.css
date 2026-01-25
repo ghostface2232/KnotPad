@@ -597,9 +597,9 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
 :root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="pink"],
 :root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="pink"] { background-color: #fde9f3; }
 
-.item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; cursor: pointer; }
+.item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; cursor: pointer; box-sizing: border-box; }
 .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); flex-shrink: 0; }
-.link-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.link-title { font-size: 14px; font-weight: 500; color: var(--text-primary); line-height: 1.3; word-break: break-word; }
 .link-title.editing {
     outline: none;
     background: var(--bg-hover);
@@ -608,7 +608,7 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     border-radius: 4px;
     cursor: text;
 }
-.link-url { font-size: 12px; color: var(--text-secondary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-url { font-size: 12px; color: var(--text-secondary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; flex-shrink: 0; }
 .link-url:hover { color: var(--accent); }
 
 /* Link Preview Image - 3:2 aspect ratio like browser tab hover */
@@ -619,9 +619,9 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     border-radius: 6px;
     background: var(--bg-hover);
     flex-shrink: 0;
-    margin-top: 4px;
+    margin-top: auto;
 }
-.link-preview-enabled .item-link { gap: 6px; }
+.link-preview-enabled .item-link { gap: 6px; padding: 14px; }
 /* Keep favicon and title at top, preview at bottom */
 .link-preview-enabled .link-favicon { order: 1; }
 .link-preview-enabled .link-title { order: 2; }
