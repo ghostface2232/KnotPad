@@ -93,6 +93,10 @@ export function loadLinkPreviewForItem(item) {
                         if (previewImg.naturalWidth < 100 || previewImg.naturalHeight < 50) {
                             return;
                         }
+                        // Double-check that no preview image was added while loading (prevents duplicates)
+                        if (itemLink.querySelector('.link-preview-img')) {
+                            return;
+                        }
                         // Append preview at the end (below title and URL)
                         itemLink.appendChild(previewImg);
                         // Adjust item height for 3:2 aspect ratio preview (width ~228px inside padding, height ~152px)
@@ -1237,10 +1241,12 @@ function setupItemEvents(item) {
         // Single click to open link (but not if it was a drag, and delay to allow double-click detection)
         itemLink.addEventListener('click', e => {
             // Don't open link if in editing mode or clicking on control buttons
+            // Also check if clicking on any contenteditable element (cursor positioning)
             if (itemLink.classList.contains('editing-mode') ||
                 e.target.closest('.delete-btn') || e.target.closest('.color-btn') ||
                 e.target.closest('.color-picker') || e.target.closest('.resize-handle') ||
-                e.target.closest('.link-title.editing')) {
+                e.target.closest('.link-title.editing') ||
+                e.target.closest('[contenteditable="true"]')) {
                 return;
             }
 
@@ -1925,6 +1931,7 @@ export function addKeyword(text = '', x, y, color = null) {
 
 // Add link
 export function addLink(url, title, x, y) {
+    const pos = findFreePosition(x, y, state.items);
     const domain = new URL(url).hostname;
     // Use larger height when link preview is enabled to accommodate 3:2 preview image
     // Without preview: 116px = favicon(28) + gap(10) + title(~18) + gap(10) + url(~18) + padding(32)
@@ -1933,8 +1940,8 @@ export function addLink(url, title, x, y) {
     const userProvidedTitle = title && title.trim();
     const item = createItem({
         type: 'link',
-        x,
-        y,
+        x: pos.x,
+        y: pos.y,
         w: 260,
         h: height,
         content: {

@@ -1,7 +1,7 @@
 // KnotPad - UI Module (Toolbar, Menus, Modals, Minimap, Search, Canvas Management)
 
 import { CANVASES_KEY, CANVAS_GROUPS_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
-import { $, esc, generateId, showToast, stripHtml } from './utils.js';
+import { $, esc, generateId, showToast, stripHtml, findFreePosition } from './utils.js';
 import * as state from './state.js';
 import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
@@ -2983,6 +2983,7 @@ export function setupSidebarResize() {
 
 export async function handleFile(file, x, y) {
     const mediaId = 'media_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const pos = findFreePosition(x, y, state.items);
 
     if (file.type.startsWith('image/')) {
         const url = URL.createObjectURL(file);
@@ -2997,7 +2998,7 @@ export async function handleFile(file, x, y) {
                 await saveMediaToFileSystem(mediaId, file);
             }
             state.blobURLCache.set(mediaId, URL.createObjectURL(file));
-            createItem({ type: 'image', x, y, w, h, content: mediaId });
+            createItem({ type: 'image', x: pos.x, y: pos.y, w, h, content: mediaId });
             eventBus.emit(Events.STATE_SAVE);
             triggerAutoSave();
         };
@@ -3008,7 +3009,7 @@ export async function handleFile(file, x, y) {
             await saveMediaToFileSystem(mediaId, file);
         }
         state.blobURLCache.set(mediaId, URL.createObjectURL(file));
-        createItem({ type: 'video', x, y, w: 400, h: 225, content: mediaId });
+        createItem({ type: 'video', x: pos.x, y: pos.y, w: 400, h: 225, content: mediaId });
         eventBus.emit(Events.STATE_SAVE);
         triggerAutoSave();
     }
