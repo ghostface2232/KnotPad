@@ -600,6 +600,9 @@ export async function switchCanvas(id) {
         updateTopbarCanvasName();
     } finally {
         switchCanvasInProgress = false;
+        if (pendingCanvasSwitchId === state.currentCanvasId) {
+            pendingCanvasSwitchId = null;
+        }
         if (pendingCanvasSwitchId && pendingCanvasSwitchId !== state.currentCanvasId) {
             const nextCanvasId = pendingCanvasSwitchId;
             pendingCanvasSwitchId = null;
