@@ -1,4 +1,4 @@
-<img src="https://github.com/user-attachments/assets/8d4b5261-871f-44a5-ba7d-db780d5410ac" width="20%"></img>
+<img src="https://github.com/user-attachments/assets/8d4b5261-871f-44a5-ba7d-db780d5410ac" width="10%"></img>
 
 # KnotPad
 A web-based infinite canvas note-taking application for visual thinking and idea organization.
