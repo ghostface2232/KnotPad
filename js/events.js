@@ -1,8 +1,8 @@
-// KnotPad - Events Module (Mouse, Touch, Keyboard, Drag & Drop)
+// KnotPad - Events Module (Mouse, Keyboard, Drag & Drop)
 
 import { $ } from './utils.js';
 import * as state from './state.js';
-import { updateTransform, setZoom, throttledMinimap, startPan, updateMinimap } from './viewport.js';
+import { updateTransform, setZoom, throttledMinimap, startPan } from './viewport.js';
 import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading } from './items.js';
 import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo, deselectConnection } from './connections.js';
 import {
@@ -18,7 +18,6 @@ const dropZone = $('dropZone');
 const fileInput = $('fileInput');
 
 let mouseEventsController;
-let touchEventsController;
 let keyboardEventsController;
 let dragDropEventsController;
 let copyEventsController;
@@ -282,52 +281,6 @@ export function setupMouseEvents() {
             triggerAutoSave();
         }
     }, { signal });
-}
-
-// ============ Touch Events ============
-
-let lastDist = 0;
-
-export function setupTouchEvents() {
-    if (touchEventsController) touchEventsController.abort();
-    touchEventsController = new AbortController();
-    const { signal } = touchEventsController;
-
-    app.addEventListener('touchstart', e => {
-        closeSidebarIfUnpinned();
-        if (e.touches.length === 2) {
-            lastDist = Math.hypot(
-                e.touches[1].clientX - e.touches[0].clientX,
-                e.touches[1].clientY - e.touches[0].clientY
-            );
-        } else if (e.touches.length === 1 && (e.target === canvas || e.target === app)) {
-            state.setIsPanning(true);
-            state.setStartX(e.touches[0].clientX - state.offsetX);
-            state.setStartY(e.touches[0].clientY - state.offsetY);
-        }
-    }, { signal });
-
-    app.addEventListener('touchmove', e => {
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            const dist = Math.hypot(
-                e.touches[1].clientX - e.touches[0].clientX,
-                e.touches[1].clientY - e.touches[0].clientY
-            );
-            const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-            const rect = app.getBoundingClientRect();
-            setZoom(state.scale * dist / lastDist, cx - rect.left, cy - rect.top, false);
-            lastDist = dist;
-        } else if (state.isPanning) {
-            state.setOffsetX(e.touches[0].clientX - state.startX);
-            state.setOffsetY(e.touches[0].clientY - state.startY);
-            updateTransform();
-            throttledMinimap();
-        }
-    }, { passive: false, signal });
-
-    app.addEventListener('touchend', () => state.setIsPanning(false), { signal });
 }
 
 // ============ Keyboard Events ============

@@ -53,7 +53,6 @@ import {
 } from './ui.js';
 import {
     setupMouseEvents,
-    setupTouchEvents,
     setupKeyboardEvents,
     setupDragDropEvents,
     setupCopyEvents,
@@ -408,7 +407,6 @@ async function init() {
     applyWrapMode(state.noteWrapMode);
     applyColorDisplayMode(state.colorDisplayMode);
     setupMouseEvents();
-    setupTouchEvents();
     setupKeyboardEvents();
     setupDragDropEvents();
     setupCopyEvents();

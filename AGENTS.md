@@ -45,7 +45,7 @@ KnotPad/
 │   ├── items.js        # Canvas items (memo, keyword, link, image, video)
 │   ├── connections.js  # Connection lines between items
 │   ├── ui.js           # UI components, modals, sidebar, canvas management
-│   ├── events.js       # Mouse, touch, keyboard, drag-drop handlers
+│   ├── events.js       # Mouse, keyboard, drag-drop handlers
 │   ├── viewport.js     # Zoom, pan, transform, minimap
 │   ├── storage.js      # IndexedDB, File System API, persistence
 │   ├── utils.js        # Helper functions (DOM, math, formatting)
@@ -74,7 +74,7 @@ KnotPad/
 | `items.js` | Item CRUD, selection, colors | `createItem`, `addMemo`, `addKeyword`, `addLink`, `deleteItem`, `setItemColor` |
 | `connections.js` | Connection management | `addConnection`, `updateConnection`, `deleteConnection`, `startConnection` |
 | `ui.js` | UI setup, canvas/sidebar management | `loadCanvases`, `saveCurrentCanvas`, `saveState`, `undo`, `redo` |
-| `events.js` | Input event handlers | `setupMouseEvents`, `setupKeyboardEvents`, `setupTouchEvents` |
+| `events.js` | Input event handlers | `setupMouseEvents`, `setupKeyboardEvents` |
 | `viewport.js` | Canvas transform, zoom | `setZoom`, `fitToScreen`, `panToItem`, `updateTransform` |
 | `storage.js` | Data persistence | `initMediaDB`, `saveMedia`, `loadMedia`, File System functions |
 
@@ -154,7 +154,6 @@ KnotPad/
 | Feature | Location |
 |---------|----------|
 | Mouse events | `events.js:setupMouseEvents()` |
-| Touch events | `events.js:setupTouchEvents()` |
 | Keyboard shortcuts | `events.js:setupKeyboardEvents()` |
 | Drag & drop | `events.js:setupDragDropEvents()` |
 | Copy/paste | `events.js:setupCopyEvents()`, `setupPasteEvents()` |
