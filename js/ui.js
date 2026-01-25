@@ -1735,9 +1735,76 @@ async function duplicateCanvas(canvasId) {
     };
 
     // Copy canvas data
-    const originalData = localStorage.getItem('knotpad-data-' + canvasId);
-    if (originalData) {
-        localStorage.setItem('knotpad-data-' + newCanvas.id, originalData);
+    const originalDataStr = localStorage.getItem('knotpad-data-' + canvasId);
+    if (originalDataStr) {
+        const originalData = JSON.parse(originalDataStr);
+
+        // Find all media items (images/videos with media_ content)
+        const mediaItems = (originalData.items || []).filter(
+            item => (item.type === 'image' || item.type === 'video') &&
+                    item.content?.startsWith('media_')
+        );
+
+        if (mediaItems.length > 0) {
+            // Collect old media IDs and create mapping to new IDs
+            const mediaIdMap = new Map();
+            const oldMediaIds = mediaItems.map(item => item.content);
+
+            for (const oldId of oldMediaIds) {
+                const newId = 'media_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                mediaIdMap.set(oldId, newId);
+            }
+
+            // Load media blobs (try file system first, then IndexedDB)
+            const mediaBlobs = await getMediaByIds(oldMediaIds);
+
+            // Also try loading from file system if connected
+            if (fsDirectoryHandle) {
+                for (const oldId of oldMediaIds) {
+                    if (!mediaBlobs[oldId]) {
+                        const fsBlob = await loadMediaFromFileSystem(oldId);
+                        if (fsBlob) {
+                            mediaBlobs[oldId] = fsBlob;
+                        }
+                    }
+                }
+            }
+
+            // Save blobs with new IDs
+            const mediaEntries = [];
+            for (const [oldId, newId] of mediaIdMap) {
+                const blob = mediaBlobs[oldId];
+                if (blob) {
+                    mediaEntries.push({ id: newId, blob });
+                }
+            }
+
+            if (mediaEntries.length > 0) {
+                await saveMediaBatch(mediaEntries);
+
+                // Also save to file system if connected
+                if (fsDirectoryHandle) {
+                    for (const entry of mediaEntries) {
+                        await saveMediaToFileSystem(entry.id, entry.blob);
+                    }
+                }
+            }
+
+            // Update items in copied data to use new media IDs
+            for (const item of originalData.items) {
+                if ((item.type === 'image' || item.type === 'video') &&
+                    item.content && mediaIdMap.has(item.content)) {
+                    item.content = mediaIdMap.get(item.content);
+                }
+            }
+        }
+
+        localStorage.setItem('knotpad-data-' + newCanvas.id, JSON.stringify(originalData));
+
+        // Also save to file system if connected
+        if (fsDirectoryHandle) {
+            await saveCanvasToFileSystem(newCanvas.id, originalData);
+        }
     }
 
     // Insert after original
