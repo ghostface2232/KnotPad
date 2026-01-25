@@ -299,6 +299,7 @@ export function popRedo() {
  */
 export function clearRedo() {
     state.redoStack = [];
+    redoStack = state.redoStack;  // Keep exported variable in sync
 }
 
 /**
