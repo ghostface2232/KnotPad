@@ -406,6 +406,13 @@ export function createItem(cfg, loading = false) {
 function setupItemEvents(item) {
     const el = item.el;
 
+    // Create AbortController for cleanup - all listeners will use this signal
+    const controller = new AbortController();
+    const signal = controller.signal;
+    item._abortController = controller;
+    // Store window-level handlers for manual cleanup (AbortController doesn't help with window listeners)
+    item._windowHandlers = [];
+
     el.addEventListener('mousedown', e => {
         const t = e.target;
         const isContentEditable = t.closest('[contenteditable="true"]') || t.classList.contains('memo-body');
@@ -460,7 +467,7 @@ function setupItemEvents(item) {
         state.selectedItems.forEach(i => i.el.classList.add('dragging'));
         canvas.classList.add('dragging-item');
         document.body.classList.add('is-dragging');
-    });
+    }, { signal });
 
     el.querySelector('.resize-handle').addEventListener('mousedown', e => {
         if (item.locked) return;
@@ -472,13 +479,13 @@ function setupItemEvents(item) {
         state.setResizingItem(item);
         // Prevent text selection during resize
         document.body.classList.add('is-dragging');
-    });
+    }, { signal });
 
     el.querySelector('.delete-btn').addEventListener('click', e => {
         e.stopPropagation();
         if (state.selectedItems.has(item)) deleteSelectedItems();
         else deleteItem(item);
-    });
+    }, { signal });
 
     const colorBtnEl = el.querySelector('.color-btn');
     const colorPicker = el.querySelector('.color-picker');
@@ -492,14 +499,14 @@ function setupItemEvents(item) {
         colorPicker.querySelectorAll('.color-opt').forEach(o =>
             o.classList.toggle('selected', o.dataset.color === (item.color || ''))
         );
-    });
+    }, { signal });
 
     colorPicker.querySelectorAll('.color-opt').forEach(opt => {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             setItemColor(item, opt.dataset.color || null);
             colorPicker.classList.remove('active');
-        });
+        }, { signal });
     });
 
     const fontSizeBtn = el.querySelector('.font-size-btn');
@@ -507,14 +514,14 @@ function setupItemEvents(item) {
         fontSizeBtn.addEventListener('click', e => {
             e.stopPropagation();
             setItemFontSize(item);
-        });
+        }, { signal });
     }
 
     el.querySelectorAll('.add-child-btn').forEach(btn => {
         btn.addEventListener('click', e => {
             e.stopPropagation();
             eventBus.emit(Events.UI_SHOW_CHILD_TYPE_PICKER, item, btn.dataset.d, e);
-        });
+        }, { signal });
     });
 
     el.querySelectorAll('.connection-handle').forEach(h => {
@@ -527,13 +534,13 @@ function setupItemEvents(item) {
             } else {
                 eventBus.emit(Events.CONNECTIONS_START, item, h.dataset.h);
             }
-        });
+        }, { signal });
         h.addEventListener('mouseenter', () => {
             if (state.connectSource && state.connectSource !== item) {
                 el.classList.add('connect-target');
             }
-        });
-        h.addEventListener('mouseleave', () => el.classList.remove('connect-target'));
+        }, { signal });
+        h.addEventListener('mouseleave', () => el.classList.remove('connect-target'), { signal });
     });
 
     el.addEventListener('contextmenu', e => {
@@ -548,7 +555,7 @@ function setupItemEvents(item) {
 
         if (!state.selectedItems.has(item)) selectItem(item);
         eventBus.emit(Events.UI_SHOW_CONTEXT_MENU, e.clientX, e.clientY, item);
-    });
+    }, { signal });
 
     if (item.type === 'memo') {
         const itemMemo = el.querySelector('.item-memo');
@@ -619,7 +626,7 @@ function setupItemEvents(item) {
                     document.body.classList.add('is-dragging');
                 }
             }
-        });
+        }, { signal });
 
         // Handle text selection drag outside memo area
         mb.addEventListener('mousedown', e => {
@@ -643,7 +650,7 @@ function setupItemEvents(item) {
                 window.addEventListener('mouseup', handleMouseUp);
                 window.addEventListener('mousemove', handleMouseMove);
             }
-        });
+        }, { signal });
 
         // Handle input - save content
         mb.addEventListener('input', () => {
@@ -660,7 +667,7 @@ function setupItemEvents(item) {
                     hasUnsavedChanges = false;
                 }
             }, 1000);
-        });
+        }, { signal });
 
         // Handle blur - save state if changed
         mb.addEventListener('blur', () => {
@@ -683,7 +690,7 @@ function setupItemEvents(item) {
                 contentBeforeEdit = item.content;
                 hasUnsavedChanges = false;
             }
-        });
+        }, { signal });
 
         // Record current state for undo on focus
         mb.addEventListener('focus', () => {
@@ -691,7 +698,7 @@ function setupItemEvents(item) {
             // Record content before editing starts
             contentBeforeEdit = item.content;
             hasUnsavedChanges = false;
-        });
+        }, { signal });
 
         // Function to show toolbar near selection
         function showToolbarNearSelection() {
@@ -763,12 +770,12 @@ function setupItemEvents(item) {
         mb.addEventListener('mouseup', () => {
             // Small delay to ensure selection is finalized
             setTimeout(showToolbarNearSelection, 10);
-        });
+        }, { signal });
 
         // Handle double-click (word selection) and triple-click (paragraph selection)
         mb.addEventListener('dblclick', () => {
             setTimeout(showToolbarNearSelection, 10);
-        });
+        }, { signal });
 
         // Handle all keyboard-based selections:
         // - Shift+Arrow keys
@@ -784,7 +791,7 @@ function setupItemEvents(item) {
             if (isSelectionKey) {
                 setTimeout(showToolbarNearSelection, 10);
             }
-        });
+        }, { signal });
 
         // Use selectionchange event to catch ALL selection methods
         // This covers: Ctrl+A, context menu "Select All", programmatic selection, etc.
@@ -810,10 +817,13 @@ function setupItemEvents(item) {
             }, 10);
         };
 
+        // Store selectionchange handler for cleanup on item deletion
+        item._selectionChangeHandler = handleSelectionChange;
+
         // Add selectionchange listener when memo gets focus
         mb.addEventListener('focus', () => {
             document.addEventListener('selectionchange', handleSelectionChange);
-        });
+        }, { signal });
 
         // Remove selectionchange listener when memo loses focus (cleanup)
         mb.addEventListener('blur', () => {
@@ -822,7 +832,7 @@ function setupItemEvents(item) {
                 clearTimeout(selectionChangeTimeout);
                 selectionChangeTimeout = null;
             }
-        });
+        }, { signal });
 
         // Initialize global event delegation for toolbar cleanup (once per module)
         // This replaces per-item document listeners to prevent memory leaks
@@ -846,7 +856,7 @@ function setupItemEvents(item) {
             if (text) {
                 document.execCommand('insertText', false, text);
             }
-        });
+        }, { signal });
 
         // Auto list formatting on Enter key
         mb.addEventListener('keydown', e => {
@@ -959,13 +969,13 @@ function setupItemEvents(item) {
                 // Trigger input event for saving
                 mb.dispatchEvent(new Event('input', { bubbles: true }));
             }
-        });
+        }, { signal });
 
         // Markdown toolbar buttons - simple toggle with execCommand
         toolbar.querySelectorAll('.md-btn').forEach(btn => {
             btn.addEventListener('mousedown', e => {
                 e.preventDefault(); // Prevent blur
-            });
+            }, { signal });
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 mb.focus();
@@ -1018,7 +1028,7 @@ function setupItemEvents(item) {
 
                 // Update toolbar position after formatting
                 setTimeout(showToolbarNearSelection, 10);
-            });
+            }, { signal });
         });
     }
 
@@ -1046,7 +1056,7 @@ function setupItemEvents(item) {
                     hasUnsavedChanges = false;
                 }
             }, 1000);
-        });
+        }, { signal });
 
         // Handle blur - save state if changed
         kb.addEventListener('blur', () => {
@@ -1060,14 +1070,14 @@ function setupItemEvents(item) {
                 contentBeforeEdit = item.content;
                 hasUnsavedChanges = false;
             }
-        });
+        }, { signal });
 
         // Record current state for undo on focus
         kb.addEventListener('focus', () => {
             el.classList.add('editing');
             contentBeforeEdit = item.content;
             hasUnsavedChanges = false;
-        });
+        }, { signal });
 
         // Prevent Enter key from adding new lines (keyword should be single-line)
         kb.addEventListener('keydown', e => {
@@ -1075,7 +1085,7 @@ function setupItemEvents(item) {
                 e.preventDefault();
                 kb.blur();
             }
-        });
+        }, { signal });
 
         // Block paste of formatted content - only allow plain text
         kb.addEventListener('paste', e => {
@@ -1084,7 +1094,7 @@ function setupItemEvents(item) {
             // Remove any newlines from pasted content
             const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
             document.execCommand('insertText', false, cleanText);
-        });
+        }, { signal });
     }
 
     // Link item click and double-click handlers
@@ -1101,7 +1111,7 @@ function setupItemEvents(item) {
             clickStartX = e.clientX;
             clickStartY = e.clientY;
             clickStartTime = Date.now();
-        });
+        }, { signal });
 
         // Single click to open link (but not if it was a drag)
         itemLink.addEventListener('click', e => {
@@ -1121,14 +1131,14 @@ function setupItemEvents(item) {
                 e.stopPropagation();
                 window.open(item.content.url, '_blank');
             }
-        });
+        }, { signal });
 
         // Double-click to rename link title
         itemLink.addEventListener('dblclick', e => {
             e.preventDefault();
             e.stopPropagation();
             eventBus.emit(Events.LINK_RENAME, item);
-        });
+        }, { signal });
     }
 
     // Video item controls
@@ -1166,22 +1176,22 @@ function setupItemEvents(item) {
             } else {
                 video.pause();
             }
-        });
+        }, { signal });
 
         // Update play/pause icon state
         video.addEventListener('play', () => {
             videoContainer.classList.add('video-playing');
-        });
+        }, { signal });
         video.addEventListener('pause', () => {
             videoContainer.classList.remove('video-playing');
-        });
+        }, { signal });
         video.addEventListener('ended', () => {
             videoContainer.classList.remove('video-playing');
-        });
+        }, { signal });
 
         // Update progress during playback
-        video.addEventListener('timeupdate', updateProgress);
-        video.addEventListener('loadedmetadata', updateProgress);
+        video.addEventListener('timeupdate', updateProgress, { signal });
+        video.addEventListener('loadedmetadata', updateProgress, { signal });
 
         // Click on progress bar to seek
         let isSeeking = false;
@@ -1198,25 +1208,31 @@ function setupItemEvents(item) {
             e.stopPropagation();
             isSeeking = true;
             seek(e);
-        });
+        }, { signal });
 
-        window.addEventListener('mousemove', e => {
+        // Window-level listeners for video seeking - store for manual cleanup
+        const handleVideoSeekMove = e => {
             if (isSeeking) {
                 e.preventDefault();
                 seek(e);
             }
-        });
-
-        window.addEventListener('mouseup', () => {
+        };
+        const handleVideoSeekUp = () => {
             isSeeking = false;
-        });
+        };
+        window.addEventListener('mousemove', handleVideoSeekMove);
+        window.addEventListener('mouseup', handleVideoSeekUp);
+        item._windowHandlers.push(
+            { type: 'mousemove', handler: handleVideoSeekMove },
+            { type: 'mouseup', handler: handleVideoSeekUp }
+        );
 
         // Mute toggle
         muteBtn.addEventListener('click', e => {
             e.stopPropagation();
             video.muted = !video.muted;
             videoContainer.classList.toggle('video-muted', video.muted);
-        });
+        }, { signal });
 
         // Fullscreen toggle
         fullscreenBtn.addEventListener('click', e => {
@@ -1226,7 +1242,7 @@ function setupItemEvents(item) {
             } else {
                 videoContainer.requestFullscreen();
             }
-        });
+        }, { signal });
 
         // Double-click on video area to toggle play/pause
         videoContainer.addEventListener('dblclick', e => {
@@ -1238,12 +1254,12 @@ function setupItemEvents(item) {
                     video.pause();
                 }
             }
-        });
+        }, { signal });
 
         // Prevent video controls from triggering drag
         el.querySelector('.video-controls').addEventListener('mousedown', e => {
             e.stopPropagation();
-        });
+        }, { signal });
     }
 }
 
@@ -1494,6 +1510,30 @@ function hideMenus() {
 
 export { hideMenus, toggleHeading };
 
+// Clean up all event listeners attached to an item
+// This prevents memory leaks when deleting items
+function cleanupItemEvents(item) {
+    // Abort all element-level listeners registered with the AbortController
+    if (item._abortController) {
+        item._abortController.abort();
+        item._abortController = null;
+    }
+
+    // Remove window-level listeners (video seeking, etc.)
+    if (item._windowHandlers) {
+        item._windowHandlers.forEach(({ type, handler }) => {
+            window.removeEventListener(type, handler);
+        });
+        item._windowHandlers = null;
+    }
+
+    // Remove document-level selectionchange listener for memos
+    if (item._selectionChangeHandler) {
+        document.removeEventListener('selectionchange', item._selectionChangeHandler);
+        item._selectionChangeHandler = null;
+    }
+}
+
 // Delete selected items
 export function deleteSelectedItems() {
     if (!state.selectedItems.size) return;
@@ -1506,6 +1546,9 @@ export function deleteSelectedItems() {
 
 // Delete a single item
 export function deleteItem(item, update = true, withFade = true) {
+    // Clean up event listeners to prevent memory leaks
+    cleanupItemEvents(item);
+
     // Delete connections without fade (they disappear with the node)
     state.connections.filter(c => c.from === item || c.to === item).forEach(c => eventBus.emit(Events.CONNECTIONS_DELETE, c, false, false));
 
