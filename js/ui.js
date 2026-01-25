@@ -58,6 +58,8 @@ let settingsModalController;
 let sidebarResizeController;
 let switchCanvasInProgress = false;
 let pendingCanvasSwitchId = null;
+let pendingCanvasSwitchPromise = null;
+let pendingCanvasSwitchResolve = null;
 
 // Note: External function calls are now handled via eventBus
 // Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
@@ -535,7 +537,12 @@ async function loadCanvasData(id) {
 export async function switchCanvas(id) {
     if (switchCanvasInProgress) {
         pendingCanvasSwitchId = id;
-        return;
+        if (!pendingCanvasSwitchPromise) {
+            pendingCanvasSwitchPromise = new Promise(resolve => {
+                pendingCanvasSwitchResolve = resolve;
+            });
+        }
+        return pendingCanvasSwitchPromise;
     }
 
     switchCanvasInProgress = true;
@@ -597,6 +604,11 @@ export async function switchCanvas(id) {
             const nextCanvasId = pendingCanvasSwitchId;
             pendingCanvasSwitchId = null;
             await switchCanvas(nextCanvasId);
+        }
+        if (!pendingCanvasSwitchId && pendingCanvasSwitchResolve) {
+            pendingCanvasSwitchResolve();
+            pendingCanvasSwitchResolve = null;
+            pendingCanvasSwitchPromise = null;
         }
     }
 }
