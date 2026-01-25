@@ -1,9 +1,9 @@
-# KnotPad
+<img src="https://github.com/user-attachments/assets/8d4b5261-871f-44a5-ba7d-db780d5410ac" width="20%"></img>
 
+# KnotPad
 A web-based infinite canvas note-taking application for visual thinking and idea organization.
 
-## Features
-
+### Features
 - **Infinite Canvas** - Pan and zoom across an unlimited workspace
 - **Multiple Item Types** - Memos (rich text), keywords, links, images, videos
 - **Visual Connections** - Draw lines between items with labels and arrows
@@ -14,32 +14,7 @@ A web-based infinite canvas note-taking application for visual thinking and idea
 - **Offline Support** - Full PWA with service worker caching
 - **File System Sync** - Optional local folder sync (Chrome/Edge)
 
-## Installation
-
-### PWA Installation (Recommended)
-
-**Desktop (Chrome/Edge)**:
-1. Open KnotPad in browser
-2. Click the install icon (⊕) in the address bar
-3. Or: Menu → "Install KnotPad..."
-
-**iOS (Safari)**:
-1. Tap Share button (⎙)
-2. Tap "Add to Home Screen"
-
-**Android (Chrome)**:
-1. Tap Menu (⋮) → "Add to Home Screen"
-
-### Self-Hosting
-
-```bash
-git clone https://github.com/ghostface2232/KnotPad.git
-cd KnotPad
-npx serve .
-```
-
-## Keyboard Shortcuts
-
+### Keyboard Shortcuts
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl/Cmd + Z` | Undo |
@@ -50,18 +25,7 @@ npx serve .
 | `Space + Drag` | Pan canvas |
 | `Alt + Drag` | Duplicate item |
 
-## Browser Support
-
-- **Chrome/Edge 80+**: Full support (File System API available)
-- **Firefox 75+**: Partial (no File System API)
-- **Safari 14+**: Partial (no File System API)
-
-## Notes
-
+### Notes
 - Data stored in browser (IndexedDB + localStorage)
 - Enable File System API in Settings for persistent local storage
 - Export backups regularly for important work
-
-## Development
-
-See [AGENTS.md](AGENTS.md) for development documentation.
