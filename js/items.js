@@ -24,8 +24,8 @@ function setupFaviconErrorHandler(imgElement) {
 // Export for use in ui.js
 export { FALLBACK_FAVICON, setupFaviconErrorHandler };
 
-// ============ Link Preview ============
-// Load preview image for link items using screenshot API
+// ============ Link Preview & Metadata ============
+// Load preview image and fetch page title for link items using screenshot API
 
 export function loadLinkPreviewForItem(item) {
     if (item.type !== 'link') return;
@@ -34,65 +34,94 @@ export function loadLinkPreviewForItem(item) {
     const itemLink = el.querySelector('.item-link');
     if (!itemLink) return;
 
-    // Check if preview already exists
-    if (el.querySelector('.link-preview-img')) return;
+    // Skip if already fetched metadata
+    if (item._metadataFetched) {
+        // Only skip preview if it already exists
+        if (el.querySelector('.link-preview-img') || !state.linkPreviewEnabled) return;
+    }
+    item._metadataFetched = true;
 
     const url = item.content.url;
-    // Use microlink.io API for screenshot preview
-    const previewUrl = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false`;
+    const domain = new URL(url).hostname;
+    const hasPreviewImage = el.querySelector('.link-preview-img');
+
+    // Determine if we need screenshot (for preview) - always fetch metadata for title
+    const needsScreenshot = state.linkPreviewEnabled && !hasPreviewImage;
+    const apiUrl = needsScreenshot
+        ? `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true`
+        : `https://api.microlink.io/?url=${encodeURIComponent(url)}`;
 
     // Add timeout for fetch
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    fetch(previewUrl, { signal: controller.signal })
+    fetch(apiUrl, { signal: controller.signal })
         .then(response => response.json())
         .then(data => {
             clearTimeout(timeoutId);
-            // Check again if preview mode is still enabled
-            if (!state.linkPreviewEnabled) return;
             // Check if element is still in DOM
             if (!el.isConnected) return;
 
-            if (data.status === 'success' && data.data?.screenshot?.url) {
-                const screenshotUrl = data.data.screenshot.url;
-
-                // Validate the image before adding it
-                const previewImg = document.createElement('img');
-                previewImg.className = 'link-preview-img';
-                previewImg.alt = 'Link preview';
-
-                // Validate image loads and has reasonable dimensions
-                previewImg.onload = () => {
-                    // Check if element is still in DOM and preview mode still enabled
-                    if (!el.isConnected || !state.linkPreviewEnabled) {
-                        return;
+            if (data.status === 'success' && data.data) {
+                // Update title if still using default domain name
+                const pageTitle = data.data.title;
+                if (pageTitle && item.content.title === domain) {
+                    item.content.title = pageTitle;
+                    const titleEl = el.querySelector('.link-title');
+                    if (titleEl && !titleEl.classList.contains('editing')) {
+                        titleEl.textContent = pageTitle;
                     }
-                    // Check for minimum dimensions to filter out broken/tiny images
-                    if (previewImg.naturalWidth < 100 || previewImg.naturalHeight < 50) {
-                        return;
-                    }
-                    // Append preview at the end (below title and URL)
-                    itemLink.appendChild(previewImg);
-                    // Adjust item height for 3:2 aspect ratio preview (width ~228px inside padding, height ~152px)
-                    if (!item.manuallyResized) {
-                        item.h = Math.max(item.h, 280);
-                        el.style.height = item.h + 'px';
-                    }
-                };
+                    eventBus.emit(Events.AUTOSAVE_TRIGGER);
+                }
 
-                previewImg.onerror = () => {
-                    // Silently fail - image couldn't load
-                };
+                // Handle screenshot preview
+                if (state.linkPreviewEnabled && data.data.screenshot?.url && !hasPreviewImage) {
+                    const screenshotUrl = data.data.screenshot.url;
 
-                // Start loading the image
-                previewImg.src = screenshotUrl;
+                    // Validate the image before adding it
+                    const previewImg = document.createElement('img');
+                    previewImg.className = 'link-preview-img';
+                    previewImg.alt = 'Link preview';
+
+                    // Validate image loads and has reasonable dimensions
+                    previewImg.onload = () => {
+                        // Check if element is still in DOM and preview mode still enabled
+                        if (!el.isConnected || !state.linkPreviewEnabled) {
+                            return;
+                        }
+                        // Check for minimum dimensions to filter out broken/tiny images
+                        if (previewImg.naturalWidth < 100 || previewImg.naturalHeight < 50) {
+                            return;
+                        }
+                        // Append preview at the end (below title and URL)
+                        itemLink.appendChild(previewImg);
+                        // Adjust item height for 3:2 aspect ratio preview (width ~228px inside padding, height ~152px)
+                        if (!item.manuallyResized) {
+                            item.h = Math.max(item.h, 280);
+                            el.style.height = item.h + 'px';
+                        }
+                    };
+
+                    previewImg.onerror = () => {
+                        // Silently fail - image couldn't load
+                    };
+
+                    // Start loading the image
+                    previewImg.src = screenshotUrl;
+                }
             }
         })
         .catch(() => {
             clearTimeout(timeoutId);
             // Silently fail - preview not available
         });
+}
+
+// Fetch link metadata (title) for newly created links, regardless of preview setting
+export function fetchLinkMetadata(item) {
+    if (item.type !== 'link') return;
+    // Always load preview/metadata for new links
+    loadLinkPreviewForItem(item);
 }
 
 export function removeLinkPreviewFromItem(item) {
@@ -1207,8 +1236,9 @@ function setupItemEvents(item) {
 
         // Single click to open link (but not if it was a drag, and delay to allow double-click detection)
         itemLink.addEventListener('click', e => {
-            // Don't open link if clicking on control buttons or title during editing
-            if (e.target.closest('.delete-btn') || e.target.closest('.color-btn') ||
+            // Don't open link if in editing mode or clicking on control buttons
+            if (itemLink.classList.contains('editing-mode') ||
+                e.target.closest('.delete-btn') || e.target.closest('.color-btn') ||
                 e.target.closest('.color-picker') || e.target.closest('.resize-handle') ||
                 e.target.closest('.link-title.editing')) {
                 return;
@@ -1900,6 +1930,7 @@ export function addLink(url, title, x, y) {
     // Without preview: 116px = favicon(28) + gap(10) + title(~18) + gap(10) + url(~18) + padding(32)
     // With preview: 280px = favicon(28) + gap(6) + title(~18) + gap(6) + url(~18) + gap(6) + preview(~152) + padding(32) + buffer
     const height = state.linkPreviewEnabled ? 280 : 116;
+    const userProvidedTitle = title && title.trim();
     const item = createItem({
         type: 'link',
         x,
@@ -1908,10 +1939,17 @@ export function addLink(url, title, x, y) {
         h: height,
         content: {
             url,
-            title: title || domain,
+            title: userProvidedTitle || domain,
             display: url.replace(/^https?:\/\//, '').replace(/\/$/, '')
         }
     });
+    // Fetch page title if user didn't provide a custom title
+    if (!userProvidedTitle) {
+        fetchLinkMetadata(item);
+    } else if (state.linkPreviewEnabled) {
+        // Still load preview image if enabled
+        loadLinkPreviewForItem(item);
+    }
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
     return item;
 }
