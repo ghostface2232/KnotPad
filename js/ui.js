@@ -2693,7 +2693,9 @@ function saveToLocalStorageSync() {
             })),
             view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
             itemId: state.itemId,
-            highestZ: state.highestZ
+            highestZ: state.highestZ,
+            undoStack: state.undoStack,
+            redoStack: state.redoStack
         };
         localStorage.setItem('knotpad-data-' + state.currentCanvasId, JSON.stringify(data));
     } catch (e) {
