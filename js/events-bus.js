@@ -138,7 +138,10 @@ export const Events = {
 
     // Link events
     LINK_EDIT: 'link:edit',
-    LINK_RENAME: 'link:rename'
+    LINK_RENAME: 'link:rename',
+
+    // Search events
+    SEARCH_RESULTS_UPDATED: 'search:resultsUpdated'
 };
 
 export default eventBus;

@@ -31,6 +31,7 @@ import {
     toggleSearch,
     openLinkModal,
     setupSearchEvents,
+    refreshSearchResultsView,
     setupCanvasIconPicker,
     setupCanvasListDropZone,
     setupMinimapClick,
@@ -80,6 +81,7 @@ eventBus.on(Events.CONNECTIONS_CANCEL, (withFade) => cancelConnection(withFade))
 // UI events
 eventBus.on(Events.UI_SHOW_CHILD_TYPE_PICKER, (item, direction, e) => showChildTypePicker(item, direction, e));
 eventBus.on(Events.UI_SHOW_CONTEXT_MENU, (x, y, item) => showContextMenu(x, y, item));
+eventBus.on(Events.SEARCH_RESULTS_UPDATED, () => refreshSearchResultsView());
 
 // Item events
 eventBus.on(Events.ITEMS_ADD_CHILD_NODE, (parent, direction, type) => addChildNode(parent, direction, type));
