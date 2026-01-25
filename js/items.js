@@ -1562,18 +1562,51 @@ function cleanupItemEvents(item) {
     }
 }
 
+function pruneSearchResults(removedItems) {
+    if (!state.searchResults.length) return false;
+    const removedSet = new Set(removedItems);
+    const previousResults = state.searchResults;
+    const nextResults = previousResults.filter(result => !removedSet.has(result));
+
+    if (nextResults.length === previousResults.length) return false;
+
+    let nextIndex = state.searchIndex;
+    if (nextIndex >= 0) {
+        const removedBeforeOrAt = previousResults
+            .slice(0, Math.min(nextIndex + 1, previousResults.length))
+            .filter(result => removedSet.has(result)).length;
+        nextIndex -= removedBeforeOrAt;
+    }
+
+    if (nextResults.length === 0) {
+        nextIndex = -1;
+    } else if (nextIndex < 0) {
+        nextIndex = 0;
+    } else if (nextIndex >= nextResults.length) {
+        nextIndex = nextResults.length - 1;
+    }
+
+    state.setSearchResults(nextResults);
+    state.setSearchIndex(nextIndex);
+    return true;
+}
+
 // Delete selected items
 export function deleteSelectedItems() {
     if (!state.selectedItems.size) return;
     eventBus.emit(Events.STATE_SAVE);
-    state.selectedItems.forEach(item => deleteItem(item, false));
+    const removedItems = Array.from(state.selectedItems);
+    removedItems.forEach(item => deleteItem(item, false, true, false));
+    if (pruneSearchResults(removedItems)) {
+        eventBus.emit(Events.SEARCH_RESULTS_UPDATED);
+    }
     state.selectedItems.clear();
     throttledMinimap();
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
 // Delete a single item
-export function deleteItem(item, update = true, withFade = true) {
+export function deleteItem(item, update = true, withFade = true, updateSearch = true) {
     // Clean up event listeners to prevent memory leaks
     cleanupItemEvents(item);
 
@@ -1592,16 +1625,8 @@ export function deleteItem(item, update = true, withFade = true) {
         }
     }
 
-    // Clean up search results if item is being deleted
-    const searchIdx = state.searchResults.indexOf(item);
-    if (searchIdx > -1) {
-        state.searchResults.splice(searchIdx, 1);
-        // Adjust search index if needed
-        if (state.searchIndex >= state.searchResults.length) {
-            state.setSearchIndex(Math.max(0, state.searchResults.length - 1));
-        } else if (state.searchIndex > searchIdx) {
-            state.setSearchIndex(state.searchIndex - 1);
-        }
+    if (updateSearch && pruneSearchResults([item])) {
+        eventBus.emit(Events.SEARCH_RESULTS_UPDATED);
     }
 
     const i = state.items.indexOf(item);

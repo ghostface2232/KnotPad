@@ -115,6 +115,21 @@ function clearSearchHighlights() {
     state.items.forEach(i => i.el.classList.remove('search-highlight'));
 }
 
+export function refreshSearchResultsView() {
+    updateSearchCount();
+    if (!searchBar.classList.contains('active')) {
+        return;
+    }
+    clearSearchHighlights();
+    if (!state.searchResults.length) {
+        return;
+    }
+    if (state.searchIndex < 0) {
+        state.setSearchIndex(0);
+    }
+    highlightCurrentResult();
+}
+
 function doSearch() {
     const q = searchInput.value.toLowerCase().trim();
     clearSearchHighlights();
@@ -136,8 +151,7 @@ function doSearch() {
 
     state.setSearchResults(results);
     state.setSearchIndex(results.length ? 0 : -1);
-    updateSearchCount();
-    highlightCurrentResult();
+    refreshSearchResultsView();
 }
 
 function updateSearchCount() {
@@ -291,6 +305,7 @@ function restoreState(stateData) {
             // Create the item anyway - it will show a broken state but connections will be correct
             // The media reload handler will attempt to restore it
             const i = createItem(d, true);
+            i.el.classList.add('media-loading');
             i.el.style.zIndex = d.z || 1;
             i.locked = d.locked;
             i.manuallyResized = d.manuallyResized || false;
