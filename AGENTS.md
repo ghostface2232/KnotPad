@@ -311,51 +311,51 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 
 ## Coding Guidelines: Common Bug Patterns to Avoid
 
-> 이 섹션은 프로젝트에서 반복적으로 발생했던 버그 패턴을 정리한 것입니다. 코드 작성 및 수정 시 아래 항목들을 주의하세요.
+> This section documents recurring bug patterns from past fixes. Be mindful of these when writing or modifying code.
 
-### 리소스 정리 (Cleanup)
+### Resource Cleanup
 
-| 주의 항목 | 가이드라인 |
-|-----------|------------|
-| **이벤트 리스너** | 요소 삭제 전 반드시 리스너 정리. `AbortController` 활용 권장 |
-| **DOM 요소** | 부모 삭제 시 연관 요소(label, hitArea, arrow 등)도 함께 제거 |
-| **Blob URL** | 미디어 삭제/실패 시 `revokeObjectURL()` 호출 필수 |
-| **타이머** | 새 작업 시작 전 기존 타이머 취소 (`clearTimeout`) |
+| Area | Guideline |
+|------|-----------|
+| **Event Listeners** | Always clean up before element removal. Use `AbortController` |
+| **DOM Elements** | Remove associated elements (label, hitArea, arrow) with parent |
+| **Blob URLs** | Call `revokeObjectURL()` on media deletion/failure |
+| **Timers** | Cancel existing timers before starting new operations |
 
-### 상태 관리 (State)
+### State Management
 
-| 주의 항목 | 가이드라인 |
-|-----------|------------|
-| **직렬화 완전성** | 새 속성 추가 시 모든 저장 함수 업데이트 (`saveState`, `saveCurrentCanvas`, `saveToLocalStorageSync`) |
-| **연관 상태 정리** | 아이템 삭제 시 `searchResults`, `selectedItems`, 연결선 참조도 정리 |
-| **Z-Index 계산** | 로드 시 저장값과 실제 아이템 값 중 최대값으로 계산 |
+| Area | Guideline |
+|------|-----------|
+| **Serialization** | Update all save functions when adding new properties (`saveState`, `saveCurrentCanvas`, `saveToLocalStorageSync`) |
+| **Related State** | Clean up `searchResults`, `selectedItems`, connection refs on item deletion |
+| **Z-Index** | Calculate as max of saved value and actual item values on load |
 
-### 초기화 및 타이밍
+### Initialization & Timing
 
-| 주의 항목 | 가이드라인 |
-|-----------|------------|
-| **초기화 순서** | 캔버스 로드 완료 후 UI 초기화 함수 호출 |
-| **비동기 경쟁** | 중복 실행 방지 플래그 사용, Promise 거부 처리 |
-| **Null 체크** | 외부 입력(URL 등) 처리 전 유효성 검증 |
+| Area | Guideline |
+|------|-----------|
+| **Init Order** | Call UI init functions after canvas load completes |
+| **Race Conditions** | Use flags to prevent duplicate execution, handle Promise rejections |
+| **Null Checks** | Validate external input (URLs, etc.) before processing |
 
-### UI 및 렌더링
+### UI & Rendering
 
-| 주의 항목 | 가이드라인 |
-|-----------|------------|
-| **CSS 속성** | 기본값에 의존하지 말고 명시적으로 설정 |
-| **HTML 처리** | 검색/표시 시 HTML 태그 제거 후 텍스트만 사용 |
-| **필터 동기화** | 아이템 필터링 시 연결선 가시성도 함께 업데이트 |
+| Area | Guideline |
+|------|-----------|
+| **CSS Properties** | Set explicitly, don't rely on defaults |
+| **HTML Content** | Strip tags for search/display, use `textContent` |
+| **Filter Sync** | Update connection visibility when filtering items |
 
-### 체크리스트
+### Checklist
 
-코드 변경 시 확인:
+Verify when making changes:
 
-- [ ] 이벤트 리스너 정리 메커니즘 존재
-- [ ] 삭제/복원 시 연관 DOM 요소 제거
-- [ ] 새 속성이 모든 저장/복원 함수에 반영
-- [ ] 초기화 순서가 의존성 준수
-- [ ] 외부 입력에 대한 null 체크 존재
-- [ ] 타이머/비동기 작업 취소 처리
-- [ ] Blob URL 해제
-- [ ] 삭제 시 연관 상태 정리
-- [ ] 필터 상태가 연관 요소에 전파
+- [ ] Event listeners have cleanup mechanism
+- [ ] Associated DOM elements removed on delete/restore
+- [ ] New properties added to all save/restore functions
+- [ ] Initialization order respects dependencies
+- [ ] Null checks for external input
+- [ ] Timers/async operations handle cancellation
+- [ ] Blob URLs revoked
+- [ ] Related state cleaned on deletion
+- [ ] Filter state propagates to related elements
