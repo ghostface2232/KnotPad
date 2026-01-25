@@ -665,7 +665,10 @@ export async function deleteCanvas(id) {
             await deleteCanvasFromFileSystem(id);
         }
         saveCanvasesList();
-        if (state.currentCanvasId === id) await switchCanvas(state.canvases[0].id);
+        if (state.currentCanvasId === id) {
+            state.setCurrentCanvasId(null);  // Clear to prevent switchCanvas from re-saving deleted canvas
+            await switchCanvas(state.canvases[0].id);
+        }
         else renderCanvasList();
         showToast('Canvas deleted');
     }
