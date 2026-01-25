@@ -172,7 +172,7 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
     stroke: var(--conn-default);
     stroke-width: 2;
 }
-[data-theme="light"] .connection-label-bg {
+:root.light .connection-label-bg {
     fill: #ffffff;
 }
 .connection-label-text {
