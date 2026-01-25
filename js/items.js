@@ -46,6 +46,8 @@ export function loadLinkPreviewForItem(item) {
         .then(data => {
             // Check again if preview mode is still enabled
             if (!state.linkPreviewEnabled) return;
+            // Check if element is still in DOM
+            if (!el.isConnected) return;
 
             if (data.status === 'success' && data.data?.screenshot?.url) {
                 const previewImg = document.createElement('img');
@@ -54,10 +56,11 @@ export function loadLinkPreviewForItem(item) {
                 previewImg.alt = 'Link preview';
                 previewImg.loading = 'lazy';
                 previewImg.onerror = () => previewImg.remove();
-                itemLink.insertBefore(previewImg, itemLink.firstChild);
-                // Adjust item height if needed
+                // Append preview at the end (below title and URL)
+                itemLink.appendChild(previewImg);
+                // Adjust item height for 3:2 aspect ratio preview (width ~228px inside padding, height ~152px)
                 if (!item.manuallyResized) {
-                    item.h = Math.max(item.h, 180);
+                    item.h = Math.max(item.h, 240);
                     el.style.height = item.h + 'px';
                 }
             }
@@ -80,6 +83,35 @@ export function removeLinkPreviewFromItem(item) {
             el.style.height = item.h + 'px';
         }
     }
+}
+
+// Get best favicon URL for a hostname with fallback chain
+function getFaviconUrl(hostname, size = 64) {
+    // Use Google's favicon service as primary source
+    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=${size}`;
+}
+
+// Alternative favicon sources to try if primary fails
+const FAVICON_FALLBACK_SOURCES = [
+    (hostname) => `https://icons.duckduckgo.com/ip3/${hostname}.ico`,
+    (hostname) => `https://${hostname}/favicon.ico`
+];
+
+// Setup enhanced favicon error handler with fallback chain
+function setupEnhancedFaviconHandler(imgElement, hostname) {
+    let fallbackIndex = 0;
+
+    imgElement.onerror = () => {
+        if (fallbackIndex < FAVICON_FALLBACK_SOURCES.length) {
+            // Try next fallback source
+            imgElement.src = FAVICON_FALLBACK_SOURCES[fallbackIndex](hostname);
+            fallbackIndex++;
+        } else {
+            // All sources failed, use SVG fallback
+            imgElement.onerror = null;
+            imgElement.src = FALLBACK_FAVICON;
+        }
+    };
 }
 
 // ============ Global Event Delegation for Memo Toolbars ============
@@ -370,9 +402,23 @@ export function createItem(cfg, loading = false) {
         const videoEl = el.querySelector('.item-video');
         if (videoEl) setupMediaErrorHandler(videoEl, cfg.content);
     } else if (cfg.type === 'link') {
-        // Setup favicon fallback for link items
+        // Setup enhanced favicon fallback for link items
         const faviconEl = el.querySelector('.link-favicon');
-        if (faviconEl) setupFaviconErrorHandler(faviconEl);
+        if (faviconEl) {
+            const linkContent = cfg.content || {};
+            const linkUrl = linkContent.url || '';
+            let hostname = '';
+            try {
+                hostname = new URL(linkUrl).hostname;
+            } catch {
+                hostname = '';
+            }
+            if (hostname) {
+                setupEnhancedFaviconHandler(faviconEl, hostname);
+            } else {
+                setupFaviconErrorHandler(faviconEl);
+            }
+        }
     }
 
     const item = {
@@ -1804,12 +1850,14 @@ export function addKeyword(text = '', x, y, color = null) {
 // Add link
 export function addLink(url, title, x, y) {
     const domain = new URL(url).hostname;
+    // Use larger height when link preview is enabled to accommodate 3:2 preview image
+    const height = state.linkPreviewEnabled ? 240 : 100;
     const item = createItem({
         type: 'link',
         x,
         y,
         w: 260,
-        h: 100,
+        h: height,
         content: {
             url,
             title: title || domain,
