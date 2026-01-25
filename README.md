@@ -3,6 +3,9 @@
 # KnotPad
 A web-based infinite canvas note-taking application for visual thinking and idea organization.
 
+### Installation
+[KnotPad](https://ghostface2232.github.io/KnotPad/)
+
 ### Features
 - **Infinite Canvas** - Pan and zoom across an unlimited workspace
 - **Multiple Item Types** - Memos (rich text), keywords, links, images, videos
