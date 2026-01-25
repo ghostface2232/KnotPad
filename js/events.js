@@ -17,9 +17,22 @@ const selectionBox = $('selectionBox');
 const dropZone = $('dropZone');
 const fileInput = $('fileInput');
 
+let mouseEventsController;
+let touchEventsController;
+let keyboardEventsController;
+let dragDropEventsController;
+let copyEventsController;
+let pasteEventsController;
+let globalContextMenuController;
+let documentClickController;
+
 // ============ Mouse Events ============
 
 export function setupMouseEvents() {
+    if (mouseEventsController) mouseEventsController.abort();
+    mouseEventsController = new AbortController();
+    const { signal } = mouseEventsController;
+
     // Wheel - zoom canvas or scroll memo content
     app.addEventListener('wheel', e => {
         // Check if cursor is over a scrollable memo-body (including child elements)
@@ -51,7 +64,7 @@ export function setupMouseEvents() {
         if (state.invertWheelZoom) d = 1 / d;
         const rect = app.getBoundingClientRect();
         setZoom(state.scale * d, e.clientX - rect.left, e.clientY - rect.top, false);
-    }, { passive: false });
+    }, { passive: false, signal });
 
     // Mouse down
     app.addEventListener('mousedown', e => {
@@ -87,7 +100,7 @@ export function setupMouseEvents() {
             selectionBox.style.width = '0px';
             selectionBox.style.height = '0px';
         }
-    });
+    }, { signal });
 
     // Double-click to create new node
     app.addEventListener('dblclick', e => {
@@ -104,7 +117,7 @@ export function setupMouseEvents() {
 
             showNewNodePicker(e.clientX, e.clientY, canvasX, canvasY);
         }
-    });
+    }, { signal });
 
     // Right-click on canvas to show context menu (or cancel connection in connecting mode)
     app.addEventListener('contextmenu', e => {
@@ -122,7 +135,7 @@ export function setupMouseEvents() {
             const canvasY = (e.clientY - rect.top - state.offsetY) / state.scale - 60;
             showCanvasContextMenu(e.clientX, e.clientY, canvasX, canvasY);
         }
-    });
+    }, { signal });
 
 
     // Mouse move
@@ -223,7 +236,7 @@ export function setupMouseEvents() {
                 (e.clientY - rect.top - state.offsetY) / state.scale + 10000
             );
         }
-    });
+    }, { signal });
 
     // Mouse up
     window.addEventListener('mouseup', e => {
@@ -268,7 +281,7 @@ export function setupMouseEvents() {
             }
             triggerAutoSave();
         }
-    });
+    }, { signal });
 }
 
 // ============ Touch Events ============
@@ -276,6 +289,10 @@ export function setupMouseEvents() {
 let lastDist = 0;
 
 export function setupTouchEvents() {
+    if (touchEventsController) touchEventsController.abort();
+    touchEventsController = new AbortController();
+    const { signal } = touchEventsController;
+
     app.addEventListener('touchstart', e => {
         closeSidebarIfUnpinned();
         if (e.touches.length === 2) {
@@ -288,7 +305,7 @@ export function setupTouchEvents() {
             state.setStartX(e.touches[0].clientX - state.offsetX);
             state.setStartY(e.touches[0].clientY - state.offsetY);
         }
-    });
+    }, { signal });
 
     app.addEventListener('touchmove', e => {
         if (e.touches.length === 2) {
@@ -308,14 +325,18 @@ export function setupTouchEvents() {
             updateTransform();
             throttledMinimap();
         }
-    }, { passive: false });
+    }, { passive: false, signal });
 
-    app.addEventListener('touchend', () => state.setIsPanning(false));
+    app.addEventListener('touchend', () => state.setIsPanning(false), { signal });
 }
 
 // ============ Keyboard Events ============
 
 export function setupKeyboardEvents() {
+    if (keyboardEventsController) keyboardEventsController.abort();
+    keyboardEventsController = new AbortController();
+    const { signal } = keyboardEventsController;
+
     document.addEventListener('keydown', e => {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
@@ -378,7 +399,7 @@ export function setupKeyboardEvents() {
             state.setIsSpacePressed(true);
             app.classList.add('space-pan-mode');
         }
-    });
+    }, { signal });
 
     document.addEventListener('keyup', e => {
         if (e.code === 'Space' && state.isSpacePressed) {
@@ -387,23 +408,27 @@ export function setupKeyboardEvents() {
             app.classList.remove('space-pan-mode');
             app.classList.remove('panning');
         }
-    });
+    }, { signal });
 }
 
 // ============ Drag & Drop Events ============
 
 export function setupDragDropEvents() {
+    if (dragDropEventsController) dragDropEventsController.abort();
+    dragDropEventsController = new AbortController();
+    const { signal } = dragDropEventsController;
+
     window.addEventListener('dragenter', e => {
         e.preventDefault();
         dropZone.classList.add('active');
-    });
+    }, { signal });
 
     window.addEventListener('dragleave', e => {
         e.preventDefault();
         dropZone.classList.remove('active');
-    });
+    }, { signal });
 
-    window.addEventListener('dragover', e => e.preventDefault());
+    window.addEventListener('dragover', e => e.preventDefault(), { signal });
 
     window.addEventListener('drop', e => {
         e.preventDefault();
@@ -422,12 +447,16 @@ export function setupDragDropEvents() {
                 triggerAutoSave();
             }
         }
-    });
+    }, { signal });
 }
 
 // ============ Copy Events ============
 
 export function setupCopyEvents() {
+    if (copyEventsController) copyEventsController.abort();
+    copyEventsController = new AbortController();
+    const { signal } = copyEventsController;
+
     window.addEventListener('copy', e => {
         // Check if there are selected link/image items and not editing text
         const isEditing = e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]');
@@ -457,12 +486,16 @@ export function setupCopyEvents() {
 
         e.preventDefault();
         e.clipboardData.setData('text/plain', plainText);
-    });
+    }, { signal });
 }
 
 // ============ Paste Events ============
 
 export function setupPasteEvents() {
+    if (pasteEventsController) pasteEventsController.abort();
+    pasteEventsController = new AbortController();
+    const { signal } = pasteEventsController;
+
     window.addEventListener('paste', e => {
         // Allow default paste behavior in input, textarea, and contenteditable elements
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -498,23 +531,31 @@ export function setupPasteEvents() {
                 });
             }
         }
-    });
+    }, { signal });
 }
 
 // ============ Global Context Menu Block ============
 
 export function setupGlobalContextMenuBlock() {
+    if (globalContextMenuController) globalContextMenuController.abort();
+    globalContextMenuController = new AbortController();
+    const { signal } = globalContextMenuController;
+
     // Block browser's default context menu globally
     // Custom context menus (items, connections, sidebar) use stopPropagation(),
     // so they won't bubble up here and will work normally
     document.addEventListener('contextmenu', e => {
         e.preventDefault();
-    });
+    }, { signal });
 }
 
 // ============ Document Click Handler ============
 
 export function setupDocumentClickHandler() {
+    if (documentClickController) documentClickController.abort();
+    documentClickController = new AbortController();
+    const { signal } = documentClickController;
+
     document.addEventListener('click', e => {
         if (!e.target.closest('.color-picker') && !e.target.closest('.color-btn')) {
             document.querySelectorAll('.color-picker.active').forEach(p => p.classList.remove('active'));
@@ -538,6 +579,5 @@ export function setupDocumentClickHandler() {
             $('canvasIconPicker').classList.remove('active');
             state.setIconPickerTarget(null);
         }
-    });
+    }, { signal });
 }
-

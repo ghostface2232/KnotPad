@@ -45,6 +45,18 @@ const sidebarGroupContextMenu = $('sidebarGroupContextMenu');
 const sidebarEmptyContextMenu = $('sidebarEmptyContextMenu');
 const groupSubmenu = $('groupSubmenu');
 
+let searchEventsController;
+let canvasListEventsController;
+let canvasListDropZoneController;
+let canvasIconPickerController;
+let contextMenuController;
+let canvasContextMenuController;
+let sidebarContextMenusController;
+let minimapClickController;
+let linkModalController;
+let settingsModalController;
+let sidebarResizeController;
+
 // Note: External function calls are now handled via eventBus
 // Events emitted: STATE_SAVE, AUTOSAVE_TRIGGER
 // Events listened: ITEMS_ADD_CHILD_NODE
@@ -140,7 +152,11 @@ function highlightCurrentResult() {
 }
 
 export function setupSearchEvents() {
-    searchInput.addEventListener('input', doSearch);
+    if (searchEventsController) searchEventsController.abort();
+    searchEventsController = new AbortController();
+    const { signal } = searchEventsController;
+
+    searchInput.addEventListener('input', doSearch, { signal });
 
     $('searchPrev').addEventListener('click', () => {
         if (state.searchResults.length) {
@@ -148,7 +164,7 @@ export function setupSearchEvents() {
             updateSearchCount();
             highlightCurrentResult();
         }
-    });
+    }, { signal });
 
     $('searchNext').addEventListener('click', () => {
         if (state.searchResults.length) {
@@ -156,9 +172,9 @@ export function setupSearchEvents() {
             updateSearchCount();
             highlightCurrentResult();
         }
-    });
+    }, { signal });
 
-    $('searchClose').addEventListener('click', closeSearch);
+    $('searchClose').addEventListener('click', closeSearch, { signal });
 }
 
 // ============ Undo/Redo ============
@@ -807,6 +823,10 @@ export function renderCanvasList() {
 
     canvasList.innerHTML = html;
 
+    if (canvasListEventsController) canvasListEventsController.abort();
+    canvasListEventsController = new AbortController();
+    const { signal } = canvasListEventsController;
+
     // Bind canvas entry events
     canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
         const id = entry.dataset.id;
@@ -815,15 +835,15 @@ export function renderCanvasList() {
                 await saveCurrentCanvas();
                 await switchCanvas(id);
             }
-        });
-        entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); });
-        entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); });
-        entry.querySelector('.canvas-icon').addEventListener('click', e => { e.stopPropagation(); openIconPicker(id, entry); });
+        }, { signal });
+        entry.querySelector('.rename').addEventListener('click', e => { e.stopPropagation(); startRename(entry, id); }, { signal });
+        entry.querySelector('.delete').addEventListener('click', e => { e.stopPropagation(); deleteCanvas(id); }, { signal });
+        entry.querySelector('.canvas-icon').addEventListener('click', e => { e.stopPropagation(); openIconPicker(id, entry); }, { signal });
         // Double-click on canvas name to rename
-        entry.querySelector('.canvas-name')?.addEventListener('dblclick', e => { e.stopPropagation(); startRename(entry, id); });
+        entry.querySelector('.canvas-name')?.addEventListener('dblclick', e => { e.stopPropagation(); startRename(entry, id); }, { signal });
 
         // Drag and drop for canvases
-        setupCanvasDragDrop(entry, id);
+        setupCanvasDragDrop(entry, id, signal);
     });
 
     // Bind group events
@@ -837,36 +857,36 @@ export function renderCanvasList() {
                 state.toggleGroupCollapsed(groupId);
                 groupEl.classList.toggle('collapsed');
             }
-        });
+        }, { signal });
 
         // Group actions
         header.querySelector('.group-action-btn.add')?.addEventListener('click', async e => {
             e.stopPropagation();
             await createNewCanvas(groupId);
-        });
+        }, { signal });
         header.querySelector('.group-action-btn.rename')?.addEventListener('click', e => {
             e.stopPropagation();
             startGroupRename(header, groupId);
-        });
+        }, { signal });
         header.querySelector('.group-action-btn.delete')?.addEventListener('click', e => {
             e.stopPropagation();
             deleteGroup(groupId);
-        });
+        }, { signal });
         // Double-click on group name to rename
         header.querySelector('.group-name')?.addEventListener('dblclick', e => {
             e.stopPropagation();
             startGroupRename(header, groupId);
-        });
+        }, { signal });
 
         // Drag drop for groups
-        setupGroupDragDrop(header, groupId);
+        setupGroupDragDrop(header, groupId, signal);
     });
 
     // Bind sidebar context menu events
-    bindSidebarContextEvents();
+    bindSidebarContextEvents(signal);
 }
 
-function setupCanvasDragDrop(entry, canvasId) {
+function setupCanvasDragDrop(entry, canvasId, signal) {
     entry.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', canvasId);
         e.dataTransfer.effectAllowed = 'move';
@@ -876,7 +896,7 @@ function setupCanvasDragDrop(entry, canvasId) {
         setTimeout(() => {
             entry.style.opacity = '0.4';
         }, 0);
-    });
+    }, { signal });
 
     entry.addEventListener('dragend', () => {
         entry.classList.remove('dragging');
@@ -885,7 +905,7 @@ function setupCanvasDragDrop(entry, canvasId) {
         canvasList.querySelectorAll('.drag-over, .drag-over-top, .drag-over-bottom').forEach(el => {
             el.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
         });
-    });
+    }, { signal });
 
     entry.addEventListener('dragover', e => {
         e.preventDefault();
@@ -901,12 +921,12 @@ function setupCanvasDragDrop(entry, canvasId) {
 
         entry.classList.remove('drag-over-top', 'drag-over-bottom');
         entry.classList.add(isAbove ? 'drag-over-top' : 'drag-over-bottom');
-    });
+    }, { signal });
 
     entry.addEventListener('dragenter', e => {
         e.preventDefault();
         e.stopPropagation();
-    });
+    }, { signal });
 
     entry.addEventListener('dragleave', e => {
         // Only remove classes if leaving to outside the entry
@@ -914,7 +934,7 @@ function setupCanvasDragDrop(entry, canvasId) {
         if (!entry.contains(relatedTarget)) {
             entry.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
         }
-    });
+    }, { signal });
 
     entry.addEventListener('drop', e => {
         e.preventDefault();
@@ -927,23 +947,23 @@ function setupCanvasDragDrop(entry, canvasId) {
         if (draggedId && draggedId !== canvasId) {
             reorderCanvas(draggedId, canvasId, isAbove);
         }
-    });
+    }, { signal });
 }
 
-function setupGroupDragDrop(header, groupId) {
+function setupGroupDragDrop(header, groupId, signal) {
     header.addEventListener('dragover', e => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-    });
+    }, { signal });
 
     header.addEventListener('dragenter', e => {
         e.preventDefault();
         header.classList.add('drag-over');
-    });
+    }, { signal });
 
     header.addEventListener('dragleave', () => {
         header.classList.remove('drag-over');
-    });
+    }, { signal });
 
     header.addEventListener('drop', e => {
         e.preventDefault();
@@ -952,7 +972,7 @@ function setupGroupDragDrop(header, groupId) {
         if (draggedId) {
             moveCanvasToGroup(draggedId, groupId);
         }
-    });
+    }, { signal });
 }
 
 function reorderCanvas(draggedId, targetId, insertBefore = false) {
@@ -978,13 +998,17 @@ function reorderCanvas(draggedId, targetId, insertBefore = false) {
 
 // Setup drop zone on canvas list for removing from groups
 export function setupCanvasListDropZone() {
+    if (canvasListDropZoneController) canvasListDropZoneController.abort();
+    canvasListDropZoneController = new AbortController();
+    const { signal } = canvasListDropZoneController;
+
     canvasList.addEventListener('dragover', e => {
         // Only handle drops directly on the list, not on items
         if (e.target === canvasList) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
         }
-    });
+    }, { signal });
 
     canvasList.addEventListener('drop', e => {
         if (e.target === canvasList) {
@@ -995,7 +1019,7 @@ export function setupCanvasListDropZone() {
                 moveCanvasToGroup(draggedId, null);
             }
         }
-    });
+    }, { signal });
 }
 
 function startRename(entry, id) {
@@ -1086,12 +1110,16 @@ function setCanvasColor(canvasId, color) {
 }
 
 export function setupCanvasIconPicker() {
+    if (canvasIconPickerController) canvasIconPickerController.abort();
+    canvasIconPickerController = new AbortController();
+    const { signal } = canvasIconPickerController;
+
     // Icon selection
     canvasIconPicker.querySelectorAll('.icon-opt').forEach(opt => {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             if (state.iconPickerTarget) setCanvasIcon(state.iconPickerTarget, opt.dataset.icon);
-        });
+        }, { signal });
     });
 
     // Color selection
@@ -1099,7 +1127,7 @@ export function setupCanvasIconPicker() {
         opt.addEventListener('click', e => {
             e.stopPropagation();
             if (state.iconPickerTarget) setCanvasColor(state.iconPickerTarget, opt.dataset.color);
-        });
+        }, { signal });
     });
 
     // Close picker when clicking outside
@@ -1110,12 +1138,12 @@ export function setupCanvasIconPicker() {
             canvasIconPicker.classList.remove('active');
             state.setIconPickerTarget(null);
         }
-    });
+    }, { signal });
 
     // Prevent clicks inside picker from closing it
     canvasIconPicker.addEventListener('click', e => {
         e.stopPropagation();
-    });
+    }, { signal });
 }
 
 // ============ Minimap ============
@@ -1165,6 +1193,10 @@ export function updateMinimap() {
 setMinimapUpdateFn(updateMinimap);
 
 export function setupMinimapClick() {
+    if (minimapClickController) minimapClickController.abort();
+    minimapClickController = new AbortController();
+    const { signal } = minimapClickController;
+
     $('minimap').addEventListener('click', e => {
         if (!state.items.length) return;
 
@@ -1199,7 +1231,7 @@ export function setupMinimapClick() {
             else updateMinimap();
         }
         requestAnimationFrame(animate);
-    });
+    }, { signal });
 }
 
 // ============ Context Menu ============
@@ -1281,6 +1313,10 @@ export function showContextMenu(x, y, item) {
 }
 
 export function setupContextMenu() {
+    if (contextMenuController) contextMenuController.abort();
+    contextMenuController = new AbortController();
+    const { signal } = contextMenuController;
+
     contextMenu.querySelectorAll('.context-menu-item').forEach(el => {
         el.addEventListener('click', () => {
             if (window.selectedItem) {
@@ -1310,7 +1346,7 @@ export function setupContextMenu() {
                 }
             }
             hideMenus();
-        });
+        }, { signal });
     });
 }
 
@@ -1410,6 +1446,10 @@ export function showCanvasContextMenu(clientX, clientY, canvasX, canvasY) {
 }
 
 export function setupCanvasContextMenu() {
+    if (canvasContextMenuController) canvasContextMenuController.abort();
+    canvasContextMenuController = new AbortController();
+    const { signal } = canvasContextMenuController;
+
     canvasContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
         el.addEventListener('click', () => {
             switch (el.dataset.action) {
@@ -1433,7 +1473,7 @@ export function setupCanvasContextMenu() {
                     break;
             }
             canvasContextMenu.classList.remove('active');
-        });
+        }, { signal });
     });
 }
 
@@ -1614,21 +1654,25 @@ function expandAllGroups() {
 export function setupSidebarContextMenus() {
     if (!sidebarCanvasContextMenu || !sidebarGroupContextMenu || !sidebarEmptyContextMenu) return;
 
+    if (sidebarContextMenusController) sidebarContextMenusController.abort();
+    sidebarContextMenusController = new AbortController();
+    const { signal } = sidebarContextMenusController;
+
     // Setup empty space context menu handler (one-time)
-    setupEmptySpaceContextMenu();
+    setupEmptySpaceContextMenu(signal);
 
     // Close menus on outside click
     document.addEventListener('click', e => {
         if (!e.target.closest('.context-menu')) {
             hideSidebarContextMenus();
         }
-    });
+    }, { signal });
 
     document.addEventListener('contextmenu', e => {
         if (!e.target.closest('.sidebar')) {
             hideSidebarContextMenus();
         }
-    });
+    }, { signal });
 
     // Canvas context menu actions
     sidebarCanvasContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
@@ -1706,7 +1750,7 @@ export function setupSidebarContextMenus() {
                 default:
                     hideSidebarContextMenus();
             }
-        });
+        }, { signal });
     });
 
     // Group submenu delegation
@@ -1764,7 +1808,7 @@ export function setupSidebarContextMenus() {
         }
 
         hideSidebarContextMenus();
-    });
+    }, { signal });
 
     // Group context menu actions
     sidebarGroupContextMenu.querySelectorAll('.context-menu-item').forEach(el => {
@@ -1822,7 +1866,7 @@ export function setupSidebarContextMenus() {
                 default:
                     hideSidebarContextMenus();
             }
-        });
+        }, { signal });
     });
 
     // Empty context menu actions
@@ -1852,19 +1896,19 @@ export function setupSidebarContextMenus() {
                 default:
                     hideSidebarContextMenus();
             }
-        });
+        }, { signal });
     });
 }
 
 // Bind context menu events to canvas list items
-export function bindSidebarContextEvents() {
+export function bindSidebarContextEvents(signal) {
     // Canvas item right-click
     canvasList.querySelectorAll('.canvas-item-entry').forEach(entry => {
         entry.addEventListener('contextmenu', e => {
             e.preventDefault();
             e.stopPropagation();
             showSidebarCanvasContextMenu(entry.dataset.id, e.clientX, e.clientY);
-        });
+        }, { signal });
     });
 
     // Group header right-click
@@ -1873,12 +1917,12 @@ export function bindSidebarContextEvents() {
             e.preventDefault();
             e.stopPropagation();
             showSidebarGroupContextMenu(header.dataset.groupId, e.clientX, e.clientY);
-        });
+        }, { signal });
     });
 }
 
 // Setup empty space context menu (called once at init)
-function setupEmptySpaceContextMenu() {
+function setupEmptySpaceContextMenu(signal) {
     // Canvas list empty space right-click
     canvasList.addEventListener('contextmenu', e => {
         // Only trigger if clicking directly on empty space (not on items/groups)
@@ -1887,7 +1931,7 @@ function setupEmptySpaceContextMenu() {
             e.stopPropagation();
             showSidebarEmptyContextMenu(e.clientX, e.clientY);
         }
-    });
+    }, { signal });
 
     // Sidebar footer right-click (also empty space)
     const sidebarFooter = sidebar.querySelector('.sidebar-footer');
@@ -1898,7 +1942,7 @@ function setupEmptySpaceContextMenu() {
                 e.stopPropagation();
                 showSidebarEmptyContextMenu(e.clientX, e.clientY);
             }
-        });
+        }, { signal });
     }
 }
 
@@ -2014,8 +2058,12 @@ function submitLinkModal() {
 }
 
 export function setupLinkModal() {
-    linkModal.addEventListener('click', e => { if (e.target === linkModal) closeLinkModal(); });
-    linkModal.querySelector('[data-close]').addEventListener('click', closeLinkModal);
+    if (linkModalController) linkModalController.abort();
+    linkModalController = new AbortController();
+    const { signal } = linkModalController;
+
+    linkModal.addEventListener('click', e => { if (e.target === linkModal) closeLinkModal(); }, { signal });
+    linkModal.querySelector('[data-close]').addEventListener('click', closeLinkModal, { signal });
 
     $('linkSubmit').addEventListener('click', () => {
         let url = $('linkUrl').value.trim();
@@ -2050,7 +2098,7 @@ export function setupLinkModal() {
             }
             closeLinkModal();
         }
-    });
+    }, { signal });
 
     // Submit on Enter key in title input
     $('linkTitle').addEventListener('keydown', e => {
@@ -2058,10 +2106,10 @@ export function setupLinkModal() {
             e.preventDefault();
             submitLinkModal();
         }
-    });
+    }, { signal });
 
     // Clear error when user starts typing
-    $('linkUrl').addEventListener('input', hideLinkModalError);
+    $('linkUrl').addEventListener('input', hideLinkModalError, { signal });
 }
 
 // ============ Settings Modal ============
@@ -2227,14 +2275,18 @@ function updateStorageScrollGradient() {
 
 export function setupSettingsModal() {
     const settingsBtn = $('settingsBtn');
+    if (settingsModalController) settingsModalController.abort();
+    settingsModalController = new AbortController();
+    const { signal } = settingsModalController;
+
     if (settingsBtn) {
-        settingsBtn.addEventListener('click', openSettingsModal);
+        settingsBtn.addEventListener('click', openSettingsModal, { signal });
     }
 
     if (settingsModal) {
-        settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettingsModal(); });
+        settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettingsModal(); }, { signal });
         const closeBtn = settingsModal.querySelector('[data-close]');
-        if (closeBtn) closeBtn.addEventListener('click', closeSettingsModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeSettingsModal, { signal });
 
         // Tab switching
         settingsModal.querySelectorAll('.settings-tab').forEach(tab => {
@@ -2250,13 +2302,13 @@ export function setupSettingsModal() {
                 } else if (tab.dataset.tab === 'storage') {
                     setTimeout(updateStorageScrollGradient, 0);
                 }
-            });
+            }, { signal });
         });
 
         // Shortcuts scroll gradient
         const shortcutsWrapper = settingsModal.querySelector('.shortcuts-scroll-wrapper');
         if (shortcutsWrapper) {
-            shortcutsWrapper.addEventListener('scroll', updateShortcutsScrollGradient);
+            shortcutsWrapper.addEventListener('scroll', updateShortcutsScrollGradient, { signal });
             // Initial check
             setTimeout(updateShortcutsScrollGradient, 0);
         }
@@ -2264,7 +2316,7 @@ export function setupSettingsModal() {
         // Storage scroll gradient
         const storageWrapper = settingsModal.querySelector('.storage-scroll-wrapper');
         if (storageWrapper) {
-            storageWrapper.addEventListener('scroll', updateStorageScrollGradient);
+            storageWrapper.addEventListener('scroll', updateStorageScrollGradient, { signal });
             // Initial check (storage is the default active tab)
             setTimeout(updateStorageScrollGradient, 0);
         }
@@ -2288,7 +2340,7 @@ export function setupSettingsModal() {
                 await disconnectStorageFolder();
                 updateStorageModalState();
             }
-        });
+        }, { signal });
     }
 
     if (fileCard) {
@@ -2300,21 +2352,21 @@ export function setupSettingsModal() {
             if (success) {
                 updateStorageModalState();
             }
-        });
+        }, { signal });
     }
 
     // Export all canvases
     const exportAllBtn = $('exportAllBtn');
     if (exportAllBtn) {
-        exportAllBtn.addEventListener('click', exportAllCanvases);
+        exportAllBtn.addEventListener('click', exportAllCanvases, { signal });
     }
 
     // Import all canvases
     const importAllBtn = $('importAllBtn');
     const importAllInput = $('importAllInput');
     if (importAllBtn && importAllInput) {
-        importAllBtn.addEventListener('click', () => importAllInput.click());
-        importAllInput.addEventListener('change', importAllCanvases);
+        importAllBtn.addEventListener('click', () => importAllInput.click(), { signal });
+        importAllInput.addEventListener('change', importAllCanvases, { signal });
     }
 
     // Default font size
@@ -2326,7 +2378,7 @@ export function setupSettingsModal() {
                 btn.classList.add('active');
                 state.setDefaultFontSize(btn.dataset.value);
                 updateFontSizePreview(btn.dataset.value);
-            });
+            }, { signal });
         });
     }
 
@@ -2339,7 +2391,7 @@ export function setupSettingsModal() {
                 btn.classList.add('active');
                 state.setNoteWrapMode(btn.dataset.value);
                 applyWrapMode(btn.dataset.value);
-            });
+            }, { signal });
         });
     }
 
@@ -2351,7 +2403,7 @@ export function setupSettingsModal() {
                 textAlignGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 state.setDefaultTextAlign(btn.dataset.value);
-            });
+            }, { signal });
         });
     }
 
@@ -2364,7 +2416,7 @@ export function setupSettingsModal() {
                 btn.classList.add('active');
                 state.setColorDisplayMode(btn.dataset.value);
                 applyColorDisplayMode(btn.dataset.value);
-            });
+            }, { signal });
         });
     }
 
@@ -2373,7 +2425,7 @@ export function setupSettingsModal() {
     if (invertWheelZoomCheckbox) {
         invertWheelZoomCheckbox.addEventListener('change', () => {
             state.setInvertWheelZoom(invertWheelZoomCheckbox.checked);
-        });
+        }, { signal });
     }
 
     // Grid snap
@@ -2381,7 +2433,7 @@ export function setupSettingsModal() {
     if (gridSnapCheckbox) {
         gridSnapCheckbox.addEventListener('change', () => {
             state.setGridSnap(gridSnapCheckbox.checked);
-        });
+        }, { signal });
     }
 
     // Link preview
@@ -2390,7 +2442,7 @@ export function setupSettingsModal() {
         linkPreviewCheckbox.addEventListener('change', () => {
             state.setLinkPreviewEnabled(linkPreviewCheckbox.checked);
             applyLinkPreviewMode(linkPreviewCheckbox.checked);
-        });
+        }, { signal });
     }
 }
 
@@ -2664,6 +2716,10 @@ export function setupSidebarResize() {
     const resizeHandle = $('sidebarResizeHandle');
     if (!resizeHandle) return;
 
+    if (sidebarResizeController) sidebarResizeController.abort();
+    sidebarResizeController = new AbortController();
+    const { signal } = sidebarResizeController;
+
     // Load saved width
     const savedWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     if (savedWidth) {
@@ -2686,7 +2742,7 @@ export function setupSidebarResize() {
         document.body.style.cursor = 'ew-resize';
         document.body.style.userSelect = 'none';
         e.preventDefault();
-    });
+    }, { signal });
 
     document.addEventListener('mousemove', e => {
         if (!isResizing) return;
@@ -2694,7 +2750,7 @@ export function setupSidebarResize() {
         let newWidth = startWidth + delta;
         newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, newWidth));
         document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
-    });
+    }, { signal });
 
     document.addEventListener('mouseup', () => {
         if (!isResizing) return;
@@ -2706,7 +2762,7 @@ export function setupSidebarResize() {
         // Save the width
         const currentWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 280;
         localStorage.setItem(SIDEBAR_WIDTH_KEY, currentWidth);
-    });
+    }, { signal });
 }
 
 // ============ File Handling ============
