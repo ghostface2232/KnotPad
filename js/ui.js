@@ -365,7 +365,9 @@ export async function saveCurrentCanvas() {
         })),
         view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
         itemId: state.itemId,
-        highestZ: state.highestZ
+        highestZ: state.highestZ,
+        undoStack: state.undoStack,
+        redoStack: state.redoStack
     };
 
     try {
@@ -493,9 +495,19 @@ async function loadCanvasData(id) {
         });
 
         updateMinimap();
-        // Store structured object directly (not JSON string)
-        state.setUndoStack([{ items: data.items, connections: data.connections.map(c => ({ ...c })) }]);
-        state.setRedoStack([]);
+
+        // Restore per-canvas undo/redo stacks if saved, otherwise create initial state
+        if (Array.isArray(data.undoStack) && data.undoStack.length > 0) {
+            state.setUndoStack(data.undoStack);
+        } else {
+            // Create initial state for canvases without saved history
+            state.setUndoStack([{ items: data.items, connections: data.connections.map(c => ({ ...c })) }]);
+        }
+        if (Array.isArray(data.redoStack)) {
+            state.setRedoStack(data.redoStack);
+        } else {
+            state.setRedoStack([]);
+        }
         updateUndoRedoButtons();
     } catch (e) {
         console.error(e);
@@ -503,9 +515,19 @@ async function loadCanvasData(id) {
 }
 
 export async function switchCanvas(id) {
+    // Save current canvas with its undo/redo history before switching
+    if (state.currentCanvasId) {
+        await saveCurrentCanvas();
+    }
+
     state.blobURLCache.forEach(url => URL.revokeObjectURL(url));
     state.blobURLCache.clear();
-    state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); });
+    state.connections.forEach(c => {
+        c.el.remove();
+        if (c.hitArea) c.hitArea.remove();
+        if (c.arrow) c.arrow.remove();
+        if (c.labelEl) c.labelEl.remove();
+    });
     state.connections.length = 0;
     state.items.forEach(i => i.el.remove());
     state.items.length = 0;
@@ -516,6 +538,7 @@ export async function switchCanvas(id) {
     state.setScale(1);
     state.setOffsetX(0);
     state.setOffsetY(0);
+    // Clear stacks before loading - loadCanvasData will restore per-canvas history
     state.setUndoStack([]);
     state.setRedoStack([]);
     updateTransform();
@@ -524,8 +547,8 @@ export async function switchCanvas(id) {
     localStorage.setItem('knotpad-active-canvas', id);
     await loadCanvasData(id);
 
+    // Ensure at least initial state exists if no history was restored
     if (!state.undoStack.length) {
-        // Store structured object directly (not JSON string)
         state.setUndoStack([{ items: [], connections: [] }]);
     }
     updateUndoRedoButtons();

@@ -277,10 +277,46 @@ function setupImportExportEvents() {
         try {
             const text = await file.text();
             const data = JSON.parse(text);
+
+            // Validate imported data structure BEFORE clearing state
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid import data: not an object');
+            }
+            if (!Array.isArray(data.items)) {
+                throw new Error('Invalid import data: missing or invalid items array');
+            }
+            if (!Array.isArray(data.connections)) {
+                throw new Error('Invalid import data: missing or invalid connections array');
+            }
+
+            // Validate each item has required fields
+            for (const item of data.items) {
+                if (!item.id || !item.type) {
+                    throw new Error('Invalid import data: item missing id or type');
+                }
+            }
+
+            // Validate each connection references valid item IDs
+            const itemIds = new Set(data.items.map(i => i.id));
+            for (const conn of data.connections) {
+                if (!conn.from || !conn.to) {
+                    throw new Error('Invalid import data: connection missing from or to');
+                }
+                if (!itemIds.has(conn.from) || !itemIds.has(conn.to)) {
+                    throw new Error('Invalid import data: connection references non-existent item');
+                }
+            }
+
             const { addConnection, updateConnectionArrow, updateConnectionLabel } = await import('./connections.js');
             const { updateMinimap } = await import('./ui.js');
 
-            state.connections.forEach(c => { c.el.remove(); if (c.arrow) c.arrow.remove(); });
+            // Now safe to clear state - validation passed
+            state.connections.forEach(c => {
+                c.el.remove();
+                if (c.hitArea) c.hitArea.remove();
+                if (c.arrow) c.arrow.remove();
+                if (c.labelEl) c.labelEl.remove();
+            });
             state.connections.length = 0;
             state.items.forEach(i => i.el.remove());
             state.items.length = 0;
@@ -288,19 +324,17 @@ function setupImportExportEvents() {
 
             // Calculate maximum item ID from imported items to prevent ID collisions
             let maxImportedItemId = 0;
-            if (data.items && data.items.length > 0) {
-                data.items.forEach(d => {
-                    if (d.id) {
-                        const match = d.id.match(/^i(\d+)$/);
-                        if (match) {
-                            const idNum = parseInt(match[1], 10);
-                            if (idNum > maxImportedItemId) {
-                                maxImportedItemId = idNum;
-                            }
+            data.items.forEach(d => {
+                if (d.id) {
+                    const match = d.id.match(/^i(\d+)$/);
+                    if (match) {
+                        const idNum = parseInt(match[1], 10);
+                        if (idNum > maxImportedItemId) {
+                            maxImportedItemId = idNum;
                         }
                     }
-                });
-            }
+                }
+            });
             // Set itemId to the maximum imported ID to prevent collisions
             state.setItemId(maxImportedItemId);
             state.setHighestZ(1);
@@ -330,6 +364,7 @@ function setupImportExportEvents() {
             const { showToast } = await import('./utils.js');
             showToast('Imported');
         } catch (err) {
+            console.error('Import failed:', err);
             const { showToast } = await import('./utils.js');
             showToast('Import failed', 'error');
         }
