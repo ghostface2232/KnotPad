@@ -222,7 +222,7 @@ export function updateConnectionLabel(c) {
 
     // Position text at center
     text.setAttribute('x', midPoint.x);
-    text.setAttribute('y', midPoint.y + 5);
+    text.setAttribute('y', midPoint.y);
     text.setAttribute('text-anchor', 'middle');
 
     // Position and size the background pill
