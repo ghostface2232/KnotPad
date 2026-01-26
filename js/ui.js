@@ -68,6 +68,8 @@ import {
     updateSettingsUI as updateSettingsUIHelper
 } from './settings-modal.js';
 
+export { applyWrapMode, applyColorDisplayMode, applyLinkPreviewMode };
+
 // DOM Elements
 const sidebar = $('sidebar');
 const canvasList = $('canvasList');
@@ -2196,7 +2198,7 @@ export function setupLinkModal() {
 export function openSettingsModal() {
     if (settingsModal) {
         updateStorageModalState();
-        updateSettingsUI();
+        updateSettingsUIHelper(settingsModal);
         settingsModal.classList.add('active');
         // Update shortcuts scroll gradient
         setTimeout(updateShortcutsScrollGradient, 0);
@@ -2237,88 +2239,7 @@ function updateStorageModalState() {
     }
 }
 
-function updateFontSizePreview(size) {
-    const previewText = $('previewText');
-    if (previewText) {
-        previewText.className = 'preview-text size-' + size;
-    }
-}
-
-// Apply wrap mode globally via body class
-export function applyWrapMode(mode) {
-    document.body.classList.toggle('wrap-mode-character', mode === 'character');
-}
-
-export function applyColorDisplayMode(mode) {
-    document.body.classList.toggle('color-mode-fill', mode === 'fill');
-}
-
-export function applyLinkPreviewMode(enabled) {
-    document.body.classList.toggle('link-preview-enabled', enabled);
-    // Update existing link items
-    state.items.filter(item => item.type === 'link').forEach(item => {
-        if (enabled) {
-            loadLinkPreviewForItem(item);
-        } else {
-            removeLinkPreviewFromItem(item);
-        }
-    });
-}
-
-function updateSettingsUI() {
-    // Update font size buttons
-    const fontSizeGroup = $('defaultFontSize');
-    if (fontSizeGroup) {
-        fontSizeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.value === state.defaultFontSize);
-        });
-    }
-
-    // Update font size preview
-    updateFontSizePreview(state.defaultFontSize);
-
-    // Update wrap mode buttons
-    const wrapModeGroup = $('noteWrapMode');
-    if (wrapModeGroup) {
-        wrapModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.value === state.noteWrapMode);
-        });
-    }
-
-    // Update text align buttons
-    const textAlignGroup = $('defaultTextAlign');
-    if (textAlignGroup) {
-        textAlignGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.value === state.defaultTextAlign);
-        });
-    }
-
-    // Update color display mode buttons
-    const colorDisplayModeGroup = $('colorDisplayMode');
-    if (colorDisplayModeGroup) {
-        colorDisplayModeGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.value === state.colorDisplayMode);
-        });
-    }
-
-    // Update invert wheel zoom toggle
-    const invertWheelZoomCheckbox = $('invertWheelZoom');
-    if (invertWheelZoomCheckbox) {
-        invertWheelZoomCheckbox.checked = state.invertWheelZoom;
-    }
-
-    // Update grid snap toggle
-    const gridSnapCheckbox = $('gridSnapToggle');
-    if (gridSnapCheckbox) {
-        gridSnapCheckbox.checked = state.gridSnap;
-    }
-
-    // Update link preview toggle
-    const linkPreviewCheckbox = $('linkPreviewToggle');
-    if (linkPreviewCheckbox) {
-        linkPreviewCheckbox.checked = state.linkPreviewEnabled;
-    }
-}
+// Settings UI helpers are imported from settings-modal.js
 
 // Scroll gradient helper wrappers - use shared updateScrollGradient from settings-modal.js
 function updateShortcutsScrollGradient() {

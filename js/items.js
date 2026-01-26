@@ -1,6 +1,6 @@
 // KnotPad - Items Module (Create, Manage, Delete)
 
-import { COLORS, COLOR_MAP, FONT_SIZES } from './constants.js';
+import { COLORS, COLOR_MAP, FONT_SIZES, ITEM_DIMENSIONS } from './constants.js';
 import { $, esc, findFreePosition } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap, updateMinimap } from './viewport.js';
@@ -712,7 +712,7 @@ function setupMemoEvents(item, el, signal) {
 
             // Use fixed border zone from canvas-item edges for consistent drag area
             // This ensures edges are always draggable regardless of scrollbar or content
-            const EDGE_ZONE = 10; // pixels from each edge that are always draggable
+            const EDGE_ZONE = ITEM_DIMENSIONS.EDGE_ZONE; // pixels from each edge that are always draggable
             const itemRect = el.getBoundingClientRect();
             const x = e.clientX;
             const y = e.clientY;
