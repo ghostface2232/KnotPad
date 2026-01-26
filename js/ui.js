@@ -1342,6 +1342,43 @@ export function setupMinimapClick() {
     }, { signal });
 }
 
+// ============ Minimap Responsive Hide ============
+
+let minimapResizeController;
+
+function checkMinimapOverlap() {
+    const minimap = $('minimap');
+    const toolbar = document.querySelector('.toolbar');
+    if (!minimap || !toolbar) return;
+
+    const minimapRect = minimap.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+
+    // Check if they overlap (with some padding for visual comfort)
+    const padding = 8;
+    const overlaps = toolbarRect.right + padding >= minimapRect.left &&
+                     toolbarRect.bottom + padding >= minimapRect.top &&
+                     toolbarRect.top - padding <= minimapRect.bottom;
+
+    if (overlaps) {
+        minimap.classList.add('hidden-responsive');
+    } else {
+        minimap.classList.remove('hidden-responsive');
+    }
+}
+
+export function setupMinimapResponsiveHide() {
+    if (minimapResizeController) minimapResizeController.abort();
+    minimapResizeController = new AbortController();
+    const { signal } = minimapResizeController;
+
+    // Check on resize
+    window.addEventListener('resize', checkMinimapOverlap, { signal });
+
+    // Initial check
+    checkMinimapOverlap();
+}
+
 // ============ Context Menu ============
 
 // Copy item content to clipboard (for link and image items)
