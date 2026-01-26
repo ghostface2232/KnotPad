@@ -352,7 +352,22 @@ function setupMediaErrorHandler(mediaElement, mediaId) {
     }
 }
 
-// Create an item on the canvas
+/**
+ * Create an item on the canvas
+ * @param {Object} cfg - Item configuration
+ * @param {string} cfg.type - Item type: 'memo' | 'keyword' | 'link' | 'image' | 'video'
+ * @param {number} cfg.x - X position on canvas
+ * @param {number} cfg.y - Y position on canvas
+ * @param {number} cfg.w - Width in pixels
+ * @param {number} cfg.h - Height in pixels
+ * @param {string|Object} [cfg.content] - Content (string for memo/keyword, object for link, mediaId for image/video)
+ * @param {string} [cfg.color] - Color name from COLOR_MAP
+ * @param {string} [cfg.fontSize] - Font size: null | 'medium' | 'large' | 'xlarge'
+ * @param {string} [cfg.textAlign] - Text alignment: null | 'center' | 'right'
+ * @param {number} [cfg.z] - Z-index (only used when loading)
+ * @param {boolean} [loading=false] - True when loading from storage (skips animations)
+ * @returns {Object} Created item object with el, type, x, y, w, h, content, etc.
+ */
 export function createItem(cfg, loading = false) {
     const el = document.createElement('div');
     el.className = 'canvas-item' + (loading ? '' : ' new');
@@ -525,17 +540,13 @@ export function createItem(cfg, loading = false) {
     return item;
 }
 
-// Setup event handlers for an item
-function setupItemEvents(item) {
-    const el = item.el;
+// ============ Item Event Handler Helpers ============
+// These functions are extracted from setupItemEvents for better organization
 
-    // Create AbortController for cleanup - all listeners will use this signal
-    const controller = new AbortController();
-    const signal = controller.signal;
-    item._abortController = controller;
-    // Store window-level handlers for manual cleanup (AbortController doesn't help with window listeners)
-    item._windowHandlers = [];
-
+/**
+ * Setup common events for all item types (drag, resize, delete, color, etc.)
+ */
+function setupItemCommonEvents(item, el, signal) {
     el.addEventListener('mousedown', e => {
         const t = e.target;
         const isContentEditable = t.closest('[contenteditable="true"]') || t.classList.contains('memo-body');
@@ -679,19 +690,23 @@ function setupItemEvents(item) {
         if (!state.selectedItems.has(item)) selectItem(item);
         eventBus.emit(Events.UI_SHOW_CONTEXT_MENU, e.clientX, e.clientY, item);
     }, { signal });
+}
 
-    if (item.type === 'memo') {
-        const itemMemo = el.querySelector('.item-memo');
-        const mb = el.querySelector('.memo-body');
-        const toolbar = el.querySelector('.memo-toolbar');
+/**
+ * Setup memo-specific events (text editing, toolbar, selection, etc.)
+ */
+function setupMemoEvents(item, el, signal) {
+    const itemMemo = el.querySelector('.item-memo');
+    const mb = el.querySelector('.memo-body');
+    const toolbar = el.querySelector('.memo-toolbar');
 
-        // Track content before editing for undo
-        let contentBeforeEdit = item.content;
-        let hasUnsavedChanges = false;
-        let undoSaveTimer = null;
+    // Track content before editing for undo
+    let contentBeforeEdit = item.content;
+    let hasUnsavedChanges = false;
+    let undoSaveTimer = null;
 
-        // Handle border/padding area click - select node instead of focusing text
-        itemMemo.addEventListener('mousedown', e => {
+    // Handle border/padding area click - select node instead of focusing text
+    itemMemo.addEventListener('mousedown', e => {
             // Only handle left mouse button
             if (e.button !== 0) return;
 
@@ -1153,11 +1168,13 @@ function setupItemEvents(item) {
                 setTimeout(showToolbarNearSelection, 10);
             }, { signal });
         });
-    }
+}
 
-    // ============ Keyword Node Event Handlers ============
-    if (item.type === 'keyword') {
-        const kb = el.querySelector('.keyword-body');
+/**
+ * Setup keyword-specific events (single-line editing, plain text only)
+ */
+function setupKeywordEvents(item, el, signal) {
+    const kb = el.querySelector('.keyword-body');
 
         // Track content before editing for undo
         let contentBeforeEdit = item.content;
@@ -1210,26 +1227,28 @@ function setupItemEvents(item) {
             }
         }, { signal });
 
-        // Block paste of formatted content - only allow plain text
-        kb.addEventListener('paste', e => {
-            e.preventDefault();
-            const text = e.clipboardData.getData('text/plain');
-            // Remove any newlines from pasted content
-            const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
-            document.execCommand('insertText', false, cleanText);
-        }, { signal });
-    }
+    // Block paste of formatted content - only allow plain text
+    kb.addEventListener('paste', e => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        // Remove any newlines from pasted content
+        const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
+        document.execCommand('insertText', false, cleanText);
+    }, { signal });
+}
 
-    // Link item click and double-click handlers
-    if (item.type === 'link') {
-        const itemLink = el.querySelector('.item-link');
-        let clickStartX = 0;
-        let clickStartY = 0;
-        let clickStartTime = 0;
-        let singleClickTimer = null;
-        const DRAG_THRESHOLD = 5; // pixels
-        const CLICK_TIMEOUT = 300; // ms
-        const DBLCLICK_DELAY = 250; // ms to wait before opening link (to detect double-click)
+/**
+ * Setup link-specific events (click to open, double-click to rename)
+ */
+function setupLinkItemEvents(item, el, signal) {
+    const itemLink = el.querySelector('.item-link');
+    let clickStartX = 0;
+    let clickStartY = 0;
+    let clickStartTime = 0;
+    let singleClickTimer = null;
+    const DRAG_THRESHOLD = 5; // pixels
+    const CLICK_TIMEOUT = 300; // ms
+    const DBLCLICK_DELAY = 250; // ms to wait before opening link (to detect double-click)
 
         // Track mousedown position to distinguish click from drag
         itemLink.addEventListener('mousedown', e => {
@@ -1284,20 +1303,22 @@ function setupItemEvents(item) {
                 singleClickTimer = null;
             }
 
-            eventBus.emit(Events.LINK_RENAME, item);
-        }, { signal });
-    }
+        eventBus.emit(Events.LINK_RENAME, item);
+    }, { signal });
+}
 
-    // Video item controls
-    if (item.type === 'video') {
-        const videoContainer = el.querySelector('.video-container');
-        const video = el.querySelector('.item-video');
-        const playBtn = el.querySelector('.video-play-btn');
-        const muteBtn = el.querySelector('.video-mute-btn');
-        const fullscreenBtn = el.querySelector('.video-fullscreen-btn');
-        const progressContainer = el.querySelector('.video-progress-container');
-        const progressFilled = el.querySelector('.video-progress-filled');
-        const timeDisplay = el.querySelector('.video-time');
+/**
+ * Setup video-specific events (play/pause, seek, mute, fullscreen)
+ */
+function setupVideoEvents(item, el, signal) {
+    const videoContainer = el.querySelector('.video-container');
+    const video = el.querySelector('.item-video');
+    const playBtn = el.querySelector('.video-play-btn');
+    const muteBtn = el.querySelector('.video-mute-btn');
+    const fullscreenBtn = el.querySelector('.video-fullscreen-btn');
+    const progressContainer = el.querySelector('.video-progress-container');
+    const progressFilled = el.querySelector('.video-progress-filled');
+    const timeDisplay = el.querySelector('.video-time');
 
         // Format time as m:ss
         const formatTime = (seconds) => {
@@ -1403,10 +1424,42 @@ function setupItemEvents(item) {
             }
         }, { signal });
 
-        // Prevent video controls from triggering drag
-        el.querySelector('.video-controls').addEventListener('mousedown', e => {
-            e.stopPropagation();
-        }, { signal });
+    // Prevent video controls from triggering drag
+    el.querySelector('.video-controls').addEventListener('mousedown', e => {
+        e.stopPropagation();
+    }, { signal });
+}
+
+/**
+ * Main setup function - delegates to type-specific handlers
+ */
+function setupItemEvents(item) {
+    const el = item.el;
+
+    // Create AbortController for cleanup - all listeners will use this signal
+    const controller = new AbortController();
+    const signal = controller.signal;
+    item._abortController = controller;
+    // Store window-level handlers for manual cleanup (AbortController doesn't help with window listeners)
+    item._windowHandlers = [];
+
+    // Common events for all item types
+    setupItemCommonEvents(item, el, signal);
+
+    // Type-specific events
+    switch (item.type) {
+        case 'memo':
+            setupMemoEvents(item, el, signal);
+            break;
+        case 'keyword':
+            setupKeywordEvents(item, el, signal);
+            break;
+        case 'link':
+            setupLinkItemEvents(item, el, signal);
+            break;
+        case 'video':
+            setupVideoEvents(item, el, signal);
+            break;
     }
 }
 
@@ -1875,7 +1928,14 @@ function calculateMemoSizeForText(text, fontSize) {
     return { w: Math.round(width), h: Math.round(height) };
 }
 
-// Add memo
+/**
+ * Add a new memo item to the canvas
+ * @param {string} [text=''] - Initial text content
+ * @param {number} x - X position (adjusted to find free space)
+ * @param {number} y - Y position (adjusted to find free space)
+ * @param {string|null} [color=null] - Color name from COLOR_MAP
+ * @returns {Object} Created memo item
+ */
 export function addMemo(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
     // Apply default font size setting
@@ -1903,7 +1963,14 @@ export function addMemo(text = '', x, y, color = null) {
     return item;
 }
 
-// Add keyword node (pill-shaped concept node)
+/**
+ * Add a new keyword item (pill-shaped concept node)
+ * @param {string} [text=''] - Initial text content
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {string|null} [color=null] - Color name from COLOR_MAP
+ * @returns {Object} Created keyword item
+ */
 export function addKeyword(text = '', x, y, color = null) {
     const pos = findFreePosition(x, y, state.items);
 
@@ -1929,7 +1996,14 @@ export function addKeyword(text = '', x, y, color = null) {
     return item;
 }
 
-// Add link
+/**
+ * Add a new link item to the canvas
+ * @param {string} url - URL to link to
+ * @param {string} [title] - Custom title (auto-fetched if not provided)
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @returns {Object} Created link item
+ */
 export function addLink(url, title, x, y) {
     const pos = findFreePosition(x, y, state.items);
     const domain = new URL(url).hostname;

@@ -1,4 +1,25 @@
 // KnotPad - UI Module (Toolbar, Menus, Modals, Minimap, Search, Canvas Management)
+//
+// ============ Table of Contents ============
+// - Theme (~20 lines)                    : loadTheme, toggleTheme
+// - Search (~110 lines)                  : toggleSearch, openSearch, closeSearch, setupSearchEvents
+// - Undo/Redo (~160 lines)               : saveState, undo, redo, restoreState
+// - Canvas Management (~700 lines)       : loadCanvases, saveCurrentCanvas, switchCanvas, createNewCanvas
+//   └─ Canvas Groups                     : createNewGroup, deleteGroup, moveCanvasToGroup
+//   └─ Canvas List UI                    : renderCanvasList, setupCanvasDragDrop
+//   └─ Canvas Icon Picker               : setupCanvasIconPicker
+// - Minimap (~130 lines)                 : updateMinimap, setupMinimapClick, setupMinimapResponsiveHide
+// - Context Menus (~770 lines)           : showContextMenu, setupContextMenu
+//   └─ Link Rename                       : startLinkRename, finishLinkRename
+//   └─ Canvas Context Menu              : showCanvasContextMenu, setupCanvasContextMenu
+//   └─ Sidebar Context Menus            : setupSidebarContextMenus, bindSidebarContextEvents
+// - Node Pickers (~20 lines)             : showChildTypePicker, showNewNodePicker
+// - Link Modal (~145 lines)              : openLinkModal, closeLinkModal, setupLinkModal
+// - Settings Modal (~545 lines)          : openSettingsModal, setupSettingsModal, exportAllCanvases
+// - Auto Save (~70 lines)                : triggerAutoSave, saveToLocalStorageSync
+// - Sidebar (~65 lines)                  : closeSidebarIfUnpinned, setupSidebarResize
+// - File Handling (~40 lines)            : handleFile
+// ==========================================
 
 import { CANVASES_KEY, CANVAS_GROUPS_KEY, THEME_KEY, CANVAS_ICONS, COLOR_MAP, MAX_HISTORY } from './constants.js';
 import { $, esc, generateId, showToast, stripHtml, findFreePosition } from './utils.js';
@@ -25,6 +46,27 @@ import {
     saveMediaBatch
 } from './storage.js';
 import eventBus, { Events } from './events-bus.js';
+import {
+    formatRelativeDate,
+    getCanvasIconHTML,
+    getCanvasIconStyle,
+    renderCanvasEntry as renderCanvasEntryHTML,
+    renderGroupHTML,
+    setupCanvasDragDrop,
+    setupGroupDragDrop,
+    reorderCanvas,
+    moveCanvasToGroup
+} from './canvas-sidebar.js';
+import {
+    updateFontSizePreview,
+    applyWrapMode,
+    applyColorDisplayMode,
+    applyLinkPreviewMode,
+    updateScrollGradient,
+    blobToBase64,
+    base64ToBlob,
+    updateSettingsUI as updateSettingsUIHelper
+} from './settings-modal.js';
 
 // DOM Elements
 const sidebar = $('sidebar');
@@ -354,6 +396,8 @@ function restoreState(stateData) {
 }
 
 // ============ Canvas Management ============
+// Core canvas CRUD operations and data persistence
+// Exports: loadCanvases, saveCanvasesList, saveCurrentCanvas, switchCanvas, createNewCanvas, deleteCanvas
 
 export async function loadCanvases() {
     try {
@@ -666,6 +710,8 @@ export async function createNewCanvas(groupId = null) {
 }
 
 // ============ Canvas Group Management ============
+// Canvas grouping and organization
+// Exports: createNewGroup, deleteGroup
 
 export function createNewGroup() {
     const ng = { id: generateId(), name: 'New Group', createdAt: Date.now() };
@@ -725,14 +771,7 @@ function startGroupRename(header, groupId) {
     });
 }
 
-function moveCanvasToGroup(canvasId, groupId) {
-    const canvas = state.canvases.find(c => c.id === canvasId);
-    if (canvas) {
-        canvas.groupId = groupId || null;
-        saveCanvasesList();
-        renderCanvasList();
-    }
-}
+// moveCanvasToGroup is now imported from canvas-sidebar.js
 
 export async function deleteCanvas(id) {
     if (state.canvases.length <= 1) {
@@ -774,98 +813,9 @@ function updateTopbarCanvasName() {
     $('topbarCanvasName').textContent = c?.name || 'Untitled';
 }
 
-function getCanvasIconHTML(c) {
-    if (c.icon && CANVAS_ICONS[c.icon]) return CANVAS_ICONS[c.icon];
-    return `<span class="icon-letter">${esc((c.name || 'U').charAt(0).toUpperCase())}</span>`;
-}
-
-function getCanvasIconStyle(c, isActive) {
-    if (c.color && COLOR_MAP[c.color]) {
-        // For colored canvas, use color as background with adjusted opacity
-        return `background: ${COLOR_MAP[c.color]}${isActive ? '' : '33'}; ${isActive ? 'color: white;' : `color: ${COLOR_MAP[c.color]};`}`;
-    }
-    return '';
-}
-
-function formatRelativeDate(timestamp) {
-    if (!timestamp) return '';
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-
-    const date = new Date(timestamp);
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function renderCanvasEntry(c) {
-    const isActive = c.id === state.currentCanvasId;
-    const iconStyle = getCanvasIconStyle(c, isActive);
-    const lastModified = formatRelativeDate(c.updatedAt || c.createdAt);
-    const metaText = `${c.itemCount || 0} items${lastModified ? ` · ${lastModified}` : ''}`;
-    return `
-        <div class="canvas-item-entry ${isActive ? 'active' : ''}${c.color ? ' has-color' : ''}" data-id="${c.id}" draggable="true">
-            <div class="canvas-icon${c.color ? ' colored' : ''}" data-canvas-id="${c.id}" style="${iconStyle}">${getCanvasIconHTML(c)}</div>
-            <div class="canvas-info">
-                <div class="canvas-name">${esc(c.name)}</div>
-                <div class="canvas-meta">${metaText}</div>
-            </div>
-            <div class="canvas-actions">
-                <button class="canvas-action-btn rename" title="Rename">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                </button>
-                <button class="canvas-action-btn delete" title="Delete">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-function renderGroupHTML(group, canvasesInGroup) {
-    const isCollapsed = state.collapsedGroups.has(group.id);
-    return `
-        <div class="canvas-group ${isCollapsed ? 'collapsed' : ''}" data-group-id="${group.id}">
-            <div class="canvas-group-header" data-group-id="${group.id}">
-                <svg class="group-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                <span class="group-name">${esc(group.name)}</span>
-                <div class="group-right">
-                    <span class="group-count">${canvasesInGroup.length}</span>
-                    <div class="group-actions">
-                        <button class="group-action-btn add" title="Add Canvas">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-                        </button>
-                        <button class="group-action-btn rename" title="Rename">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                        </button>
-                        <button class="group-action-btn delete" title="Delete Group">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="canvas-group-content">
-                ${canvasesInGroup.map(c => renderCanvasEntry(c)).join('')}
-            </div>
-        </div>
-    `;
-}
+// Rendering helpers are now imported from canvas-sidebar.js
+// - formatRelativeDate, getCanvasIconHTML, getCanvasIconStyle
+// - renderCanvasEntry (as renderCanvasEntryHTML), renderGroupHTML
 
 export function renderCanvasList() {
     // Separate canvases by group
@@ -880,13 +830,13 @@ export function renderCanvasList() {
 
     // Render ungrouped canvases first
     ungroupedCanvases.forEach(c => {
-        html += renderCanvasEntry(c);
+        html += renderCanvasEntryHTML(c, state.currentCanvasId);
     });
 
     // Render groups
     state.canvasGroups.forEach(group => {
         const canvasesInGroup = groupedCanvasMap.get(group.id) || [];
-        html += renderGroupHTML(group, canvasesInGroup);
+        html += renderGroupHTML(group, canvasesInGroup, state.currentCanvasId, state.collapsedGroups);
     });
 
     canvasList.innerHTML = html;
@@ -911,7 +861,9 @@ export function renderCanvasList() {
         entry.querySelector('.canvas-name')?.addEventListener('dblclick', e => { e.stopPropagation(); startRename(entry, id); }, { signal });
 
         // Drag and drop for canvases
-        setupCanvasDragDrop(entry, id, signal);
+        setupCanvasDragDrop(entry, id, signal, canvasList, (draggedId, targetId, insertBefore) => {
+            reorderCanvas(draggedId, targetId, insertBefore, saveCanvasesList, renderCanvasList);
+        });
     });
 
     // Bind group events
@@ -947,122 +899,17 @@ export function renderCanvasList() {
         }, { signal });
 
         // Drag drop for groups
-        setupGroupDragDrop(header, groupId, signal);
+        setupGroupDragDrop(header, groupId, signal, (canvasId, targetGroupId) => {
+            moveCanvasToGroup(canvasId, targetGroupId, saveCanvasesList, renderCanvasList);
+        });
     });
 
     // Bind sidebar context menu events
     bindSidebarContextEvents(signal);
 }
 
-function setupCanvasDragDrop(entry, canvasId, signal) {
-    entry.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', canvasId);
-        e.dataTransfer.effectAllowed = 'move';
-        entry.classList.add('dragging');
-        canvasList.classList.add('drag-active');
-        // Small delay to ensure drag image is captured
-        setTimeout(() => {
-            entry.style.opacity = '0.4';
-        }, 0);
-    }, { signal });
-
-    entry.addEventListener('dragend', () => {
-        entry.classList.remove('dragging');
-        entry.style.opacity = '';
-        canvasList.classList.remove('drag-active');
-        canvasList.querySelectorAll('.drag-over, .drag-over-top, .drag-over-bottom').forEach(el => {
-            el.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
-        });
-    }, { signal });
-
-    entry.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'move';
-
-        if (entry.classList.contains('dragging')) return;
-
-        // Determine if dropping above or below based on mouse position
-        const rect = entry.getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        const isAbove = e.clientY < midY;
-
-        entry.classList.remove('drag-over-top', 'drag-over-bottom');
-        entry.classList.add(isAbove ? 'drag-over-top' : 'drag-over-bottom');
-    }, { signal });
-
-    entry.addEventListener('dragenter', e => {
-        e.preventDefault();
-        e.stopPropagation();
-    }, { signal });
-
-    entry.addEventListener('dragleave', e => {
-        // Only remove classes if leaving to outside the entry
-        const relatedTarget = e.relatedTarget;
-        if (!entry.contains(relatedTarget)) {
-            entry.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
-        }
-    }, { signal });
-
-    entry.addEventListener('drop', e => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const isAbove = entry.classList.contains('drag-over-top');
-        entry.classList.remove('drag-over', 'drag-over-top', 'drag-over-bottom');
-
-        const draggedId = e.dataTransfer.getData('text/plain');
-        if (draggedId && draggedId !== canvasId) {
-            reorderCanvas(draggedId, canvasId, isAbove);
-        }
-    }, { signal });
-}
-
-function setupGroupDragDrop(header, groupId, signal) {
-    header.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    }, { signal });
-
-    header.addEventListener('dragenter', e => {
-        e.preventDefault();
-        header.classList.add('drag-over');
-    }, { signal });
-
-    header.addEventListener('dragleave', () => {
-        header.classList.remove('drag-over');
-    }, { signal });
-
-    header.addEventListener('drop', e => {
-        e.preventDefault();
-        header.classList.remove('drag-over');
-        const draggedId = e.dataTransfer.getData('text/plain');
-        if (draggedId) {
-            moveCanvasToGroup(draggedId, groupId);
-        }
-    }, { signal });
-}
-
-function reorderCanvas(draggedId, targetId, insertBefore = false) {
-    const draggedIdx = state.canvases.findIndex(c => c.id === draggedId);
-    const targetIdx = state.canvases.findIndex(c => c.id === targetId);
-
-    if (draggedIdx === -1 || targetIdx === -1 || draggedIdx === targetIdx) return;
-
-    const targetCanvas = state.canvases[targetIdx];
-    const [draggedCanvas] = state.canvases.splice(draggedIdx, 1);
-    // Match target's group
-    draggedCanvas.groupId = targetCanvas.groupId || null;
-
-    // Find where target is now after removal
-    const newTargetIdx = state.canvases.findIndex(c => c.id === targetId);
-    // Insert before or after based on drop position
-    const insertIdx = insertBefore ? newTargetIdx : newTargetIdx + 1;
-    state.canvases.splice(insertIdx, 0, draggedCanvas);
-
-    saveCanvasesList();
-    renderCanvasList();
-}
+// Drag-and-drop functions are now imported from canvas-sidebar.js
+// - setupCanvasDragDrop, setupGroupDragDrop, reorderCanvas, moveCanvasToGroup
 
 // Setup drop zone on canvas list for removing from groups
 export function setupCanvasListDropZone() {
@@ -1084,7 +931,7 @@ export function setupCanvasListDropZone() {
             const draggedId = e.dataTransfer.getData('text/plain');
             if (draggedId) {
                 // Move canvas out of any group to ungrouped
-                moveCanvasToGroup(draggedId, null);
+                moveCanvasToGroup(draggedId, null, saveCanvasesList, renderCanvasList);
             }
         }
     }, { signal });
@@ -1380,6 +1227,8 @@ export function setupMinimapResponsiveHide() {
 }
 
 // ============ Context Menu ============
+// Item context menu (right-click on canvas items)
+// Exports: copyItemToClipboard, showContextMenu, setupContextMenu
 
 // Copy item content to clipboard (for link and image items)
 export async function copyItemToClipboard(item) {
@@ -1577,6 +1426,8 @@ function finishLinkRename(item, titleEl, originalTitle) {
 }
 
 // ============ Canvas Context Menu ============
+// Context menu for empty canvas area (right-click on canvas background)
+// Exports: showCanvasContextMenu, setupCanvasContextMenu
 
 let canvasContextX = 0;
 let canvasContextY = 0;
@@ -1634,6 +1485,9 @@ export function setupCanvasContextMenu() {
 }
 
 // ============ Sidebar Context Menus ============
+// Context menus for sidebar items (canvases, groups, empty space)
+// Exports: setupSidebarContextMenus, bindSidebarContextEvents
+// Internal: hideSidebarContextMenus, positionContextMenu, showSidebar*ContextMenu, duplicateCanvas
 
 let sidebarContextTargetId = null;
 
@@ -2336,6 +2190,8 @@ export function setupLinkModal() {
 }
 
 // ============ Settings Modal ============
+// Application settings, preferences, and data import/export
+// Exports: openSettingsModal, closeSettingsModal, setupSettingsModal, applyWrapMode, applyColorDisplayMode, applyLinkPreviewMode
 
 export function openSettingsModal() {
     if (settingsModal) {
@@ -2464,52 +2320,17 @@ function updateSettingsUI() {
     }
 }
 
+// Scroll gradient helper wrappers - use shared updateScrollGradient from settings-modal.js
 function updateShortcutsScrollGradient() {
-    const wrapper = settingsModal?.querySelector('.shortcuts-scroll-wrapper');
-    if (!wrapper) return;
-
-    const scrollTop = wrapper.scrollTop;
-    const scrollHeight = wrapper.scrollHeight;
-    const clientHeight = wrapper.clientHeight;
-    const threshold = 5;
-
-    const canScrollUp = scrollTop > threshold;
-    const canScrollDown = scrollTop + clientHeight < scrollHeight - threshold;
-
-    wrapper.classList.toggle('can-scroll-up', canScrollUp);
-    wrapper.classList.toggle('can-scroll-down', canScrollDown);
+    updateScrollGradient(settingsModal?.querySelector('.shortcuts-scroll-wrapper'));
 }
 
 function updateStorageScrollGradient() {
-    const wrapper = settingsModal?.querySelector('.storage-scroll-wrapper');
-    if (!wrapper) return;
-
-    const scrollTop = wrapper.scrollTop;
-    const scrollHeight = wrapper.scrollHeight;
-    const clientHeight = wrapper.clientHeight;
-    const threshold = 5;
-
-    const canScrollUp = scrollTop > threshold;
-    const canScrollDown = scrollTop + clientHeight < scrollHeight - threshold;
-
-    wrapper.classList.toggle('can-scroll-up', canScrollUp);
-    wrapper.classList.toggle('can-scroll-down', canScrollDown);
+    updateScrollGradient(settingsModal?.querySelector('.storage-scroll-wrapper'));
 }
 
 function updateNodeStyleScrollGradient() {
-    const wrapper = settingsModal?.querySelector('.nodestyle-scroll-wrapper');
-    if (!wrapper) return;
-
-    const scrollTop = wrapper.scrollTop;
-    const scrollHeight = wrapper.scrollHeight;
-    const clientHeight = wrapper.clientHeight;
-    const threshold = 5;
-
-    const canScrollUp = scrollTop > threshold;
-    const canScrollDown = scrollTop + clientHeight < scrollHeight - threshold;
-
-    wrapper.classList.toggle('can-scroll-up', canScrollUp);
-    wrapper.classList.toggle('can-scroll-down', canScrollDown);
+    updateScrollGradient(settingsModal?.querySelector('.nodestyle-scroll-wrapper'));
 }
 
 export function setupSettingsModal() {
@@ -2759,27 +2580,7 @@ async function exportAllCanvases() {
     }
 }
 
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const base64 = reader.result.split(',')[1];
-            resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-function base64ToBlob(base64, mimeType) {
-    const byteChars = atob(base64);
-    const byteNumbers = new Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) {
-        byteNumbers[i] = byteChars.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
-}
+// blobToBase64 and base64ToBlob are now imported from settings-modal.js
 
 async function importAllCanvases(e) {
     const file = e.target.files[0];

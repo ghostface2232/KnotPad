@@ -52,3 +52,52 @@ export const MIME_TO_EXT = {
 };
 
 export const MEDIA_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov'];
+
+// ============ Item Dimensions ============
+// Default sizes and limits for canvas items
+
+export const ITEM_DIMENSIONS = {
+    // Memo
+    MEMO_DEFAULT_WIDTH: 220,
+    MEMO_MIN_HEIGHT: 140,
+    MEMO_MAX_HEIGHT: 600,
+    MEMO_PADDING: 24,
+    MEMO_EXTRA_HEIGHT: 65, // 24 + 38 + 3 (header + toolbar + padding)
+
+    // Keyword
+    KEYWORD_HEIGHT: 56,
+    KEYWORD_MIN_WIDTH: 256,
+    KEYWORD_MAX_WIDTH: 640,
+    KEYWORD_CHAR_WIDTH: 14,
+    KEYWORD_PADDING: 80,
+
+    // Link
+    LINK_WIDTH: 260,
+    LINK_HEIGHT_DEFAULT: 116,
+    LINK_HEIGHT_WITH_PREVIEW: 280,
+
+    // Common
+    EDGE_ZONE: 10, // pixels from edge that are always draggable
+};
+
+// ============ Animation Timings ============
+export const ANIMATION = {
+    DURATION: 400,
+    FADE_OUT: 150,
+    FADE_IN: 250,
+    FRAMES: 10,
+};
+
+// ============ Interaction Thresholds ============
+export const INTERACTION = {
+    CLICK_TIMEOUT: 300,
+    DBLCLICK_DELAY: 250,
+    TOOLBAR_WIDTH: 180,
+};
+
+// ============ Color Group Layout ============
+export const COLOR_GROUP_LAYOUT = {
+    HORIZONTAL_GAP: 48,
+    VERTICAL_GAP: 24,
+    SUB_COLUMN_GAP: 24,
+};
