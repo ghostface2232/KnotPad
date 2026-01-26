@@ -911,6 +911,12 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm); overflow: hidden; z-index: 50;
     cursor: pointer;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.minimap.hidden-responsive {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 .minimap-content { width: 100%; height: 100%; position: relative; }
 .minimap-viewport { position: absolute; border: 2px solid var(--accent); background: var(--accent-glow); pointer-events: none; border-radius: 2px; }

@@ -35,6 +35,7 @@ import {
     setupCanvasIconPicker,
     setupCanvasListDropZone,
     setupMinimapClick,
+    setupMinimapResponsiveHide,
     setupContextMenu,
     showContextMenu,
     setupChildTypePicker,
@@ -397,6 +398,7 @@ async function init() {
     setupConnDirectionPicker();
     setupConnectionContextMenu();
     setupMinimapClick();
+    setupMinimapResponsiveHide();
     setupContextMenu();
     setupCanvasContextMenu();
     setupSidebarContextMenus();
