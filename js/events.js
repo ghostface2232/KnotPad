@@ -466,22 +466,28 @@ export function setupPasteEvents() {
         const x = (innerWidth / 2 - state.offsetX) / state.scale - 100;
         const y = (innerHeight / 2 - state.offsetY) / state.scale - 100;
 
+        // Handle images from clipboard items
+        let imageCount = 0;
         for (let i = 0; i < cd.items.length; i++) {
             const item = cd.items[i];
             if (item.type.indexOf('image') !== -1) {
-                handleFile(item.getAsFile(), x + i * 20, y + i * 20);
-            } else if (item.kind === 'string' && item.type.indexOf('text/plain') !== -1) {
-                item.getAsString(text => {
-                    text = text.trim();
-                    if (!text) return;
-                    if (/^https?:\/\/[^ "]+$/.test(text)) {
-                        addLink(text, '', x, y);
-                    } else {
-                        addMemo(text, x, y);
-                    }
-                    saveState();
-                    triggerAutoSave();
-                });
+                handleFile(item.getAsFile(), x + imageCount * 20, y + imageCount * 20);
+                imageCount++;
+            }
+        }
+
+        // Handle text - use getData to get plain text once, avoiding duplicate memos
+        // when clipboard contains multiple text representations (e.g., text/plain + text/html)
+        if (imageCount === 0) {
+            const text = (cd.getData('text/plain') || '').trim();
+            if (text) {
+                if (/^https?:\/\/[^ "]+$/.test(text)) {
+                    addLink(text, '', x, y);
+                } else {
+                    addMemo(text, x, y);
+                }
+                saveState();
+                triggerAutoSave();
             }
         }
     }, { signal });
