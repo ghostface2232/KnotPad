@@ -257,7 +257,97 @@ function parseContent(content) {
 
 // Get HTML content from contenteditable element (direct storage, no conversion)
 function getHtmlContent(el) {
-    return el.innerHTML;
+    return normalizeMemoHtml(el.innerHTML);
+}
+
+// Normalize memo HTML so it stays stable across browser edit behaviors.
+// This prevents unexpected block wrappers and keeps formatting tags on save/load.
+function normalizeMemoHtml(html) {
+    if (!html) return '';
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+
+    // Convert paragraph-like wrappers into line breaks for a consistent storage format.
+    wrapper.querySelectorAll('div, p').forEach(block => {
+        if (block.closest('li, blockquote, h1, h2, h3')) return;
+
+        const parent = block.parentNode;
+        if (!parent) return;
+
+        while (block.firstChild) {
+            parent.insertBefore(block.firstChild, block);
+        }
+
+        if (block.nextSibling) {
+            parent.insertBefore(document.createElement('br'), block);
+        }
+        block.remove();
+    });
+
+    // Remove trailing line breaks inserted by normalization.
+    while (wrapper.lastChild && wrapper.lastChild.nodeName === 'BR') {
+        wrapper.lastChild.remove();
+    }
+
+    return wrapper.innerHTML;
+}
+
+// Keep only formatting tags supported by memo toolbar and preserve line breaks.
+function sanitizeClipboardHtml(rawHtml) {
+    if (!rawHtml) return '';
+
+    const template = document.createElement('template');
+    template.innerHTML = rawHtml;
+
+    const allowedTags = new Set([
+        'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE',
+        'H1', 'H2', 'H3', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'DIV', 'P'
+    ]);
+
+    const sanitizeNode = node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return document.createTextNode(node.textContent || '');
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            return document.createTextNode('');
+        }
+
+        const tag = node.tagName.toUpperCase();
+
+        if (!allowedTags.has(tag)) {
+            const fragment = document.createDocumentFragment();
+            node.childNodes.forEach(child => {
+                fragment.appendChild(sanitizeNode(child));
+            });
+            return fragment;
+        }
+
+        const outTag = tag === 'B' ? 'strong'
+            : tag === 'I' ? 'em'
+            : (tag === 'S' || tag === 'STRIKE') ? 'strike'
+            : tag.toLowerCase();
+
+        const clean = document.createElement(outTag);
+
+        if (node.style?.textAlign && ['left', 'center', 'right'].includes(node.style.textAlign)) {
+            clean.style.textAlign = node.style.textAlign;
+        }
+
+        node.childNodes.forEach(child => {
+            clean.appendChild(sanitizeNode(child));
+        });
+
+        return clean;
+    };
+
+    const cleaned = document.createElement('div');
+    template.content.childNodes.forEach(node => {
+        cleaned.appendChild(sanitizeNode(node));
+    });
+
+    return normalizeMemoHtml(cleaned.innerHTML);
 }
 
 // Note: External function calls are now handled via eventBus
@@ -961,7 +1051,7 @@ function setupItemEvents(item) {
         // This replaces per-item document listeners to prevent memory leaks
         initMemoToolbarDelegation();
 
-        // Block image paste in memo and only allow plain text
+        // Block image paste and preserve supported inline/block formatting from HTML clipboard
         mb.addEventListener('paste', e => {
             e.preventDefault();
             const cd = e.clipboardData;
@@ -974,10 +1064,21 @@ function setupItemEvents(item) {
                 }
             }
 
-            // Only allow plain text paste
+            const html = cd.getData('text/html');
             const text = cd.getData('text/plain');
+
+            if (html) {
+                const sanitized = sanitizeClipboardHtml(html);
+                if (sanitized) {
+                    document.execCommand('insertHTML', false, sanitized);
+                    mb.dispatchEvent(new Event('input', { bubbles: true }));
+                    return;
+                }
+            }
+
             if (text) {
                 document.execCommand('insertText', false, text);
+                mb.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }, { signal });
 
@@ -1085,7 +1186,7 @@ function setupItemEvents(item) {
                     }
 
                     // Insert new line with prefix
-                    document.execCommand('insertLineBreak', false, null);
+                    document.execCommand('insertHTML', false, '<br>');
                     document.execCommand('insertText', false, prefix);
                 }
 
@@ -1522,7 +1623,7 @@ function toggleHeading(el) {
         if (node.nodeType === Node.ELEMENT_NODE) {
             const tag = node.tagName;
             if (tag === 'H1' || tag === 'H2' || tag === 'H3') {
-                const text = node.textContent;
+                const html = node.innerHTML;
                 let newNode;
 
                 if (tag === 'H1') {
@@ -1533,7 +1634,7 @@ function toggleHeading(el) {
                     newNode = document.createElement('div');
                 }
 
-                newNode.textContent = text;
+                newNode.innerHTML = html;
                 node.parentNode.replaceChild(newNode, node);
 
                 const range = document.createRange();
