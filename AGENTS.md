@@ -304,6 +304,7 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 | `knotpad-grid-snap` | Grid snap toggle |
 | `knotpad-color-display-mode` | Color display mode (bar/fill) |
 | `knotpad-link-preview-enabled` | Link preview image toggle |
+| `knotpad-canvas-paste-formatting` | Auto-format plain text when pasting directly onto the canvas |
 | `knotpad-fs-enabled` | File System API enabled |
 
 ---

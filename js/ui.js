@@ -2462,6 +2462,12 @@ function updateSettingsUI() {
     if (linkPreviewCheckbox) {
         linkPreviewCheckbox.checked = state.linkPreviewEnabled;
     }
+
+    // Update canvas paste formatting toggle
+    const canvasPasteFormattingCheckbox = $('canvasPasteFormattingToggle');
+    if (canvasPasteFormattingCheckbox) {
+        canvasPasteFormattingCheckbox.checked = state.canvasPasteFormattingEnabled;
+    }
 }
 
 function updateShortcutsScrollGradient() {
@@ -2689,6 +2695,14 @@ export function setupSettingsModal() {
         linkPreviewCheckbox.addEventListener('change', () => {
             state.setLinkPreviewEnabled(linkPreviewCheckbox.checked);
             applyLinkPreviewMode(linkPreviewCheckbox.checked);
+        }, { signal });
+    }
+
+    // Canvas paste formatting
+    const canvasPasteFormattingCheckbox = $('canvasPasteFormattingToggle');
+    if (canvasPasteFormattingCheckbox) {
+        canvasPasteFormattingCheckbox.addEventListener('change', () => {
+            state.setCanvasPasteFormattingEnabled(canvasPasteFormattingCheckbox.checked);
         }, { signal });
     }
 }

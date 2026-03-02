@@ -18,11 +18,12 @@ const localStorageProps = {
     invertWheelZoom: 'knotpad-invert-wheel-zoom',
     gridSnap: 'knotpad-grid-snap',
     colorDisplayMode: 'knotpad-color-display-mode',
-    linkPreviewEnabled: 'knotpad-link-preview-enabled'
+    linkPreviewEnabled: 'knotpad-link-preview-enabled',
+    canvasPasteFormattingEnabled: 'knotpad-canvas-paste-formatting'
 };
 
 // Properties that are boolean in localStorage
-const booleanProps = new Set(['sidebarPinned', 'sidebarOpen', 'invertWheelZoom', 'gridSnap', 'linkPreviewEnabled']);
+const booleanProps = new Set(['sidebarPinned', 'sidebarOpen', 'invertWheelZoom', 'gridSnap', 'linkPreviewEnabled', 'canvasPasteFormattingEnabled']);
 
 // Properties that should not trigger state:changed events (internal/transient)
 const silentProps = new Set([
@@ -185,7 +186,8 @@ const initialState = {
         // New user - use new default 'fill'
         return 'fill';
     })(),
-    linkPreviewEnabled: localStorage.getItem('knotpad-link-preview-enabled') === 'true'
+    linkPreviewEnabled: localStorage.getItem('knotpad-link-preview-enabled') === 'true',
+    canvasPasteFormattingEnabled: localStorage.getItem('knotpad-canvas-paste-formatting') !== 'false'
 };
 
 // Create the reactive state
@@ -362,6 +364,7 @@ export let invertWheelZoom = state.invertWheelZoom;
 export let gridSnap = state.gridSnap;
 export let colorDisplayMode = state.colorDisplayMode;
 export let linkPreviewEnabled = state.linkPreviewEnabled;
+export let canvasPasteFormattingEnabled = state.canvasPasteFormattingEnabled;
 export let colorGroupModeActive = state.colorGroupModeActive;
 export let originalPositions = state.originalPositions;
 
@@ -415,3 +418,4 @@ export function setInvertWheelZoom(val) { state.invertWheelZoom = val; invertWhe
 export function setGridSnap(val) { state.gridSnap = val; gridSnap = val; }
 export function setColorDisplayMode(val) { state.colorDisplayMode = val; colorDisplayMode = val; }
 export function setLinkPreviewEnabled(val) { state.linkPreviewEnabled = val; linkPreviewEnabled = val; }
+export function setCanvasPasteFormattingEnabled(val) { state.canvasPasteFormattingEnabled = val; canvasPasteFormattingEnabled = val; }

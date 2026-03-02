@@ -3,7 +3,10 @@
 import { $ } from './utils.js';
 import * as state from './state.js';
 import { updateTransform, setZoom, throttledMinimap, startPan } from './viewport.js';
-import { selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading } from './items.js';
+import {
+    selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading,
+    getMemoHtmlFromClipboardData, clipboardContainsStructuredMemoContent, selectAllItems
+} from './items.js';
 import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo, deselectConnection } from './connections.js';
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
@@ -89,6 +92,9 @@ export function setupMouseEvents() {
             if (state.isSelectingText) return;
             // Don't start box selection if in connecting mode (wait for click/dblclick)
             if (state.connectSource) return;
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
+            document.body.classList.add('is-box-selecting');
             if (!e.shiftKey) deselectAll();
             state.setIsSelecting(true);
             state.setSelStartX(e.clientX);
@@ -249,6 +255,7 @@ export function setupMouseEvents() {
             state.setIsSelecting(false);
             const sb = selectionBox.getBoundingClientRect();
             selectionBox.style.display = 'none';
+            document.body.classList.remove('is-box-selecting');
 
             if (sb.width > 2 && sb.height > 2) {
                 const rect = app.getBoundingClientRect();
@@ -264,6 +271,7 @@ export function setupMouseEvents() {
                 });
             }
         }
+        document.body.classList.remove('is-box-selecting');
 
         if (state.draggedItem || state.resizingItem) {
             if (state.draggedItem) {
@@ -291,6 +299,11 @@ export function setupKeyboardEvents() {
     const { signal } = keyboardEventsController;
 
     document.addEventListener('keydown', e => {
+        const isEditableTarget = e.target instanceof Element && (
+            e.target.matches('input,textarea,[contenteditable="true"]') ||
+            e.target.closest('[contenteditable="true"]')
+        );
+
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
             return;
@@ -308,6 +321,11 @@ export function setupKeyboardEvents() {
         if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
             e.preventDefault();
             redo();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && !isEditableTarget) {
+            e.preventDefault();
+            selectAllItems();
             return;
         }
         // Ctrl+D for strikethrough in contenteditable
@@ -405,6 +423,8 @@ export function setupDragDropEvents() {
 
 // ============ Copy Events ============
 
+const KNOTPAD_MEMO_CLIPBOARD_MARKER = '<!--KNOTPAD_MEMO-->';
+
 export function setupCopyEvents() {
     if (copyEventsController) copyEventsController.abort();
     copyEventsController = new AbortController();
@@ -412,7 +432,10 @@ export function setupCopyEvents() {
 
     window.addEventListener('copy', e => {
         // Check if there are selected link/image items and not editing text
-        const isEditing = e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]');
+        const editableRoot = e.target.matches('[contenteditable="true"]')
+            ? e.target
+            : e.target.closest('[contenteditable="true"]');
+        const isEditing = Boolean(editableRoot);
 
         if (!isEditing && state.selectedItems.size > 0) {
             // Get first selected item that is link or image
@@ -427,18 +450,30 @@ export function setupCopyEvents() {
             }
         }
 
-        // Original contenteditable copy behavior
-        if (!isEditing) return;
+        // Preserve canonical memo HTML for in-app memo copy/paste without affecting external paste rules.
+        const memoBody = editableRoot?.closest('.memo-body');
+        if (memoBody) {
+            const sel = window.getSelection();
+            if (!sel.rangeCount || sel.isCollapsed) return;
 
-        const sel = window.getSelection();
-        if (!sel.rangeCount || sel.isCollapsed) return;
+            const plainText = sel.toString();
+            if (!plainText) return;
 
-        // Get plain text from selection
-        const plainText = sel.toString();
-        if (!plainText) return;
+            const fragment = sel.getRangeAt(0).cloneContents();
+            const container = document.createElement('div');
+            container.appendChild(fragment);
+            const html = container.innerHTML;
+            if (!html) return;
 
-        e.preventDefault();
-        e.clipboardData.setData('text/plain', plainText);
+            e.preventDefault();
+            e.clipboardData.setData('text/plain', plainText);
+            e.clipboardData.setData('text/html', KNOTPAD_MEMO_CLIPBOARD_MARKER + html);
+            e.clipboardData.setData('application/x-knotpad-memo', html);
+            return;
+        }
+
+        // Let the browser handle other contenteditable copy so native clipboard formats are preserved.
+        if (isEditing) return;
     }, { signal });
 }
 
@@ -479,12 +514,19 @@ export function setupPasteEvents() {
         // Handle text - use getData to get plain text once, avoiding duplicate memos
         // when clipboard contains multiple text representations (e.g., text/plain + text/html)
         if (imageCount === 0) {
-            const text = (cd.getData('text/plain') || '').trim();
-            if (text) {
-                if (/^https?:\/\/[^ "]+$/.test(text)) {
-                    addLink(text, '', x, y);
+            const text = cd.getData('text/plain') || '';
+            const trimmedText = text.trim();
+            const memoHtml = getMemoHtmlFromClipboardData(cd, {
+                preferPlainText: false,
+                enablePlainTextFormatting: state.canvasPasteFormattingEnabled
+            });
+            const hasStructuredContent = clipboardContainsStructuredMemoContent(cd);
+
+            if (memoHtml || trimmedText) {
+                if (/^https?:\/\/[^ "]+$/.test(trimmedText) && !hasStructuredContent) {
+                    addLink(trimmedText, '', x, y);
                 } else {
-                    addMemo(text, x, y);
+                    addMemo(memoHtml || text, x, y);
                 }
                 saveState();
                 triggerAutoSave();

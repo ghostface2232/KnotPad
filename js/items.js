@@ -8,6 +8,8 @@ import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle, loadMedia, l
 import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
+const ZERO_WIDTH_SPACE = '\u200B';
+const KNOTPAD_MEMO_CLIPBOARD_MARKER = '<!--KNOTPAD_MEMO-->';
 
 // ============ Favicon Fallback ============
 // Globe icon SVG as data URI for when favicon fails to load
@@ -199,13 +201,13 @@ function isLegacyMarkdown(text) {
     // If it contains HTML tags, it's already HTML
     if (/<[a-z][\s\S]*>/i.test(text)) return false;
     // If it has markdown patterns, it's legacy markdown
-    return /^#{1,3} |^\d+\. |^- |\*\*|\*[^*]+\*|~~|__|\n/.test(text);
+    return /^#{1,3} |^\d+\. |^[-*] |\*\*|\*[^*]+\*|~~|__|\n/.test(text);
 }
 
 // Convert legacy markdown to HTML (for migration only)
 function migrateLegacyMarkdown(text) {
     if (!text) return '';
-    let html = esc(text);
+    let html = esc(text).replace(/\r\n?/g, '\n');
 
     // Headings: # ## ###
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
@@ -231,14 +233,17 @@ function migrateLegacyMarkdown(text) {
     html = html.replace(/__(.+?)__/g, '<u>$1</u>');
 
     // Unordered list: - item
-    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+    html = html.replace(/^[-*] (.+)$/gm, '<li data-list="ul">$1</li>');
 
     // Ordered list: 1. item
-    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/^(\d+)\. (.+)$/gm, '<li data-list="ol" value="$1">$2</li>');
+    html = html.replace(/((?:<li data-list="ul"[^>]*>.*<\/li>(?:\n(?=<li data-list="ul"[^>]*>)|))+)/g, '<ul>$1</ul>');
+    html = html.replace(/((?:<li data-list="ol"[^>]*>.*<\/li>(?:\n(?=<li data-list="ol"[^>]*>)|))+)/g, '<ol>$1</ol>');
+    html = html.replace(/ data-list="(?:ul|ol)"/g, '');
+    html = html.replace(/<\/li>\n<li/g, '</li><li');
 
     // Line breaks
-    html = html.replace(/(<\/(h1|h2|h3|blockquote)>|<hr>)\n/g, '$1');
+    html = html.replace(/(<\/(h1|h2|h3|blockquote|ul|ol)>|<hr>)\n/g, '$1');
     html = html.replace(/\n/g, '<br>');
     html = html.replace(/<\/blockquote><br><blockquote>/g, '</blockquote><blockquote>');
     html = html.replace(/^(<br>)+/, '');
@@ -246,18 +251,517 @@ function migrateLegacyMarkdown(text) {
     return html;
 }
 
+function convertPlainTextToMemoHtml(text, enableAutoFormatting = true) {
+    if (!text) return '';
+    const normalizedText = text.replace(/\r\n?/g, '\n');
+    if (!enableAutoFormatting || !isLegacyMarkdown(normalizedText)) {
+        return memoPlainTextToHtml(normalizedText);
+    }
+    return migrateLegacyMarkdown(normalizedText);
+}
+
 // Parse content - migrate legacy markdown or return HTML as-is
 function parseContent(content) {
     if (!content) return '';
-    if (isLegacyMarkdown(content)) {
-        return migrateLegacyMarkdown(content);
+    if (/<[a-z][\s\S]*>/i.test(content)) {
+        return normalizeMemoHtml(content);
     }
-    return content; // Already HTML, return as-is
+    return normalizeMemoHtml(convertPlainTextToMemoHtml(content));
 }
 
 // Get HTML content from contenteditable element (direct storage, no conversion)
 function getHtmlContent(el) {
     return normalizeMemoHtml(el.innerHTML);
+}
+
+function isWhitespaceOnlyTextNode(node) {
+    return node?.nodeType === Node.TEXT_NODE && !/\S/.test(node.textContent || '');
+}
+
+function hasSupportedTextAlign(node) {
+    return Boolean(node?.style?.textAlign && ['left', 'center', 'right'].includes(node.style.textAlign));
+}
+
+function getOverlayCounterScale() {
+    const rawScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--counter-scale-soft'));
+    return Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1;
+}
+
+function extractInternalMemoClipboardHtml(rawHtml) {
+    if (!rawHtml || !rawHtml.includes(KNOTPAD_MEMO_CLIPBOARD_MARKER)) return '';
+    return rawHtml.replace(KNOTPAD_MEMO_CLIPBOARD_MARKER, '');
+}
+
+function wrapTopLevelLineInDiv(root, node) {
+    let current = node;
+    while (current && current !== root && current.parentNode !== root) {
+        current = current.parentNode;
+    }
+
+    if (!current || current === root || current.nodeName === 'BR') return null;
+
+    let lineStart = current;
+    while (lineStart.previousSibling && lineStart.previousSibling.nodeName !== 'BR') {
+        lineStart = lineStart.previousSibling;
+    }
+
+    let lineEnd = current;
+    while (lineEnd.nextSibling && lineEnd.nextSibling.nodeName !== 'BR') {
+        lineEnd = lineEnd.nextSibling;
+    }
+
+    const trailingBreak = lineEnd.nextSibling?.nodeName === 'BR' ? lineEnd.nextSibling : null;
+    const div = document.createElement('div');
+    lineStart.parentNode.insertBefore(div, lineStart);
+
+    let movingNode = lineStart;
+    const stopNode = trailingBreak || lineEnd.nextSibling;
+    while (movingNode && movingNode !== stopNode) {
+        const nextNode = movingNode.nextSibling;
+        div.appendChild(movingNode);
+        movingNode = nextNode;
+    }
+
+    if (trailingBreak) {
+        trailingBreak.remove();
+    }
+
+    return div;
+}
+
+function getNextMeaningfulSibling(node) {
+    let sibling = node?.nextSibling || null;
+    while (sibling && isWhitespaceOnlyTextNode(sibling)) {
+        sibling = sibling.nextSibling;
+    }
+    return sibling;
+}
+
+function normalizeTextNodeLineBreaks(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+
+    while (walker.nextNode()) {
+        const textNode = walker.currentNode;
+        const rawText = textNode.textContent || '';
+        const text = rawText.replace(/\u200B/g, '');
+
+        if (text !== rawText) {
+            textNode.textContent = text;
+        }
+
+        if (/[\r\n]/.test(text) && /\S/.test(text)) {
+            textNodes.push(textNode);
+        }
+    }
+
+    textNodes.forEach(textNode => {
+        const parent = textNode.parentNode;
+        if (!parent) return;
+
+        const normalizedText = (textNode.textContent || '').replace(/\r\n?/g, '\n');
+        const parts = normalizedText.split('\n');
+        if (parts.length === 1) return;
+
+        const fragment = document.createDocumentFragment();
+        parts.forEach((part, index) => {
+            if (part) {
+                fragment.appendChild(document.createTextNode(part));
+            }
+            if (index < parts.length - 1) {
+                fragment.appendChild(document.createElement('br'));
+            }
+        });
+
+        parent.replaceChild(fragment, textNode);
+    });
+}
+
+function memoPlainTextToHtml(text) {
+    if (!text) return '';
+    return esc(text)
+        .replace(/\r\n?/g, '\n')
+        .replace(/\n/g, '<br>');
+}
+
+function stripMemoEditorArtifacts(text) {
+    return (text || '').replace(/\u200B/g, '').replace(/\u00A0/g, ' ');
+}
+
+function getMemoTextBeforeCaret(editor) {
+    const range = getMemoSelectionRange(editor);
+    if (!range) return '';
+
+    const prefixRange = document.createRange();
+    prefixRange.selectNodeContents(editor);
+    prefixRange.setEnd(range.startContainer, range.startOffset);
+
+    const container = document.createElement('div');
+    container.appendChild(prefixRange.cloneContents());
+
+    container.querySelectorAll('br').forEach(br => {
+        br.replaceWith(document.createTextNode('\n'));
+    });
+
+    container.querySelectorAll('hr').forEach(hr => {
+        hr.replaceWith(document.createTextNode('\n'));
+    });
+
+    container.querySelectorAll('div, p, li, h1, h2, h3, blockquote').forEach(block => {
+        const next = block.nextSibling;
+        if (!(next?.nodeType === Node.TEXT_NODE && next.textContent?.startsWith('\n'))) {
+            block.after(document.createTextNode('\n'));
+        }
+    });
+
+    return stripMemoEditorArtifacts(container.textContent || '').replace(/\r\n?/g, '\n');
+}
+
+function getPlainTextListContext(editor) {
+    const textBeforeCaret = getMemoTextBeforeCaret(editor);
+    const lines = textBeforeCaret.split('\n');
+    const currentLine = lines[lines.length - 1] || '';
+    const currentOrderedMatch = currentLine.match(/^(\d+)\.(?:\s|$)/);
+    const currentUnorderedMatch = currentLine.match(/^([-*])(?:\s|$)/);
+
+    if (currentOrderedMatch || currentUnorderedMatch) {
+        return {
+            currentLine,
+            sourceLine: currentLine,
+            orderedMatch: currentOrderedMatch,
+            unorderedMatch: currentUnorderedMatch,
+            isDirectMatch: true
+        };
+    }
+
+    for (let i = lines.length - 2; i >= 0; i--) {
+        const line = lines[i];
+        if (!line.trim()) break;
+
+        const orderedMatch = line.match(/^(\d+)\.(?:\s|$)/);
+        const unorderedMatch = line.match(/^([-*])(?:\s|$)/);
+
+        if (orderedMatch || unorderedMatch) {
+            return {
+                currentLine,
+                sourceLine: line,
+                orderedMatch,
+                unorderedMatch,
+                isDirectMatch: false
+            };
+        }
+    }
+
+    return null;
+}
+
+function getMemoSelectionRange(editor) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+
+    const range = sel.getRangeAt(0);
+    const containsNode = node => node && (node === editor || editor.contains(node));
+    if (!containsNode(range.startContainer) || !containsNode(range.endContainer)) {
+        return null;
+    }
+
+    return range;
+}
+
+function insertMemoHtmlAtSelection(editor, html) {
+    if (!html) return false;
+
+    const range = getMemoSelectionRange(editor);
+    if (!range) return false;
+
+    range.deleteContents();
+    const fragment = range.createContextualFragment(html);
+    const lastNode = fragment.lastChild;
+    if (!lastNode) return false;
+
+    range.insertNode(fragment);
+
+    const sel = window.getSelection();
+    const caretRange = document.createRange();
+
+    if (lastNode.nodeType === Node.ELEMENT_NODE && lastNode.nodeName === 'BR' && !getNextMeaningfulSibling(lastNode)) {
+        const placeholder = document.createTextNode(ZERO_WIDTH_SPACE);
+        lastNode.parentNode.insertBefore(placeholder, lastNode.nextSibling);
+        caretRange.setStart(placeholder, 0);
+    } else {
+        caretRange.setStartAfter(lastNode);
+    }
+
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+
+    return true;
+}
+
+function insertMemoLineBreakAtSelection(editor, prefix = '') {
+    const range = getMemoSelectionRange(editor);
+    if (!range) return false;
+
+    range.deleteContents();
+
+    const fragment = document.createDocumentFragment();
+    const br = document.createElement('br');
+    const caretText = document.createTextNode(prefix + ZERO_WIDTH_SPACE);
+
+    fragment.appendChild(br);
+    fragment.appendChild(caretText);
+    range.insertNode(fragment);
+
+    const sel = window.getSelection();
+    const caretRange = document.createRange();
+    caretRange.setStart(caretText, prefix.length);
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+
+    return true;
+}
+
+function getTopLevelAlignedBlockAtSelection(editor) {
+    const range = getMemoSelectionRange(editor);
+    if (!range) return null;
+
+    let node = range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? range.startContainer
+        : range.startContainer.parentNode;
+
+    while (node && node !== editor) {
+        if (node.parentNode === editor && node.nodeType === Node.ELEMENT_NODE && hasSupportedTextAlign(node)) {
+            return node;
+        }
+        node = node.parentNode;
+    }
+
+    return null;
+}
+
+function insertAlignedBlockBreakAtSelection(editor) {
+    const range = getMemoSelectionRange(editor);
+    if (!range || !range.collapsed) return false;
+
+    const block = getTopLevelAlignedBlockAtSelection(editor);
+    if (!block) return false;
+
+    const trailingRange = document.createRange();
+    trailingRange.selectNodeContents(block);
+    trailingRange.setStart(range.startContainer, range.startOffset);
+
+    // Only create a new aligned sibling when the caret is already at the end of the block.
+    // Otherwise the normal line-break path should continue handling inline breaks.
+    if (!trailingRange.collapsed) {
+        return false;
+    }
+
+    const newBlock = block.cloneNode(false);
+    newBlock.textContent = '';
+
+    const placeholder = document.createTextNode(ZERO_WIDTH_SPACE);
+    newBlock.appendChild(placeholder);
+    block.parentNode.insertBefore(newBlock, block.nextSibling);
+
+    const sel = window.getSelection();
+    const caretRange = document.createRange();
+    caretRange.setStart(placeholder, 0);
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+
+    return true;
+}
+
+function deleteCharactersBeforeCaret(editor, count) {
+    if (!count) return false;
+
+    const range = getMemoSelectionRange(editor);
+    if (!range || !range.collapsed) return false;
+
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return false;
+
+    const text = node.textContent || '';
+    const startOffset = Math.max(0, range.startOffset - count);
+    node.textContent = text.slice(0, startOffset) + text.slice(range.startOffset);
+
+    const sel = window.getSelection();
+    const caretRange = document.createRange();
+    caretRange.setStart(node, startOffset);
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+
+    return true;
+}
+
+function hasSemanticClipboardFormatting(rawHtml) {
+    if (!rawHtml) return false;
+
+    const template = document.createElement('template');
+    template.innerHTML = rawHtml;
+
+    return Boolean(template.content.querySelector('strong, b, em, i, u, s, strike, h1, h2, h3, blockquote, ul, ol, li, hr'));
+}
+
+function getListItemAtSelection(editor) {
+    const range = getMemoSelectionRange(editor);
+    if (!range) return null;
+
+    let node = range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? range.startContainer
+        : range.startContainer.parentNode;
+
+    while (node && node !== editor) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'LI') {
+            return node;
+        }
+        node = node.parentNode;
+    }
+
+    return null;
+}
+
+function isSelectionInsideListItem(editor) {
+    return Boolean(getListItemAtSelection(editor));
+}
+
+function getOrderedListNumber(listItem) {
+    if (!listItem || listItem.tagName !== 'LI') return 1;
+
+    const explicitValue = parseInt(listItem.getAttribute('value') || '', 10);
+    if (!Number.isNaN(explicitValue)) {
+        return explicitValue;
+    }
+
+    let previous = listItem.previousElementSibling;
+    while (previous) {
+        if (previous.tagName === 'LI') {
+            return getOrderedListNumber(previous) + 1;
+        }
+        previous = previous.previousElementSibling;
+    }
+
+    const list = listItem.parentElement;
+    const startValue = parseInt(list?.getAttribute('start') || '1', 10);
+    return Number.isNaN(startValue) ? 1 : startValue;
+}
+
+function renumberOrderedListFrom(listItem, startValue) {
+    if (!listItem) return;
+
+    let current = listItem;
+    let value = startValue;
+
+    while (current) {
+        if (current.tagName === 'LI') {
+            current.setAttribute('value', String(value));
+            value += 1;
+        }
+        current = current.nextElementSibling;
+    }
+}
+
+function trimListItemBoundaryNodes(listItem) {
+    if (!listItem) return;
+
+    while (listItem.firstChild) {
+        const first = listItem.firstChild;
+        if (first.nodeType === Node.TEXT_NODE && !stripMemoEditorArtifacts(first.textContent).trim()) {
+            first.remove();
+            continue;
+        }
+        if (first.nodeType === Node.ELEMENT_NODE && first.nodeName === 'BR') {
+            first.remove();
+            continue;
+        }
+        break;
+    }
+
+    while (listItem.lastChild) {
+        const last = listItem.lastChild;
+        if (last.nodeType === Node.TEXT_NODE && !stripMemoEditorArtifacts(last.textContent).trim()) {
+            last.remove();
+            continue;
+        }
+        if (last.nodeType === Node.ELEMENT_NODE && last.nodeName === 'BR') {
+            last.remove();
+            continue;
+        }
+        break;
+    }
+}
+
+function placeCaretAtStart(container) {
+    if (!container) return false;
+
+    if (!container.firstChild) {
+        container.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+    }
+
+    const sel = window.getSelection();
+    const caretRange = document.createRange();
+    const first = container.firstChild;
+
+    if (first.nodeType === Node.TEXT_NODE) {
+        caretRange.setStart(first, 0);
+    } else {
+        caretRange.setStart(container, 0);
+    }
+
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+
+    return true;
+}
+
+function insertListItemAfterCurrent(editor, currentListItem) {
+    if (!currentListItem?.parentElement) return false;
+
+    const selectionRange = getMemoSelectionRange(editor);
+    if (!selectionRange) return false;
+
+    if (!selectionRange.collapsed) {
+        selectionRange.deleteContents();
+    }
+
+    const range = getMemoSelectionRange(editor);
+    if (!range) return false;
+
+    const list = currentListItem.parentElement;
+    const splitRange = document.createRange();
+    splitRange.selectNodeContents(currentListItem);
+    splitRange.setStart(range.startContainer, range.startOffset);
+
+    const movedContent = splitRange.extractContents();
+    const newListItem = document.createElement('li');
+
+    if (movedContent.childNodes.length > 0) {
+        newListItem.appendChild(movedContent);
+    }
+
+    trimListItemBoundaryNodes(currentListItem);
+    trimListItemBoundaryNodes(newListItem);
+
+    if (!newListItem.firstChild) {
+        newListItem.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+    }
+
+    if (currentListItem.nextSibling) {
+        list.insertBefore(newListItem, currentListItem.nextSibling);
+    } else {
+        list.appendChild(newListItem);
+    }
+
+    if (list.tagName === 'OL') {
+        renumberOrderedListFrom(newListItem, getOrderedListNumber(currentListItem) + 1);
+    }
+
+    return placeCaretAtStart(newListItem);
 }
 
 // Normalize memo HTML so it stays stable across browser edit behaviors.
@@ -267,10 +771,23 @@ function normalizeMemoHtml(html) {
 
     const wrapper = document.createElement('div');
     wrapper.innerHTML = html;
+    normalizeTextNodeLineBreaks(wrapper);
 
     // Convert paragraph-like wrappers into line breaks for a consistent storage format.
     wrapper.querySelectorAll('div, p').forEach(block => {
         if (block.closest('li, blockquote, h1, h2, h3')) return;
+
+        if (hasSupportedTextAlign(block)) {
+            if (block.tagName === 'P') {
+                const alignedDiv = document.createElement('div');
+                alignedDiv.style.textAlign = block.style.textAlign;
+                while (block.firstChild) {
+                    alignedDiv.appendChild(block.firstChild);
+                }
+                block.parentNode?.replaceChild(alignedDiv, block);
+            }
+            return;
+        }
 
         const parent = block.parentNode;
         if (!parent) return;
@@ -279,16 +796,11 @@ function normalizeMemoHtml(html) {
             parent.insertBefore(block.firstChild, block);
         }
 
-        if (block.nextSibling) {
+        if (getNextMeaningfulSibling(block)) {
             parent.insertBefore(document.createElement('br'), block);
         }
         block.remove();
     });
-
-    // Remove trailing line breaks inserted by normalization.
-    while (wrapper.lastChild && wrapper.lastChild.nodeName === 'BR') {
-        wrapper.lastChild.remove();
-    }
 
     return wrapper.innerHTML;
 }
@@ -302,12 +814,15 @@ function sanitizeClipboardHtml(rawHtml) {
 
     const allowedTags = new Set([
         'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE',
-        'H1', 'H2', 'H3', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'DIV', 'P'
+        'H1', 'H2', 'H3', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'DIV', 'P', 'HR'
     ]);
 
     const sanitizeNode = node => {
         if (node.nodeType === Node.TEXT_NODE) {
-            return document.createTextNode(node.textContent || '');
+            const text = (node.textContent || '')
+                .replace(/\r\n?/g, '\n')
+                .replace(/[\n\t]+/g, ' ');
+            return document.createTextNode(text);
         }
 
         if (node.nodeType !== Node.ELEMENT_NODE) {
@@ -335,6 +850,14 @@ function sanitizeClipboardHtml(rawHtml) {
             clean.style.textAlign = node.style.textAlign;
         }
 
+        if (outTag === 'ol' && node.hasAttribute('start')) {
+            clean.setAttribute('start', node.getAttribute('start'));
+        }
+
+        if (outTag === 'li' && node.hasAttribute('value')) {
+            clean.setAttribute('value', node.getAttribute('value'));
+        }
+
         node.childNodes.forEach(child => {
             clean.appendChild(sanitizeNode(child));
         });
@@ -348,6 +871,79 @@ function sanitizeClipboardHtml(rawHtml) {
     });
 
     return normalizeMemoHtml(cleaned.innerHTML);
+}
+
+function extractPlainTextFromMemoHtml(content) {
+    if (!content) return '';
+
+    if (!/<[a-z][\s\S]*>/i.test(content)) {
+        return content.replace(/\r\n?/g, '\n');
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = content;
+
+    wrapper.querySelectorAll('br').forEach(br => {
+        br.replaceWith(document.createTextNode('\n'));
+    });
+    wrapper.querySelectorAll('hr').forEach(hr => {
+        hr.replaceWith(document.createTextNode('\n'));
+    });
+    wrapper.querySelectorAll('div, p, li, h1, h2, h3, blockquote').forEach(block => {
+        if (!block.nextSibling || block.nextSibling.nodeType !== Node.TEXT_NODE || !block.nextSibling.textContent.startsWith('\n')) {
+            block.after(document.createTextNode('\n'));
+        }
+    });
+
+    return stripMemoEditorArtifacts(wrapper.textContent || '').replace(/\r\n?/g, '\n');
+}
+
+export function getMemoHtmlFromClipboardData(clipboardData, options = {}) {
+    if (!clipboardData) return '';
+
+    const {
+        preferPlainText = true,
+        enablePlainTextFormatting = true
+    } = options;
+
+    const internalHtml = clipboardData.getData('application/x-knotpad-memo');
+    if (internalHtml) {
+        return normalizeMemoHtml(internalHtml);
+    }
+
+    const rawHtml = clipboardData.getData('text/html');
+    const markedInternalHtml = extractInternalMemoClipboardHtml(rawHtml);
+    if (markedInternalHtml) {
+        return normalizeMemoHtml(markedInternalHtml);
+    }
+
+    const text = clipboardData.getData('text/plain');
+    const plainTextHtml = text
+        ? convertPlainTextToMemoHtml(text, enablePlainTextFormatting)
+        : '';
+    const semanticHtml = rawHtml && hasSemanticClipboardFormatting(rawHtml)
+        ? sanitizeClipboardHtml(rawHtml)
+        : '';
+
+    return preferPlainText
+        ? (plainTextHtml || semanticHtml)
+        : (semanticHtml || plainTextHtml);
+}
+
+export function clipboardContainsStructuredMemoContent(clipboardData) {
+    if (!clipboardData) return false;
+
+    const internalHtml = clipboardData.getData('application/x-knotpad-memo');
+    if (internalHtml) return true;
+
+    const rawHtml = clipboardData.getData('text/html');
+    if (!rawHtml) return false;
+
+    if (extractInternalMemoClipboardHtml(rawHtml)) {
+        return true;
+    }
+
+    return hasSemanticClipboardFormatting(rawHtml);
 }
 
 // Note: External function calls are now handled via eventBus
@@ -953,11 +1549,11 @@ function setupItemEvents(item) {
             toolbar.style.left = '-9999px';
             toolbar.style.top = '-9999px';
             toolbar.classList.add('active');
-            const toolbarHeight = toolbar.offsetHeight || 40;
-
-            const toolbarWidth = 180; // Approximate toolbar width
-            let left = rect.left + (rect.width / 3) - (toolbarWidth / 3);
-            let top = rect.top - toolbarHeight - 28;
+            const toolbarScale = getOverlayCounterScale();
+            const toolbarHeight = (toolbar.offsetHeight || 40) * toolbarScale;
+            const toolbarWidth = (toolbar.offsetWidth || 180) * toolbarScale;
+            let left = rect.left + (rect.width / 2) - (toolbarWidth / 2);
+            let top = rect.top - toolbarHeight - 12;
 
             // Keep toolbar within viewport
             if (left < 8) left = 8;
@@ -1051,7 +1647,8 @@ function setupItemEvents(item) {
         // This replaces per-item document listeners to prevent memory leaks
         initMemoToolbarDelegation();
 
-        // Block image paste and preserve supported inline/block formatting from HTML clipboard
+        // Prefer canonical plain text so memo paste matches canvas paste line-for-line.
+        // Fall back to sanitized semantic HTML only when plain text is unavailable.
         mb.addEventListener('paste', e => {
             e.preventDefault();
             const cd = e.clipboardData;
@@ -1064,32 +1661,84 @@ function setupItemEvents(item) {
                 }
             }
 
-            const html = cd.getData('text/html');
-            const text = cd.getData('text/plain');
+            const memoHtml = getMemoHtmlFromClipboardData(cd, {
+                preferPlainText: true,
+                enablePlainTextFormatting: true
+            });
 
-            if (html) {
-                const sanitized = sanitizeClipboardHtml(html);
-                if (sanitized) {
-                    document.execCommand('insertHTML', false, sanitized);
-                    mb.dispatchEvent(new Event('input', { bubbles: true }));
-                    return;
-                }
+            if (memoHtml && insertMemoHtmlAtSelection(mb, memoHtml)) {
+                mb.dispatchEvent(new Event('input', { bubbles: true }));
+                return;
             }
 
-            if (text) {
-                document.execCommand('insertText', false, text);
+            const fallbackHtml = cd.getData('text/html');
+            if (fallbackHtml && hasSemanticClipboardFormatting(fallbackHtml)) {
+                const sanitized = sanitizeClipboardHtml(fallbackHtml);
+                if (sanitized && insertMemoHtmlAtSelection(mb, sanitized)) {
+                    mb.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        }, { signal });
+
+        // Lists are more reliable when handled at beforeinput time than keydown.
+        // This avoids browser-specific contenteditable list behavior after Shift+Enter.
+        mb.addEventListener('beforeinput', e => {
+            if (e.inputType !== 'insertParagraph' && e.inputType !== 'insertLineBreak') return;
+
+            const activeListItem = getListItemAtSelection(mb);
+            if (!activeListItem) return;
+
+            const range = getMemoSelectionRange(mb);
+            if (!range) return;
+
+            if (e.inputType === 'insertLineBreak') {
+                e.preventDefault();
+                if (insertMemoLineBreakAtSelection(mb)) {
+                    mb.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                return;
+            }
+
+            const listText = stripMemoEditorArtifacts(activeListItem.textContent).trim();
+            if (!listText) {
+                return;
+            }
+
+            e.preventDefault();
+            if (insertListItemAfterCurrent(mb, activeListItem)) {
                 mb.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }, { signal });
 
         // Auto list formatting on Enter key
         mb.addEventListener('keydown', e => {
-            if (e.key !== 'Enter' || e.shiftKey) return;
+            if (e.key !== 'Enter') return;
+
+            if (e.isComposing) {
+                return;
+            }
+
+            if (getListItemAtSelection(mb)) {
+                return;
+            }
+
+            if (e.shiftKey) {
+                e.preventDefault();
+                if (insertMemoLineBreakAtSelection(mb)) {
+                    mb.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                return;
+            }
+
+            e.preventDefault();
 
             // Skip list continuation if we just cancelled a list
             if (mb._listCancelled) {
                 delete mb._listCancelled;
-                return; // Allow default Enter behavior
+                if (insertAlignedBlockBreakAtSelection(mb) || insertMemoLineBreakAtSelection(mb)) {
+                    mb.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                return;
             }
 
             const sel = window.getSelection();
@@ -1144,19 +1793,18 @@ function setupItemEvents(item) {
                 lineText = lineNode.textContent;
             }
 
-            // Check for list patterns
-            // Ordered list: "1. ", "2. ", "10. ", etc.
-            const orderedMatch = lineText.match(/^(\d+)\.\s/);
-            // Unordered list: "- " or "* "
-            const unorderedMatch = lineText.match(/^([-*])\s/);
+            lineText = stripMemoEditorArtifacts(lineText);
+
+            const listContext = getPlainTextListContext(mb);
+            const orderedMatch = listContext?.orderedMatch || null;
+            const unorderedMatch = listContext?.unorderedMatch || null;
 
             if (orderedMatch || unorderedMatch) {
-                e.preventDefault();
-
                 // Check if the line only contains the list marker (empty item)
+                const trimmedLineText = (listContext?.currentLine ?? lineText).trim();
                 const isEmptyItem = orderedMatch
-                    ? lineText.trim() === orderedMatch[1] + '.'
-                    : lineText.trim() === unorderedMatch[1];
+                    ? listContext?.isDirectMatch && trimmedLineText === orderedMatch[1] + '.'
+                    : listContext?.isDirectMatch && trimmedLineText === unorderedMatch[1];
 
                 if (isEmptyItem) {
                     // Double enter - remove the list marker and exit list mode
@@ -1165,11 +1813,7 @@ function setupItemEvents(item) {
                         ? orderedMatch[0].length  // "1. " or "10. " etc.
                         : unorderedMatch[0].length;  // "- " or "* "
 
-                    // Delete the prefix characters backwards using execCommand
-                    // This keeps cursor position stable
-                    for (let i = 0; i < prefixLen; i++) {
-                        document.execCommand('delete', false, null);
-                    }
+                    deleteCharactersBeforeCaret(mb, prefixLen);
 
                     // Set flag to prevent list from reappearing on next Enter
                     mb._listCancelled = true;
@@ -1186,10 +1830,15 @@ function setupItemEvents(item) {
                     }
 
                     // Insert new line with prefix
-                    document.execCommand('insertHTML', false, '<br>');
-                    document.execCommand('insertText', false, prefix);
+                    insertMemoLineBreakAtSelection(mb, prefix);
                 }
 
+                // Trigger input event for saving
+                mb.dispatchEvent(new Event('input', { bubbles: true }));
+                return;
+            }
+
+            if (insertAlignedBlockBreakAtSelection(mb) || insertMemoLineBreakAtSelection(mb)) {
                 // Trigger input event for saving
                 mb.dispatchEvent(new Event('input', { bubbles: true }));
             }
@@ -1546,10 +2195,7 @@ function setAlignment(el, alignment) {
         if (current && current.parentNode === el) {
             if (current.nodeType === Node.TEXT_NODE ||
                 (current.nodeType === Node.ELEMENT_NODE && !blockTags.includes(current.tagName))) {
-                const div = document.createElement('div');
-                current.parentNode.insertBefore(div, current);
-                div.appendChild(current);
-                return div;
+                return wrapTopLevelLineInDiv(el, current);
             }
         }
         return null;
@@ -1595,9 +2241,11 @@ function setAlignment(el, alignment) {
     }
 
     // Apply alignment to all found blocks
+    let lastAlignedBlock = null;
     blocksToAlign.forEach(block => {
         // Always set textAlign explicitly to ensure it overrides any CSS inheritance
         block.style.textAlign = alignment;
+        lastAlignedBlock = block;
     });
 
     // If no blocks found, create a div wrapper for the entire content
@@ -1610,6 +2258,15 @@ function setAlignment(el, alignment) {
         } else if (alignment === 'right') {
             document.execCommand('justifyRight', false, null);
         }
+        return;
+    }
+
+    if (lastAlignedBlock) {
+        const caretRange = document.createRange();
+        caretRange.selectNodeContents(lastAlignedBlock);
+        caretRange.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(caretRange);
     }
 }
 
@@ -1723,6 +2380,17 @@ export function selectItem(item, accumulate = false) {
     // Always bring selected item to top (z-index)
     item.el.style.zIndex = state.incrementHighestZ();
     state.setSelectedItem(item);
+}
+
+export function selectAllItems() {
+    deselectAll();
+    let lastItem = null;
+    state.items.forEach(item => {
+        state.selectedItems.add(item);
+        item.el.classList.add('selected');
+        lastItem = item;
+    });
+    state.setSelectedItem(lastItem);
 }
 
 // Deselect all items
@@ -1985,7 +2653,8 @@ export function addMemo(text = '', x, y, color = null) {
     const textAlign = state.defaultTextAlign !== 'left' ? state.defaultTextAlign : null;
 
     // Calculate size based on text content if provided
-    const calculatedSize = text ? calculateMemoSizeForText(text, fontSize) : null;
+    const sizingText = text ? extractPlainTextFromMemoHtml(text) : '';
+    const calculatedSize = sizingText ? calculateMemoSizeForText(sizingText, fontSize) : null;
     const defaultW = 220;
     const defaultH = getDefaultHeight(fontSize);
 

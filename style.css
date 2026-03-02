@@ -9,6 +9,7 @@
     --bg-secondary: #18181b;
     --bg-card: #1f1f23;
     --bg-hover: rgba(255, 255, 255, 0.06);
+    --bg-hover-solid: #212126;
     --border-subtle: rgba(255, 255, 255, 0.08);
     --border-active: rgba(255, 255, 255, 0.16);
     --text-primary: #fafafa;
@@ -36,6 +37,7 @@
 :root.light {
     --bg-primary: #f4f4f5; --bg-secondary: #ffffff; --bg-card: #ffffff;
     --bg-hover: rgba(0, 0, 0, 0.04);
+    --bg-hover-solid: #f5f5f5;
     --border-subtle: rgba(0, 0, 0, 0.08); --border-active: rgba(0, 0, 0, 0.16);
     --text-primary: #18181b; --text-secondary: rgba(0, 0, 0, 0.56); --text-placeholder: rgba(0, 0, 0, 0.32);
     --accent: #2563eb; --accent-glow: rgba(37, 99, 235, 0.16); --accent-dim: rgba(37, 99, 235, 0.3);
@@ -58,7 +60,8 @@ input, textarea, button { font-family: inherit; }
 #app.panning { cursor: grabbing; }
 #app.space-pan-mode { cursor: grab; }
 #app.space-pan-mode.panning { cursor: grabbing; }
-body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: none; }
+body.is-dragging, body.is-dragging *,
+body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user-select: none; }
 
 #canvas { position: absolute; width: 100%; height: 100%; transform-origin: 0 0; }
 
@@ -169,7 +172,7 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 .connection-label { pointer-events: auto; cursor: pointer; }
 .connection-label-bg {
     fill: #1f1f23;
-    stroke: var(--conn-default);
+    stroke: var(--connection-label-accent, var(--conn-default));
     stroke-width: 2;
 }
 :root.light .connection-label-bg {
@@ -203,6 +206,9 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
     box-shadow: var(--shadow-md);
     cursor: move; min-width: 140px; min-height: 80px; overflow: visible;
     -webkit-user-select: none; user-select: none;
+    --control-btn-step: calc(28px * var(--counter-scale, 1));
+    --child-btn-offset: calc(32px + ((var(--counter-scale, 1) - 1) * 22px));
+    --child-btn-offset-wide: calc(36px + ((var(--counter-scale, 1) - 1) * 22px));
 }
 .canvas-item .color-dot {
     display: none;
@@ -244,20 +250,26 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     color: var(--text-secondary); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    opacity: 0; transition: all var(--transition); font-size: 14px; z-index: 10;
+    opacity: 1; visibility: hidden; pointer-events: none; transition: background var(--transition), color var(--transition), border-color var(--transition), transform var(--transition), visibility 0s linear var(--transition); font-size: 14px; z-index: 10;
     transform: scale(var(--counter-scale, 1));
-    transform-origin: center;
+    transform-origin: top right;
 }
 .canvas-item .delete-btn { right: -10px; }
-.canvas-item .font-size-btn { right: 18px; }
-.canvas-item .color-btn { right: 46px; }
-.canvas-item.no-font-btn .color-btn { right: 18px; }
-.canvas-item:hover .delete-btn, .canvas-item:hover .color-btn, .canvas-item:hover .font-size-btn { opacity: 1; }
+.canvas-item .font-size-btn { right: calc(-10px + var(--control-btn-step)); }
+.canvas-item .color-btn { right: calc(-10px + (var(--control-btn-step) * 2)); }
+.canvas-item.no-font-btn .color-btn { right: calc(-10px + var(--control-btn-step)); }
+.canvas-item:hover .delete-btn, .canvas-item:hover .color-btn, .canvas-item:hover .font-size-btn,
+.canvas-item .delete-btn:hover, .canvas-item .color-btn:hover, .canvas-item .font-size-btn:hover {
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+}
 .canvas-item .delete-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
-.canvas-item .color-btn:hover, .canvas-item .font-size-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.canvas-item .color-btn:hover, .canvas-item .font-size-btn:hover { background: var(--bg-hover-solid); color: var(--text-primary); border-color: var(--border-active); }
 
 .color-picker {
-    position: absolute; top: -50px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: -50px; left: 50%; transform: translateX(-50%) scale(var(--counter-scale-soft, 1));
+    transform-origin: center bottom;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     border-radius: 9999px; padding: 8px 12px;
     display: none; gap: 6px;
@@ -315,10 +327,10 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 }
 .canvas-item:hover .add-child-btn { opacity: 1; }
 .add-child-btn:hover { transform: scale(calc(var(--counter-scale, 1) * 1.2)); }
-.add-child-btn.top { top: -32px; left: 50%; margin-left: -12px; }
-.add-child-btn.bottom { bottom: -32px; left: 50%; margin-left: -12px; }
-.add-child-btn.left { left: -32px; top: 50%; margin-top: -12px; }
-.add-child-btn.right { right: -32px; top: 50%; margin-top: -12px; }
+.add-child-btn.top { top: calc(-1 * var(--child-btn-offset)); left: 50%; margin-left: -12px; }
+.add-child-btn.bottom { bottom: calc(-1 * var(--child-btn-offset)); left: 50%; margin-left: -12px; }
+.add-child-btn.left { left: calc(-1 * var(--child-btn-offset)); top: 50%; margin-top: -12px; }
+.add-child-btn.right { right: calc(-1 * var(--child-btn-offset)); top: 50%; margin-top: -12px; }
 
 #canvas.connecting .add-child-btn { display: none !important; }
 
@@ -423,7 +435,7 @@ body.is-dragging, body.is-dragging * { -webkit-user-select: none; user-select: n
 .memo-body li { margin: 0.1em 0; }
 
 /* Markdown toolbar - floating selection-based */
-.memo-toolbar { display: flex; gap: 4px; padding: 6px 10px; position: fixed; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.1s, visibility 0.1s; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 10000; }
+.memo-toolbar { display: flex; gap: 4px; padding: 6px 10px; position: fixed; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.1s, visibility 0.1s; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 10000; transform: scale(var(--counter-scale-soft, 1)); transform-origin: top left; }
 .memo-toolbar.active { opacity: 1; visibility: visible; pointer-events: auto; }
 .md-btn { width: 28px; height: 28px; border: none; background: var(--bg-hover); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .md-btn svg { transform: scale(0.8); }
@@ -490,11 +502,11 @@ body.wrap-mode-character .memo-body { word-break: break-all; }
 /* Keyword node: connection handles use default edge positions (no override) */
 /* This ensures getHandlePos() calculation matches visual handle positions */
 /* Keyword node: child buttons further outside to avoid overlap with handles */
-.canvas-item.keyword-node .add-child-btn.left { left: -36px; }
-.canvas-item.keyword-node .add-child-btn.right { right: -36px; }
+.canvas-item.keyword-node .add-child-btn.left { left: calc(-1 * var(--child-btn-offset-wide)); }
+.canvas-item.keyword-node .add-child-btn.right { right: calc(-1 * var(--child-btn-offset-wide)); }
 /* Keyword node: buttons at top */
 .canvas-item.keyword-node .color-btn {
-    right: 20px;
+    right: calc(-8px + var(--control-btn-step));
     top: -10px;
     transform: scale(var(--counter-scale, 1));
 }
@@ -596,6 +608,28 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
 :root.light body.color-mode-fill .canvas-item.has-color[data-item-type="memo"][data-color="pink"],
 :root.light body.color-mode-fill .canvas-item.has-color[data-item-type="keyword"][data-color="pink"],
 :root.light body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="pink"] { background-color: #fde9f3; }
+
+/* Connection label pills follow node fill colors when fill mode is active */
+body.color-mode-fill .connection-label[data-color="red"] .connection-label-bg { fill: #3e2528; stroke: #3e2528; }
+body.color-mode-fill .connection-label[data-color="orange"] .connection-label-bg { fill: #402c21; stroke: #402c21; }
+body.color-mode-fill .connection-label[data-color="yellow"] .connection-label-bg { fill: #373120; stroke: #373120; }
+body.color-mode-fill .connection-label[data-color="green"] .connection-label-bg { fill: #1f332a; stroke: #1f332a; }
+body.color-mode-fill .connection-label[data-color="blue"] .connection-label-bg { fill: #232e43; stroke: #232e43; }
+body.color-mode-fill .connection-label[data-color="purple"] .connection-label-bg { fill: #2f2843; stroke: #2f2843; }
+body.color-mode-fill .connection-label[data-color="pink"] .connection-label-bg { fill: #3e2535; stroke: #3e2535; }
+
+:root.light body.color-mode-fill .connection-label[data-color="red"] .connection-label-bg { fill: #fde9e9; stroke: #fde9e9; }
+:root.light body.color-mode-fill .connection-label[data-color="orange"] .connection-label-bg { fill: #feeee3; stroke: #feeee3; }
+:root.light body.color-mode-fill .connection-label[data-color="yellow"] .connection-label-bg { fill: #fdf7e6; stroke: #fdf7e6; }
+:root.light body.color-mode-fill .connection-label[data-color="green"] .connection-label-bg { fill: #e9f9ef; stroke: #e9f9ef; }
+:root.light body.color-mode-fill .connection-label[data-color="blue"] .connection-label-bg { fill: #e7f0fe; stroke: #e7f0fe; }
+:root.light body.color-mode-fill .connection-label[data-color="purple"] .connection-label-bg { fill: #f1ebfe; stroke: #f1ebfe; }
+:root.light body.color-mode-fill .connection-label[data-color="pink"] .connection-label-bg { fill: #fde9f3; stroke: #fde9f3; }
+
+body.color-mode-fill .connection-label.selected .connection-label-bg {
+    stroke: var(--accent);
+    stroke-width: 2.5;
+}
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; cursor: pointer; box-sizing: border-box; }
 .link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); flex-shrink: 0; }
@@ -965,8 +999,9 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     border-radius: var(--radius-md); color: var(--text-secondary);
     cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 201;
     box-shadow: var(--shadow-md);
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
-.sidebar-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar-toggle:hover { background: var(--bg-hover-solid); color: var(--text-primary); border-color: var(--border-active); }
 .sidebar.open ~ .sidebar-toggle { left: calc(var(--sidebar-width, 280px) + 16px); }
 
 .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
@@ -977,16 +1012,18 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
     color: var(--text-secondary); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
-.sidebar-pin-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar-pin-btn:hover { background: var(--bg-hover-solid); color: var(--text-primary); border-color: var(--border-active); }
 .sidebar-pin-btn.pinned { background: var(--accent); border-color: var(--accent); color: white; }
 .sidebar-icon-btn {
     width: 28px; height: 28px; background: transparent;
     border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
     color: var(--text-secondary); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
-.sidebar-icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar-icon-btn:hover { background: var(--bg-hover-solid); color: var(--text-primary); border-color: var(--border-active); }
 
 .sidebar-add {
     width: 28px; height: 28px; background: var(--accent);
@@ -1312,7 +1349,7 @@ body.color-mode-fill .canvas-item.has-color[data-item-type="link"][data-color="p
     transition: all var(--transition);
 }
 .sidebar-settings-btn:hover {
-    background: var(--bg-hover);
+    background: var(--bg-hover-solid);
     color: var(--text-primary);
     border-color: var(--border-active);
 }

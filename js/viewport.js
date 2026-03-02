@@ -11,14 +11,18 @@ export function updateTransform() {
     canvas.style.transform = `translate(${state.offsetX}px,${state.offsetY}px) scale(${state.scale})`;
     zoomDisplay.textContent = Math.round(state.scale * 100) + '%';
 
-    // Set CSS variable for counter-scaling hover UI elements when zoomed out
-    // This ensures minimum usability at low zoom levels
-    const minScale = 0.5; // Below this scale, apply counter-scaling
-    const counterScale = state.scale < minScale ? minScale / state.scale : 1;
+    // Keep small interactive controls readable when zoomed far out, but avoid
+    // letting them shrink too far to interact with comfortably.
+    const minControlScale = 0.72;
+    const minOverlayScale = 0.62;
+    const counterScale = state.scale < minControlScale ? minControlScale / state.scale : 1;
+    const overlayCounterScale = state.scale < minOverlayScale ? minOverlayScale / state.scale : 1;
+
     document.documentElement.style.setProperty('--counter-scale', counterScale);
+    document.documentElement.style.setProperty('--counter-scale-soft', overlayCounterScale);
 
     // Toggle low-zoom class for CSS targeting
-    canvas.classList.toggle('low-zoom', state.scale < minScale);
+    canvas.classList.toggle('low-zoom', state.scale < minOverlayScale);
 }
 
 // Set zoom level with optional center point and animation

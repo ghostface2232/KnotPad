@@ -233,11 +233,14 @@ export function updateConnectionLabel(c) {
     rect.setAttribute('height', height);
     rect.setAttribute('rx', height / 2);
 
-    // Apply color from source node to border (not fill for better contrast)
+    // Expose source-node color via CSS variables/attrs so display modes can
+    // restyle the label without fighting inline SVG styles.
     if (c.from.color && COLOR_MAP[c.from.color]) {
-        rect.style.stroke = COLOR_MAP[c.from.color];
+        c.labelEl.style.setProperty('--connection-label-accent', COLOR_MAP[c.from.color]);
+        c.labelEl.dataset.color = c.from.color;
     } else {
-        rect.style.stroke = '';
+        c.labelEl.style.removeProperty('--connection-label-accent');
+        delete c.labelEl.dataset.color;
     }
 
     // Add selected class if connection is selected
