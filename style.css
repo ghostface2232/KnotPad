@@ -32,6 +32,7 @@
     --conn-default: rgba(255, 255, 255, 0.35);
     --conn-hover: rgba(255, 255, 255, 0.6);
     --bg-thumbnail: #1f1f23;
+    --memo-paragraph-spacing-percent: 30;
 }
 
 :root.light {
@@ -433,6 +434,7 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
 .memo-body hr { border: none; border-top: 1px solid var(--border-subtle); margin: 0.5em 0; }
 .memo-body ul, .memo-body ol { margin: 0.3em 0; padding-left: 1.2em; }
 .memo-body li { margin: 0.1em 0; }
+.memo-body > div[data-knotpad-paragraph="true"] + div[data-knotpad-paragraph="true"] { margin-top: calc(1em * var(--memo-paragraph-spacing-percent) / 100); }
 
 /* Markdown toolbar - floating selection-based */
 .memo-toolbar { display: flex; gap: 4px; padding: 6px 10px; position: fixed; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.1s, visibility 0.1s; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 10000; transform: scale(var(--counter-scale-soft, 1)); transform-origin: top left; }

@@ -15,6 +15,7 @@ const localStorageProps = {
     defaultFontSize: 'knotpad-default-font-size',
     noteWrapMode: 'knotpad-note-wrap-mode',
     defaultTextAlign: 'knotpad-default-text-align',
+    paragraphSpacing: 'knotpad-paragraph-spacing',
     invertWheelZoom: 'knotpad-invert-wheel-zoom',
     gridSnap: 'knotpad-grid-snap',
     colorDisplayMode: 'knotpad-color-display-mode',
@@ -165,6 +166,7 @@ const initialState = {
     defaultFontSize: localStorage.getItem('knotpad-default-font-size') || 'small',
     noteWrapMode: localStorage.getItem('knotpad-note-wrap-mode') || 'word',
     defaultTextAlign: localStorage.getItem('knotpad-default-text-align') || 'left',
+    paragraphSpacing: localStorage.getItem('knotpad-paragraph-spacing') || '30',
     invertWheelZoom: localStorage.getItem('knotpad-invert-wheel-zoom') === 'true',
     gridSnap: localStorage.getItem('knotpad-grid-snap') === 'true',
     colorDisplayMode: (() => {
@@ -360,6 +362,7 @@ export let zoomAnimationFrame = state.zoomAnimationFrame;
 export let defaultFontSize = state.defaultFontSize;
 export let noteWrapMode = state.noteWrapMode;
 export let defaultTextAlign = state.defaultTextAlign;
+export let paragraphSpacing = state.paragraphSpacing;
 export let invertWheelZoom = state.invertWheelZoom;
 export let gridSnap = state.gridSnap;
 export let colorDisplayMode = state.colorDisplayMode;
@@ -414,6 +417,7 @@ export function setZoomAnimationFrame(val) { state.zoomAnimationFrame = val; zoo
 export function setDefaultFontSize(val) { state.defaultFontSize = val; defaultFontSize = val; }
 export function setNoteWrapMode(val) { state.noteWrapMode = val; noteWrapMode = val; }
 export function setDefaultTextAlign(val) { state.defaultTextAlign = val; defaultTextAlign = val; }
+export function setParagraphSpacing(val) { state.paragraphSpacing = val; paragraphSpacing = val; }
 export function setInvertWheelZoom(val) { state.invertWheelZoom = val; invertWheelZoom = val; }
 export function setGridSnap(val) { state.gridSnap = val; gridSnap = val; }
 export function setColorDisplayMode(val) { state.colorDisplayMode = val; colorDisplayMode = val; }

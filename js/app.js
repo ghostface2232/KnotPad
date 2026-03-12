@@ -48,6 +48,7 @@ import {
     setupSidebarResize,
     handleFile,
     applyWrapMode,
+    applyParagraphSpacing,
     applyColorDisplayMode,
     applyLinkPreviewMode,
     startLinkRename
@@ -407,6 +408,7 @@ async function init() {
     setupLinkModal();
     setupSettingsModal();
     applyWrapMode(state.noteWrapMode);
+    applyParagraphSpacing(state.paragraphSpacing);
     applyColorDisplayMode(state.colorDisplayMode);
     setupMouseEvents();
     setupKeyboardEvents();

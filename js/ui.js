@@ -2393,6 +2393,11 @@ export function applyWrapMode(mode) {
     document.body.classList.toggle('wrap-mode-character', mode === 'character');
 }
 
+export function applyParagraphSpacing(value) {
+    const normalizedValue = ['10', '20', '30', '40'].includes(String(value)) ? String(value) : '30';
+    document.documentElement.style.setProperty('--memo-paragraph-spacing-percent', normalizedValue);
+}
+
 export function applyColorDisplayMode(mode) {
     document.body.classList.toggle('color-mode-fill', mode === 'fill');
 }
@@ -2434,6 +2439,13 @@ function updateSettingsUI() {
     if (textAlignGroup) {
         textAlignGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.value === state.defaultTextAlign);
+        });
+    }
+
+    const paragraphSpacingGroup = $('paragraphSpacing');
+    if (paragraphSpacingGroup) {
+        paragraphSpacingGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === state.paragraphSpacing);
         });
     }
 
@@ -2656,6 +2668,18 @@ export function setupSettingsModal() {
                 textAlignGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 state.setDefaultTextAlign(btn.dataset.value);
+            }, { signal });
+        });
+    }
+
+    const paragraphSpacingGroup = $('paragraphSpacing');
+    if (paragraphSpacingGroup) {
+        paragraphSpacingGroup.querySelectorAll('.settings-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                paragraphSpacingGroup.querySelectorAll('.settings-option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.setParagraphSpacing(btn.dataset.value);
+                applyParagraphSpacing(btn.dataset.value);
             }, { signal });
         });
     }

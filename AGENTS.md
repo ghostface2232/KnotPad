@@ -98,6 +98,9 @@ KnotPad/
 | Create link | `items.js:addLink()` |
 | Handle image/video | `ui.js:handleFile()` |
 | Item rendering | `items.js:createItem()` |
+| Memo paste normalization | `items.js:getMemoHtmlFromClipboardData()`, `sanitizeClipboardHtml()` |
+| Memo paragraph spacing on Enter | `items.js:insertParagraphBreakAtSelection()`, `ui.js:applyParagraphSpacing()` |
+| Legacy memo line-break normalization | `items.js:normalizeMemoHtml()`, `convertTopLevelLegacyBreaksToParagraphs()` |
 | Item events | `items.js:setupItemEvents()` |
 | Color management | `items.js:setItemColor()` |
 | Font size cycling | `items.js:setItemFontSize()` |
@@ -136,6 +139,7 @@ KnotPad/
 | Context menus | `ui.js:setupContextMenu()`, `showContextMenu()` |
 | Search | `ui.js:setupSearchEvents()`, `toggleSearch()` |
 | Modals | `ui.js:setupLinkModal()`, `setupSettingsModal()` |
+| Node style settings | `ui.js:setupSettingsModal()`, `applyParagraphSpacing()` |
 | Theme toggle | `ui.js:toggleTheme()`, `loadTheme()` |
 | Toast notifications | `utils.js:showToast()` |
 
@@ -300,6 +304,7 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 | `knotpad-default-font-size` | Default memo font size |
 | `knotpad-note-wrap-mode` | Text wrap mode |
 | `knotpad-default-text-align` | Default text alignment |
+| `knotpad-paragraph-spacing` | Extra spacing for Enter-created memo paragraphs |
 | `knotpad-invert-wheel-zoom` | Zoom direction preference |
 | `knotpad-grid-snap` | Grid snap toggle |
 | `knotpad-color-display-mode` | Color display mode (bar/fill) |
@@ -359,3 +364,4 @@ Verify when making changes:
 - [ ] Blob URLs revoked
 - [ ] Related state cleaned on deletion
 - [ ] Filter state propagates to related elements
+- [ ] Memo input/paste changes do not alter legacy note migration paths or break existing note data rendering

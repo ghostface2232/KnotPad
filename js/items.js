@@ -10,6 +10,7 @@ import eventBus, { Events } from './events-bus.js';
 const canvas = $('canvas');
 const ZERO_WIDTH_SPACE = '\u200B';
 const KNOTPAD_MEMO_CLIPBOARD_MARKER = '<!--KNOTPAD_MEMO-->';
+const MEMO_PARAGRAPH_ATTR = 'data-knotpad-paragraph';
 
 // ============ Favicon Fallback ============
 // Globe icon SVG as data URI for when favicon fails to load
@@ -269,6 +270,11 @@ function parseContent(content) {
     return normalizeMemoHtml(convertPlainTextToMemoHtml(content));
 }
 
+function convertClipboardPlainTextToMemoHtml(text) {
+    if (!text) return '';
+    return memoPlainTextToHtml(text.replace(/\r\n?/g, '\n'));
+}
+
 // Get HTML content from contenteditable element (direct storage, no conversion)
 function getHtmlContent(el) {
     return normalizeMemoHtml(el.innerHTML);
@@ -292,6 +298,19 @@ function extractInternalMemoClipboardHtml(rawHtml) {
     return rawHtml.replace(KNOTPAD_MEMO_CLIPBOARD_MARKER, '');
 }
 
+function ensureMemoParagraphBlock(block) {
+    if (block?.nodeType === Node.ELEMENT_NODE && block.tagName === 'DIV') {
+        block.setAttribute(MEMO_PARAGRAPH_ATTR, 'true');
+    }
+    return block;
+}
+
+function isMemoParagraphBlock(node) {
+    return node?.nodeType === Node.ELEMENT_NODE &&
+        node.tagName === 'DIV' &&
+        node.getAttribute(MEMO_PARAGRAPH_ATTR) === 'true';
+}
+
 function wrapTopLevelLineInDiv(root, node) {
     let current = node;
     while (current && current !== root && current.parentNode !== root) {
@@ -311,7 +330,7 @@ function wrapTopLevelLineInDiv(root, node) {
     }
 
     const trailingBreak = lineEnd.nextSibling?.nodeName === 'BR' ? lineEnd.nextSibling : null;
-    const div = document.createElement('div');
+    const div = ensureMemoParagraphBlock(document.createElement('div'));
     lineStart.parentNode.insertBefore(div, lineStart);
 
     let movingNode = lineStart;
@@ -335,6 +354,80 @@ function getNextMeaningfulSibling(node) {
         sibling = sibling.nextSibling;
     }
     return sibling;
+}
+
+function isMemoTopLevelBlock(node) {
+    return node?.nodeType === Node.ELEMENT_NODE && [
+        'DIV', 'P', 'H1', 'H2', 'H3', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'HR'
+    ].includes(node.tagName);
+}
+
+function appendLegacyParagraphBlock(root, nodes) {
+    if (!nodes.length) return null;
+
+    const block = ensureMemoParagraphBlock(document.createElement('div'));
+    nodes[0].parentNode?.insertBefore(block, nodes[0]);
+    nodes.forEach(node => block.appendChild(node));
+
+    if (!block.firstChild) {
+        block.appendChild(document.createElement('br'));
+    }
+
+    return block;
+}
+
+function convertTopLevelLegacyBreaksToParagraphs(root) {
+    const inlineNodes = [];
+    let sawTopLevelBreak = false;
+    let previousWasBreak = false;
+
+    const flushInlineNodes = () => {
+        appendLegacyParagraphBlock(root, inlineNodes.splice(0, inlineNodes.length));
+    };
+
+    let node = root.firstChild;
+    while (node) {
+        const nextNode = node.nextSibling;
+
+        if (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'BR') {
+            sawTopLevelBreak = true;
+            flushInlineNodes();
+
+            if (previousWasBreak) {
+                const emptyBlock = ensureMemoParagraphBlock(document.createElement('div'));
+                emptyBlock.appendChild(document.createElement('br'));
+                root.insertBefore(emptyBlock, node);
+            }
+
+            node.remove();
+            previousWasBreak = true;
+            node = nextNode;
+            continue;
+        }
+
+        if (isWhitespaceOnlyTextNode(node)) {
+            if (previousWasBreak) {
+                node.remove();
+                node = nextNode;
+                continue;
+            }
+        }
+
+        if (isMemoTopLevelBlock(node)) {
+            flushInlineNodes();
+            previousWasBreak = false;
+            node = nextNode;
+            continue;
+        }
+
+        inlineNodes.push(node);
+        previousWasBreak = false;
+        node = nextNode;
+    }
+
+    flushInlineNodes();
+
+    return sawTopLevelBreak;
 }
 
 function normalizeTextNodeLineBreaks(root) {
@@ -523,7 +616,37 @@ function insertMemoLineBreakAtSelection(editor, prefix = '') {
     return true;
 }
 
-function getTopLevelAlignedBlockAtSelection(editor) {
+function trimEditableBlockBoundaryNodes(block) {
+    if (!block) return;
+
+    while (block.firstChild) {
+        const first = block.firstChild;
+        if (first.nodeType === Node.TEXT_NODE && !stripMemoEditorArtifacts(first.textContent).trim()) {
+            first.remove();
+            continue;
+        }
+        if (first.nodeType === Node.ELEMENT_NODE && first.nodeName === 'BR') {
+            first.remove();
+            continue;
+        }
+        break;
+    }
+
+    while (block.lastChild) {
+        const last = block.lastChild;
+        if (last.nodeType === Node.TEXT_NODE && !stripMemoEditorArtifacts(last.textContent).trim()) {
+            last.remove();
+            continue;
+        }
+        if (last.nodeType === Node.ELEMENT_NODE && last.nodeName === 'BR') {
+            last.remove();
+            continue;
+        }
+        break;
+    }
+}
+
+function getTopLevelParagraphBlockAtSelection(editor) {
     const range = getMemoSelectionRange(editor);
     if (!range) return null;
 
@@ -532,7 +655,12 @@ function getTopLevelAlignedBlockAtSelection(editor) {
         : range.startContainer.parentNode;
 
     while (node && node !== editor) {
-        if (node.parentNode === editor && node.nodeType === Node.ELEMENT_NODE && hasSupportedTextAlign(node)) {
+        if (
+            node.parentNode === editor &&
+            node.nodeType === Node.ELEMENT_NODE &&
+            node.tagName === 'DIV' &&
+            (hasSupportedTextAlign(node) || isMemoParagraphBlock(node))
+        ) {
             return node;
         }
         node = node.parentNode;
@@ -541,38 +669,77 @@ function getTopLevelAlignedBlockAtSelection(editor) {
     return null;
 }
 
-function insertAlignedBlockBreakAtSelection(editor) {
-    const range = getMemoSelectionRange(editor);
-    if (!range || !range.collapsed) return false;
+function getParagraphWrapTarget(editor, range) {
+    if (!range) return null;
 
-    const block = getTopLevelAlignedBlockAtSelection(editor);
-    if (!block) return false;
-
-    const trailingRange = document.createRange();
-    trailingRange.selectNodeContents(block);
-    trailingRange.setStart(range.startContainer, range.startOffset);
-
-    // Only create a new aligned sibling when the caret is already at the end of the block.
-    // Otherwise the normal line-break path should continue handling inline breaks.
-    if (!trailingRange.collapsed) {
-        return false;
+    if (range.startContainer === editor) {
+        return editor.childNodes[range.startOffset] ||
+            editor.childNodes[range.startOffset - 1] ||
+            null;
     }
 
-    const newBlock = block.cloneNode(false);
-    newBlock.textContent = '';
+    if (range.startContainer.nodeType === Node.TEXT_NODE) {
+        return range.startContainer;
+    }
 
-    const placeholder = document.createTextNode(ZERO_WIDTH_SPACE);
-    newBlock.appendChild(placeholder);
+    return range.startContainer.childNodes[range.startOffset] ||
+        range.startContainer.childNodes[range.startOffset - 1] ||
+        range.startContainer;
+}
+
+function insertParagraphBreakAtSelection(editor) {
+    let range = getMemoSelectionRange(editor);
+    if (!range) return false;
+
+    if (!range.collapsed) {
+        range.deleteContents();
+        range = getMemoSelectionRange(editor);
+        if (!range) return false;
+    }
+
+    let block = getTopLevelParagraphBlockAtSelection(editor);
+    if (!block) {
+        const wrapTarget = getParagraphWrapTarget(editor, range);
+        if (wrapTarget && wrapTarget !== editor && wrapTarget.nodeName !== 'BR') {
+            block = wrapTopLevelLineInDiv(editor, wrapTarget);
+        }
+    }
+
+    if (!block) {
+        const newBlock = ensureMemoParagraphBlock(document.createElement('div'));
+        newBlock.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+        const referenceNode = range.startContainer === editor
+            ? (editor.childNodes[range.startOffset] || null)
+            : null;
+        editor.insertBefore(newBlock, referenceNode);
+        return placeCaretAtStart(newBlock);
+    }
+
+    ensureMemoParagraphBlock(block);
+
+    const splitRange = document.createRange();
+    splitRange.selectNodeContents(block);
+    splitRange.setStart(range.startContainer, range.startOffset);
+
+    const movedContent = splitRange.extractContents();
+    const newBlock = ensureMemoParagraphBlock(block.cloneNode(false));
+
+    if (movedContent.childNodes.length > 0) {
+        newBlock.appendChild(movedContent);
+    }
+
+    trimEditableBlockBoundaryNodes(block);
+    trimEditableBlockBoundaryNodes(newBlock);
+
+    if (!block.firstChild) {
+        block.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+    }
+    if (!newBlock.firstChild) {
+        newBlock.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+    }
+
     block.parentNode.insertBefore(newBlock, block.nextSibling);
-
-    const sel = window.getSelection();
-    const caretRange = document.createRange();
-    caretRange.setStart(placeholder, 0);
-    caretRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(caretRange);
-
-    return true;
+    return placeCaretAtStart(newBlock);
 }
 
 function deleteCharactersBeforeCaret(editor, count) {
@@ -598,13 +765,22 @@ function deleteCharactersBeforeCaret(editor, count) {
     return true;
 }
 
-function hasSemanticClipboardFormatting(rawHtml) {
-    if (!rawHtml) return false;
+function getMeaningfulClipboardHtml(rawHtml, plainText = '') {
+    if (!rawHtml) return '';
 
-    const template = document.createElement('template');
-    template.innerHTML = rawHtml;
+    const sanitizedHtml = sanitizeClipboardHtml(rawHtml);
+    if (!sanitizedHtml) return '';
 
-    return Boolean(template.content.querySelector('strong, b, em, i, u, s, strike, h1, h2, h3, blockquote, ul, ol, li, hr'));
+    const normalizedPlainTextHtml = convertClipboardPlainTextToMemoHtml(plainText);
+    if (!normalizedPlainTextHtml) {
+        return sanitizedHtml;
+    }
+
+    return sanitizedHtml === normalizedPlainTextHtml ? '' : sanitizedHtml;
+}
+
+function hasSemanticClipboardFormatting(rawHtml, plainText = '') {
+    return Boolean(getMeaningfulClipboardHtml(rawHtml, plainText));
 }
 
 function getListItemAtSelection(editor) {
@@ -666,33 +842,7 @@ function renumberOrderedListFrom(listItem, startValue) {
 }
 
 function trimListItemBoundaryNodes(listItem) {
-    if (!listItem) return;
-
-    while (listItem.firstChild) {
-        const first = listItem.firstChild;
-        if (first.nodeType === Node.TEXT_NODE && !stripMemoEditorArtifacts(first.textContent).trim()) {
-            first.remove();
-            continue;
-        }
-        if (first.nodeType === Node.ELEMENT_NODE && first.nodeName === 'BR') {
-            first.remove();
-            continue;
-        }
-        break;
-    }
-
-    while (listItem.lastChild) {
-        const last = listItem.lastChild;
-        if (last.nodeType === Node.TEXT_NODE && !stripMemoEditorArtifacts(last.textContent).trim()) {
-            last.remove();
-            continue;
-        }
-        if (last.nodeType === Node.ELEMENT_NODE && last.nodeName === 'BR') {
-            last.remove();
-            continue;
-        }
-        break;
-    }
+    trimEditableBlockBoundaryNodes(listItem);
 }
 
 function placeCaretAtStart(container) {
@@ -777,9 +927,16 @@ function normalizeMemoHtml(html) {
     wrapper.querySelectorAll('div, p').forEach(block => {
         if (block.closest('li, blockquote, h1, h2, h3')) return;
 
+        if (isMemoParagraphBlock(block)) {
+            if (!block.firstChild) {
+                block.appendChild(document.createElement('br'));
+            }
+            return;
+        }
+
         if (hasSupportedTextAlign(block)) {
             if (block.tagName === 'P') {
-                const alignedDiv = document.createElement('div');
+                const alignedDiv = ensureMemoParagraphBlock(document.createElement('div'));
                 alignedDiv.style.textAlign = block.style.textAlign;
                 while (block.firstChild) {
                     alignedDiv.appendChild(block.firstChild);
@@ -801,6 +958,8 @@ function normalizeMemoHtml(html) {
         }
         block.remove();
     });
+
+    convertTopLevelLegacyBreaksToParagraphs(wrapper);
 
     return wrapper.innerHTML;
 }
@@ -919,10 +1078,12 @@ export function getMemoHtmlFromClipboardData(clipboardData, options = {}) {
 
     const text = clipboardData.getData('text/plain');
     const plainTextHtml = text
-        ? convertPlainTextToMemoHtml(text, enablePlainTextFormatting)
+        ? (enablePlainTextFormatting
+            ? convertPlainTextToMemoHtml(text, true)
+            : convertClipboardPlainTextToMemoHtml(text))
         : '';
-    const semanticHtml = rawHtml && hasSemanticClipboardFormatting(rawHtml)
-        ? sanitizeClipboardHtml(rawHtml)
+    const semanticHtml = rawHtml
+        ? getMeaningfulClipboardHtml(rawHtml, text)
         : '';
 
     return preferPlainText
@@ -943,7 +1104,7 @@ export function clipboardContainsStructuredMemoContent(clipboardData) {
         return true;
     }
 
-    return hasSemanticClipboardFormatting(rawHtml);
+    return hasSemanticClipboardFormatting(rawHtml, clipboardData.getData('text/plain'));
 }
 
 // Note: External function calls are now handled via eventBus
@@ -1662,8 +1823,8 @@ function setupItemEvents(item) {
             }
 
             const memoHtml = getMemoHtmlFromClipboardData(cd, {
-                preferPlainText: true,
-                enablePlainTextFormatting: true
+                preferPlainText: false,
+                enablePlainTextFormatting: false
             });
 
             if (memoHtml && insertMemoHtmlAtSelection(mb, memoHtml)) {
@@ -1672,9 +1833,9 @@ function setupItemEvents(item) {
             }
 
             const fallbackHtml = cd.getData('text/html');
-            if (fallbackHtml && hasSemanticClipboardFormatting(fallbackHtml)) {
-                const sanitized = sanitizeClipboardHtml(fallbackHtml);
-                if (sanitized && insertMemoHtmlAtSelection(mb, sanitized)) {
+            const fallbackSemanticHtml = getMeaningfulClipboardHtml(fallbackHtml, cd.getData('text/plain'));
+            if (fallbackSemanticHtml) {
+                if (insertMemoHtmlAtSelection(mb, fallbackSemanticHtml)) {
                     mb.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }
@@ -1735,7 +1896,7 @@ function setupItemEvents(item) {
             // Skip list continuation if we just cancelled a list
             if (mb._listCancelled) {
                 delete mb._listCancelled;
-                if (insertAlignedBlockBreakAtSelection(mb) || insertMemoLineBreakAtSelection(mb)) {
+                if (insertParagraphBreakAtSelection(mb) || insertMemoLineBreakAtSelection(mb)) {
                     mb.dispatchEvent(new Event('input', { bubbles: true }));
                 }
                 return;
@@ -1838,7 +1999,7 @@ function setupItemEvents(item) {
                 return;
             }
 
-            if (insertAlignedBlockBreakAtSelection(mb) || insertMemoLineBreakAtSelection(mb)) {
+            if (insertParagraphBreakAtSelection(mb) || insertMemoLineBreakAtSelection(mb)) {
                 // Trigger input event for saving
                 mb.dispatchEvent(new Event('input', { bubbles: true }));
             }
