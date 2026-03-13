@@ -2,7 +2,8 @@
 
 import { $ } from './utils.js';
 import * as state from './state.js';
-import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder } from './storage.js';
+import { initSettingsSaveCallback } from './state.js';
+import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder, scheduleSettingsSave } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
 import { createItem, addMemo, addKeyword, setFilter, setItemColor, toggleColorGroupMode, positionNewItemInColorGroup } from './items.js';
 import {
@@ -430,6 +431,10 @@ async function init() {
 
     // Try to restore file system connection from saved handle
     const fsRestoreResult = await tryRestoreFsConnection();
+
+    // Wire up settings save callback for FS persistence
+    initSettingsSaveCallback(scheduleSettingsSave);
+
     if (fsRestoreResult === 'needs-permission') {
         // Handle exists but needs permission - setup click handler for reconnection
         const storageIndicator = $('storageIndicator');

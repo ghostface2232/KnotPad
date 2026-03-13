@@ -262,6 +262,8 @@ export async function selectStorageFolder() {
         await requestPersistentStorage();
 
         updateStorageIndicator(true);
+        // Save current settings to FS immediately
+        await saveSettingsToFileSystem();
         showToast('Storage folder connected');
         return true;
     } catch (e) {
@@ -328,7 +330,11 @@ export async function saveCanvasesListToFileSystem() {
         const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
         const fileHandle = await canvasesDir.getFileHandle('_index.json', { create: true });
         const writable = await fileHandle.createWritable();
-        await writable.write(JSON.stringify(state.canvases, null, 2));
+        const data = {
+            canvases: state.canvases,
+            groups: state.canvasGroups || []
+        };
+        await writable.write(JSON.stringify(data, null, 2));
         await writable.close();
     } catch (e) {
         console.error('Failed to save canvases list to file system:', e);
@@ -342,7 +348,12 @@ export async function loadCanvasesListFromFileSystem() {
         const fileHandle = await canvasesDir.getFileHandle('_index.json');
         const file = await fileHandle.getFile();
         const text = await file.text();
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        // Support both old format (plain array) and new format (object with canvases+groups)
+        if (Array.isArray(parsed)) {
+            return { canvases: parsed, groups: [] };
+        }
+        return parsed;
     } catch (e) {
         return null;
     }
@@ -454,9 +465,75 @@ export async function migrateToFileSystem() {
         }
         // Migrate canvases list
         await saveCanvasesListToFileSystem();
+        // Migrate settings
+        await saveSettingsToFileSystem();
         showToast('Data migrated to file storage');
     } catch (e) {
         console.error('Migration error:', e);
+    }
+}
+
+// ============ File System Settings Operations ============
+
+const SETTINGS_FILE = '_settings.json';
+
+// Debounce timer for settings save
+let settingsSaveTimer = null;
+
+export async function saveSettingsToFileSystem() {
+    if (!fsDirectoryHandle) return;
+    try {
+        const settings = {};
+        // Gather all localStorage settings keys
+        const settingsKeys = [
+            'knotpad-theme',
+            'knotpad-sidebar-pinned',
+            'knotpad-sidebar-open',
+            'knotpad-sidebar-width',
+            'knotpad-default-font-size',
+            'knotpad-note-wrap-mode',
+            'knotpad-default-text-align',
+            'knotpad-paragraph-spacing',
+            'knotpad-invert-wheel-zoom',
+            'knotpad-grid-snap',
+            'knotpad-color-display-mode',
+            'knotpad-link-preview-enabled',
+            'knotpad-canvas-paste-formatting',
+            'knotpad-active-canvas'
+        ];
+        for (const key of settingsKeys) {
+            const val = localStorage.getItem(key);
+            if (val !== null) {
+                settings[key] = val;
+            }
+        }
+        const fileHandle = await fsDirectoryHandle.getFileHandle(SETTINGS_FILE, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(settings, null, 2));
+        await writable.close();
+    } catch (e) {
+        console.error('Failed to save settings to file system:', e);
+    }
+}
+
+export function scheduleSettingsSave() {
+    if (!fsDirectoryHandle) return;
+    if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+    settingsSaveTimer = setTimeout(() => {
+        settingsSaveTimer = null;
+        saveSettingsToFileSystem();
+    }, 500);
+}
+
+export async function loadSettingsFromFileSystem() {
+    if (!fsDirectoryHandle) return null;
+    try {
+        const fileHandle = await fsDirectoryHandle.getFileHandle(SETTINGS_FILE);
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        return JSON.parse(text);
+    } catch (e) {
+        return null;
     }
 }
 

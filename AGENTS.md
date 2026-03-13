@@ -150,6 +150,7 @@ KnotPad/
 | IndexedDB init | `storage.js:initMediaDB()` |
 | Save/load media | `storage.js:saveMedia()`, `loadMedia()` |
 | File System API | `storage.js:selectStorageFolder()`, `saveCanvasToFileSystem()` |
+| FS Settings | `storage.js:saveSettingsToFileSystem()`, `loadSettingsFromFileSystem()`, `scheduleSettingsSave()` |
 | Auto-save | `ui.js:triggerAutoSave()` |
 | Undo/redo | `ui.js:saveState()`, `undo()`, `redo()` |
 

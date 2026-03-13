@@ -11,6 +11,7 @@ import {
     fsDirectoryHandle,
     isFileSystemSupported,
     saveCanvasesListToFileSystem,
+    loadCanvasesListFromFileSystem,
     saveCanvasToFileSystem,
     loadCanvasFromFileSystem,
     deleteCanvasFromFileSystem,
@@ -22,7 +23,9 @@ import {
     disconnectStorageFolder,
     updateStorageIndicator,
     getMediaByIds,
-    saveMediaBatch
+    saveMediaBatch,
+    loadSettingsFromFileSystem,
+    scheduleSettingsSave
 } from './storage.js';
 import eventBus, { Events } from './events-bus.js';
 
@@ -78,6 +81,7 @@ export function toggleTheme() {
     document.documentElement.classList.toggle('light');
     localStorage.setItem(THEME_KEY, document.documentElement.classList.contains('light') ? 'light' : 'dark');
     updateThemeIcon();
+    scheduleSettingsSave();
 }
 
 function updateThemeIcon() {
@@ -357,8 +361,81 @@ function restoreState(stateData) {
 
 export async function loadCanvases() {
     try {
-        state.setCanvases(JSON.parse(localStorage.getItem(CANVASES_KEY) || '[]'));
-        state.setCanvasGroups(JSON.parse(localStorage.getItem(CANVAS_GROUPS_KEY) || '[]'));
+        // Try loading settings from File System first (for FS-enabled users)
+        if (fsDirectoryHandle) {
+            const fsSettings = await loadSettingsFromFileSystem();
+            if (fsSettings) {
+                // Restore settings that may not be in localStorage (e.g. after browser data clear)
+                let restoredAny = false;
+                for (const [key, val] of Object.entries(fsSettings)) {
+                    if (localStorage.getItem(key) === null) {
+                        localStorage.setItem(key, val);
+                        restoredAny = true;
+                    }
+                }
+                // If any settings were restored, sync them to the reactive state
+                if (restoredAny) {
+                    const settingsStateMap = {
+                        'knotpad-default-font-size': { setter: state.setDefaultFontSize, bool: false },
+                        'knotpad-note-wrap-mode': { setter: state.setNoteWrapMode, bool: false },
+                        'knotpad-default-text-align': { setter: state.setDefaultTextAlign, bool: false },
+                        'knotpad-paragraph-spacing': { setter: state.setParagraphSpacing, bool: false },
+                        'knotpad-invert-wheel-zoom': { setter: state.setInvertWheelZoom, bool: true },
+                        'knotpad-grid-snap': { setter: state.setGridSnap, bool: true },
+                        'knotpad-color-display-mode': { setter: state.setColorDisplayMode, bool: false },
+                        'knotpad-link-preview-enabled': { setter: state.setLinkPreviewEnabled, bool: true },
+                        'knotpad-canvas-paste-formatting': { setter: state.setCanvasPasteFormattingEnabled, bool: true, trueDefault: true },
+                        'knotpad-sidebar-pinned': { setter: state.setSidebarPinned, bool: true },
+                        'knotpad-sidebar-open': { setter: state.setSidebarOpen, bool: true }
+                    };
+                    for (const [key, val] of Object.entries(fsSettings)) {
+                        const mapping = settingsStateMap[key];
+                        if (mapping) {
+                            if (mapping.bool) {
+                                if (mapping.trueDefault) {
+                                    mapping.setter(val !== 'false');
+                                } else {
+                                    mapping.setter(val === 'true');
+                                }
+                            } else {
+                                mapping.setter(val);
+                            }
+                        }
+                    }
+                    // Re-apply theme if restored
+                    if (fsSettings['knotpad-theme']) {
+                        if (fsSettings['knotpad-theme'] === 'light') {
+                            document.documentElement.classList.add('light');
+                        } else {
+                            document.documentElement.classList.remove('light');
+                        }
+                    }
+                    // Re-apply sidebar width if restored
+                    if (fsSettings['knotpad-sidebar-width']) {
+                        document.documentElement.style.setProperty('--sidebar-width', fsSettings['knotpad-sidebar-width'] + 'px');
+                    }
+                }
+            }
+        }
+
+        // Try loading canvases list from File System first
+        let canvasesList = null;
+        let canvasGroups = null;
+        if (fsDirectoryHandle) {
+            const fsData = await loadCanvasesListFromFileSystem();
+            if (fsData) {
+                canvasesList = fsData.canvases;
+                canvasGroups = fsData.groups;
+            }
+        }
+        if (!canvasesList) {
+            canvasesList = JSON.parse(localStorage.getItem(CANVASES_KEY) || '[]');
+        }
+        if (!canvasGroups) {
+            canvasGroups = JSON.parse(localStorage.getItem(CANVAS_GROUPS_KEY) || '[]');
+        }
+        state.setCanvases(canvasesList);
+        state.setCanvasGroups(canvasGroups);
         if (!state.canvases.length) {
             state.setCanvases([{ id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 }]);
         }
@@ -618,6 +695,7 @@ export async function switchCanvas(id) {
 
         state.setCurrentCanvasId(id);
         localStorage.setItem('knotpad-active-canvas', id);
+        scheduleSettingsSave();
         await loadCanvasData(id);
 
         // Ensure at least initial state exists if no history was restored
@@ -3051,6 +3129,7 @@ export function setupSidebarResize() {
         // Save the width
         const currentWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width')) || 280;
         localStorage.setItem(SIDEBAR_WIDTH_KEY, currentWidth);
+        scheduleSettingsSave();
     }, { signal });
 }
 

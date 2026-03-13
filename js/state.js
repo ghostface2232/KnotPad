@@ -2,6 +2,12 @@
 
 import eventBus, { Events } from './events-bus.js';
 
+// Lazy reference to storage module to avoid circular imports
+let _scheduleSettingsSave = null;
+export function initSettingsSaveCallback(fn) {
+    _scheduleSettingsSave = fn;
+}
+
 // Grid size constant (non-reactive)
 export const GRID_SIZE = 16;
 
@@ -54,11 +60,9 @@ function createState(initialState) {
             // Sync to localStorage if needed
             if (property in localStorageProps) {
                 const storageKey = localStorageProps[property];
-                if (booleanProps.has(property)) {
-                    localStorage.setItem(storageKey, value);
-                } else {
-                    localStorage.setItem(storageKey, value);
-                }
+                localStorage.setItem(storageKey, value);
+                // Also schedule save to File System if enabled
+                if (_scheduleSettingsSave) _scheduleSettingsSave();
             }
 
             // Emit state change event for non-silent properties
