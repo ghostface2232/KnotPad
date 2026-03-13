@@ -1670,11 +1670,17 @@ function setupItemEvents(item) {
             hasUnsavedChanges = false;
         }, { signal });
 
+        // Flag to prevent toolbar from hiding during formatting button operations
+        let formattingInProgress = false;
+
         // Function to show toolbar near selection
         function showToolbarNearSelection() {
             const sel = window.getSelection();
             if (!sel.rangeCount || sel.isCollapsed) {
-                toolbar.classList.remove('active');
+                // During formatting, selection may temporarily collapse - keep toolbar visible
+                if (!formattingInProgress) {
+                    toolbar.classList.remove('active');
+                }
                 return;
             }
 
@@ -1682,7 +1688,9 @@ function setupItemEvents(item) {
             // anchorNode or focusNode could be null in edge cases
             if (!sel.anchorNode || !sel.focusNode ||
                 !mb.contains(sel.anchorNode) || !mb.contains(sel.focusNode)) {
-                toolbar.classList.remove('active');
+                if (!formattingInProgress) {
+                    toolbar.classList.remove('active');
+                }
                 return;
             }
 
@@ -1703,6 +1711,13 @@ function setupItemEvents(item) {
                 if (rect.width === 0 && rect.height === 0) {
                     rect = mb.getBoundingClientRect();
                 }
+            }
+
+            // Check if the selection is scrolled out of the memo's visible area
+            const mbRect = mb.getBoundingClientRect();
+            if (rect.bottom < mbRect.top || rect.top > mbRect.bottom) {
+                toolbar.classList.remove('active');
+                return;
             }
 
             // Position toolbar above the selection
@@ -1746,6 +1761,13 @@ function setupItemEvents(item) {
         mb.addEventListener('dblclick', () => {
             setTimeout(showToolbarNearSelection, 10);
         }, { signal });
+
+        // Reposition toolbar when memo body is scrolled; hide when selection scrolls out of view
+        mb.addEventListener('scroll', () => {
+            if (toolbar.classList.contains('active')) {
+                showToolbarNearSelection();
+            }
+        }, { signal, passive: true });
 
         // Handle all keyboard-based selections:
         // - Shift+Arrow keys
@@ -2012,6 +2034,7 @@ function setupItemEvents(item) {
             }, { signal });
             btn.addEventListener('click', e => {
                 e.stopPropagation();
+                formattingInProgress = true;
                 mb.focus();
                 const md = btn.dataset.md;
 
@@ -2060,8 +2083,11 @@ function setupItemEvents(item) {
                     hasUnsavedChanges = false;
                 }
 
-                // Update toolbar position after formatting
-                setTimeout(showToolbarNearSelection, 10);
+                // Update toolbar position after formatting, then clear the flag
+                setTimeout(() => {
+                    showToolbarNearSelection();
+                    formattingInProgress = false;
+                }, 10);
             }, { signal });
         });
     }
