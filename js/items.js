@@ -1623,7 +1623,31 @@ function setupItemEvents(item) {
         }, { signal });
 
         // Handle input - save content
-        mb.addEventListener('input', () => {
+        mb.addEventListener('input', e => {
+            // After deletion, convert empty headings to plain divs so that
+            // subsequent lines don't inherit heading formatting when they merge up.
+            if (e.inputType && e.inputType.startsWith('delete')) {
+                const sel = window.getSelection();
+                if (sel.rangeCount) {
+                    let block = sel.anchorNode;
+                    // Walk up to find the direct child block of the memo body
+                    while (block && block !== mb && block.parentNode !== mb) {
+                        block = block.parentNode;
+                    }
+                    if (block && block !== mb && block.nodeType === Node.ELEMENT_NODE &&
+                        /^H[1-3]$/.test(block.tagName) && !block.textContent.trim()) {
+                        const div = document.createElement('div');
+                        div.innerHTML = block.innerHTML || '<br>';
+                        block.parentNode.replaceChild(div, block);
+                        const range = document.createRange();
+                        range.selectNodeContents(div);
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                }
+            }
+
             item.content = getHtmlContent(mb);
             eventBus.emit(Events.AUTOSAVE_TRIGGER);
             hasUnsavedChanges = true;
@@ -1670,11 +1694,17 @@ function setupItemEvents(item) {
             hasUnsavedChanges = false;
         }, { signal });
 
+        // Flag to prevent toolbar from hiding during formatting button operations
+        let formattingInProgress = false;
+
         // Function to show toolbar near selection
         function showToolbarNearSelection() {
             const sel = window.getSelection();
             if (!sel.rangeCount || sel.isCollapsed) {
-                toolbar.classList.remove('active');
+                // During formatting, selection may temporarily collapse - keep toolbar visible
+                if (!formattingInProgress) {
+                    toolbar.classList.remove('active');
+                }
                 return;
             }
 
@@ -1682,7 +1712,9 @@ function setupItemEvents(item) {
             // anchorNode or focusNode could be null in edge cases
             if (!sel.anchorNode || !sel.focusNode ||
                 !mb.contains(sel.anchorNode) || !mb.contains(sel.focusNode)) {
-                toolbar.classList.remove('active');
+                if (!formattingInProgress) {
+                    toolbar.classList.remove('active');
+                }
                 return;
             }
 
@@ -1703,6 +1735,13 @@ function setupItemEvents(item) {
                 if (rect.width === 0 && rect.height === 0) {
                     rect = mb.getBoundingClientRect();
                 }
+            }
+
+            // Check if the selection is scrolled out of the memo's visible area
+            const mbRect = mb.getBoundingClientRect();
+            if (rect.bottom < mbRect.top || rect.top > mbRect.bottom) {
+                toolbar.classList.remove('active');
+                return;
             }
 
             // Position toolbar above the selection
@@ -1746,6 +1785,13 @@ function setupItemEvents(item) {
         mb.addEventListener('dblclick', () => {
             setTimeout(showToolbarNearSelection, 10);
         }, { signal });
+
+        // Reposition toolbar when memo body is scrolled; hide when selection scrolls out of view
+        mb.addEventListener('scroll', () => {
+            if (toolbar.classList.contains('active')) {
+                showToolbarNearSelection();
+            }
+        }, { signal, passive: true });
 
         // Handle all keyboard-based selections:
         // - Shift+Arrow keys
@@ -2012,6 +2058,7 @@ function setupItemEvents(item) {
             }, { signal });
             btn.addEventListener('click', e => {
                 e.stopPropagation();
+                formattingInProgress = true;
                 mb.focus();
                 const md = btn.dataset.md;
 
@@ -2060,8 +2107,11 @@ function setupItemEvents(item) {
                     hasUnsavedChanges = false;
                 }
 
-                // Update toolbar position after formatting
-                setTimeout(showToolbarNearSelection, 10);
+                // Update toolbar position after formatting, then clear the flag
+                setTimeout(() => {
+                    showToolbarNearSelection();
+                    formattingInProgress = false;
+                }, 10);
             }, { signal });
         });
     }
@@ -2453,6 +2503,20 @@ function toggleHeading(el) {
                 }
 
                 newNode.innerHTML = html;
+
+                // When converting heading back to normal div, strip residual
+                // inline font-size/font-weight the browser may have injected
+                // during block-merge operations (e.g. content absorbed into a heading).
+                if (newNode.tagName === 'DIV') {
+                    newNode.querySelectorAll('[style]').forEach(child => {
+                        child.style.removeProperty('font-size');
+                        child.style.removeProperty('font-weight');
+                        if (!child.getAttribute('style')?.trim()) {
+                            child.removeAttribute('style');
+                        }
+                    });
+                }
+
                 node.parentNode.replaceChild(newNode, node);
 
                 const range = document.createRange();
