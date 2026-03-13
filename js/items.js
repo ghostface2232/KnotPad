@@ -1623,7 +1623,31 @@ function setupItemEvents(item) {
         }, { signal });
 
         // Handle input - save content
-        mb.addEventListener('input', () => {
+        mb.addEventListener('input', e => {
+            // After deletion, convert empty headings to plain divs so that
+            // subsequent lines don't inherit heading formatting when they merge up.
+            if (e.inputType && e.inputType.startsWith('delete')) {
+                const sel = window.getSelection();
+                if (sel.rangeCount) {
+                    let block = sel.anchorNode;
+                    // Walk up to find the direct child block of the memo body
+                    while (block && block !== mb && block.parentNode !== mb) {
+                        block = block.parentNode;
+                    }
+                    if (block && block !== mb && block.nodeType === Node.ELEMENT_NODE &&
+                        /^H[1-3]$/.test(block.tagName) && !block.textContent.trim()) {
+                        const div = document.createElement('div');
+                        div.innerHTML = block.innerHTML || '<br>';
+                        block.parentNode.replaceChild(div, block);
+                        const range = document.createRange();
+                        range.selectNodeContents(div);
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                }
+            }
+
             item.content = getHtmlContent(mb);
             eventBus.emit(Events.AUTOSAVE_TRIGGER);
             hasUnsavedChanges = true;
@@ -2479,6 +2503,20 @@ function toggleHeading(el) {
                 }
 
                 newNode.innerHTML = html;
+
+                // When converting heading back to normal div, strip residual
+                // inline font-size/font-weight the browser may have injected
+                // during block-merge operations (e.g. content absorbed into a heading).
+                if (newNode.tagName === 'DIV') {
+                    newNode.querySelectorAll('[style]').forEach(child => {
+                        child.style.removeProperty('font-size');
+                        child.style.removeProperty('font-weight');
+                        if (!child.getAttribute('style')?.trim()) {
+                            child.removeAttribute('style');
+                        }
+                    });
+                }
+
                 node.parentNode.replaceChild(newNode, node);
 
                 const range = document.createRange();

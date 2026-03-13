@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v15.9.33';
+const CACHE_VERSION = 'v15.9.34';
 const CACHE_NAME = 'knotpad-' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   './',
