@@ -561,11 +561,46 @@ function getMemoSelectionRange(editor) {
     return range;
 }
 
+// Convert paragraph blocks to <br>-separated inline content so pasted HTML
+// can be inserted into an existing paragraph without creating nested blocks.
+function flattenParagraphBlocksForInsertion(html) {
+    if (!html) return html;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+
+    const blocks = wrapper.querySelectorAll(':scope > div[' + MEMO_PARAGRAPH_ATTR + '="true"]');
+    if (!blocks.length) return html;
+
+    blocks.forEach(block => {
+        const parent = block.parentNode;
+        if (!parent) return;
+
+        let lastExtractedIsBr = false;
+        while (block.firstChild) {
+            const child = block.firstChild;
+            lastExtractedIsBr = (child.nodeType === Node.ELEMENT_NODE && child.nodeName === 'BR');
+            parent.insertBefore(child, block);
+        }
+
+        if (getNextMeaningfulSibling(block) && !lastExtractedIsBr) {
+            parent.insertBefore(document.createElement('br'), block);
+        }
+
+        block.remove();
+    });
+
+    return wrapper.innerHTML;
+}
+
 function insertMemoHtmlAtSelection(editor, html) {
     if (!html) return false;
 
     const range = getMemoSelectionRange(editor);
     if (!range) return false;
+
+    // Flatten paragraph blocks to inline content to avoid nesting block
+    // elements inside the current paragraph (which causes extra line breaks).
+    html = flattenParagraphBlocksForInsertion(html);
 
     range.deleteContents();
     const fragment = range.createContextualFragment(html);
@@ -949,11 +984,17 @@ function normalizeMemoHtml(html) {
         const parent = block.parentNode;
         if (!parent) return;
 
+        let lastExtractedIsBr = false;
         while (block.firstChild) {
-            parent.insertBefore(block.firstChild, block);
+            const child = block.firstChild;
+            lastExtractedIsBr = (child.nodeType === Node.ELEMENT_NODE && child.nodeName === 'BR');
+            parent.insertBefore(child, block);
         }
 
-        if (getNextMeaningfulSibling(block)) {
+        // Only add a separator <br> if the block's last child wasn't already a <br>.
+        // Empty blocks like <div><br></div> already contribute a line break via
+        // their inner <br>, so adding another would double the empty line.
+        if (getNextMeaningfulSibling(block) && !lastExtractedIsBr) {
             parent.insertBefore(document.createElement('br'), block);
         }
         block.remove();
