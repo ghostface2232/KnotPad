@@ -575,6 +575,9 @@ function flattenParagraphBlocksForInsertion(html) {
         const parent = block.parentNode;
         if (!parent) return;
 
+        // Preserve blocks with explicit text alignment instead of flattening
+        if (hasSupportedTextAlign(block)) return;
+
         let lastExtractedIsBr = false;
         while (block.firstChild) {
             const child = block.firstChild;
@@ -1924,6 +1927,16 @@ function setupItemEvents(item) {
             if (fallbackSemanticHtml) {
                 if (insertMemoHtmlAtSelection(mb, fallbackSemanticHtml)) {
                     mb.dispatchEvent(new Event('input', { bubbles: true }));
+                    return;
+                }
+            }
+
+            // Final fallback: insert plain text so paste is never silently swallowed
+            const plainText = cd.getData('text/plain');
+            if (plainText) {
+                const plainHtml = convertClipboardPlainTextToMemoHtml(plainText);
+                if (plainHtml && insertMemoHtmlAtSelection(mb, plainHtml)) {
+                    mb.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }
         }, { signal });
@@ -2500,17 +2513,16 @@ function setAlignment(el, alignment) {
         lastAlignedBlock = block;
     });
 
-    // If no blocks found, create a div wrapper for the entire content
+    // If no blocks found, wrap all content in a paragraph div and align it
     if (blocksToAlign.size === 0 && el.childNodes.length > 0) {
-        // Try using execCommand as fallback
-        if (alignment === 'left') {
-            document.execCommand('justifyLeft', false, null);
-        } else if (alignment === 'center') {
-            document.execCommand('justifyCenter', false, null);
-        } else if (alignment === 'right') {
-            document.execCommand('justifyRight', false, null);
+        const wrapper = document.createElement('div');
+        ensureMemoParagraphBlock(wrapper);
+        wrapper.style.textAlign = alignment;
+        while (el.firstChild) {
+            wrapper.appendChild(el.firstChild);
         }
-        return;
+        el.appendChild(wrapper);
+        lastAlignedBlock = wrapper;
     }
 
     if (lastAlignedBlock) {
@@ -2549,6 +2561,14 @@ function toggleHeading(el) {
                 // inline font-size/font-weight the browser may have injected
                 // during block-merge operations (e.g. content absorbed into a heading).
                 if (newNode.tagName === 'DIV') {
+                    ensureMemoParagraphBlock(newNode);
+                    // Clean residual styles on the div itself
+                    newNode.style.removeProperty('font-size');
+                    newNode.style.removeProperty('font-weight');
+                    if (!newNode.getAttribute('style')?.trim()) {
+                        newNode.removeAttribute('style');
+                    }
+                    // Clean residual styles on children
                     newNode.querySelectorAll('[style]').forEach(child => {
                         child.style.removeProperty('font-size');
                         child.style.removeProperty('font-weight');
