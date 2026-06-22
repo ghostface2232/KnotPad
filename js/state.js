@@ -14,6 +14,11 @@ export const GRID_SIZE = 16;
 // Blob URL cache (non-reactive, managed separately)
 export const blobURLCache = new Map();
 
+// Media ids pending deletion (deferred GC). Media bytes are NOT destroyed at
+// delete time so that Undo can restore them; gcOrphanMedia() reclaims any id
+// no longer referenced by live items or in-memory undo/redo snapshots.
+export const pendingMediaDeletes = new Set();
+
 // Properties that should sync to localStorage
 const localStorageProps = {
     sidebarPinned: 'knotpad-sidebar-pinned',
@@ -256,6 +261,10 @@ export function resetViewport() {
 export function clearItemsAndConnections() {
     blobURLCache.forEach(url => URL.revokeObjectURL(url));
     blobURLCache.clear();
+    // Drop pending-delete tracking on canvas switch/clear: the leaving canvas's
+    // undo/redo stacks are persisted to localStorage and may still reference these
+    // media, so GC-ing them here would corrupt that canvas's history. Keep the bytes.
+    pendingMediaDeletes.clear();
     state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); if (c.labelEl) c.labelEl.remove(); });
     state.connections = [];
     state.items.forEach(i => i.el.remove());

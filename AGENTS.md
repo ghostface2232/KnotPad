@@ -82,7 +82,7 @@ KnotPad/
 
 | File | Purpose | Key Exports |
 |------|---------|-------------|
-| `utils.js` | Helper functions | `$` (DOM selector), `esc`, `curvePath`, `showToast` |
+| `utils.js` | Helper functions | `$` (DOM selector), `esc`, `sanitizeUrl`, `sanitizeMemoHtml`, `curvePath`, `showToast` |
 | `constants.js` | App configuration | `COLORS`, `COLOR_MAP`, `CANVAS_ICONS`, `FONT_SIZES` |
 
 ---
@@ -106,6 +106,7 @@ KnotPad/
 | Font size cycling | `items.js:setItemFontSize()` |
 | Selection | `items.js:selectItem()`, `deselectAll()` |
 | Deletion | `items.js:deleteItem()`, `deleteSelectedItems()` |
+| Media deletion (deferred GC) | `items.js:deleteItem()` (defers via `state.pendingMediaDeletes`), `items.js:gcOrphanMedia()`, triggered in `ui.js:saveState()` |
 | Duplication | `items.js:duplicateItem()` |
 | Color grouping | `items.js:toggleColorGroupMode()`, `arrangeByColor()` |
 
@@ -325,7 +326,7 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 |------|-----------|
 | **Event Listeners** | Always clean up before element removal. Use `AbortController` |
 | **DOM Elements** | Remove associated elements (label, hitArea, arrow) with parent |
-| **Blob URLs** | Call `revokeObjectURL()` on media deletion/failure |
+| **Blob URLs** | Call `revokeObjectURL()` on failure. On item deletion media is NOT destroyed immediately — it is deferred to `gcOrphanMedia()` so Undo can restore it (revoke happens there once unreferenced) |
 | **Timers** | Cancel existing timers before starting new operations |
 
 ### State Management
@@ -351,6 +352,14 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 | **CSS Properties** | Set explicitly, don't rely on defaults |
 | **HTML Content** | Strip tags for search/display, use `textContent` |
 | **Filter Sync** | Update connection visibility when filtering items |
+
+### Security (untrusted canvas JSON)
+
+| Area | Guideline |
+|------|-----------|
+| **Media src** | Never interpolate `src` into an HTML string; assign via the `.src` property after `innerHTML` (see `createItem`) |
+| **Link href** | Pass URLs through `sanitizeUrl()` (http/https only); add `rel="noopener noreferrer"` to `target="_blank"` anchors |
+| **Memo HTML on load** | `parseContent()` runs `sanitizeMemoHtml()` on the load/import boundary, not just paste — keep both boundaries sanitized |
 
 ### Checklist
 
