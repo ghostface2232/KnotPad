@@ -5,7 +5,7 @@ import { $, esc, generateId, showToast, stripHtml, findFreePosition } from './ut
 import * as state from './state.js';
 import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
-import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus, setupFaviconErrorHandler, loadLinkPreviewForItem, removeLinkPreviewFromItem, gcOrphanMedia } from './items.js';
+import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus, setupFaviconErrorHandler, loadLinkPreviewForItem, removeLinkPreviewFromItem, gcOrphanMedia, finishMemoCompositions, flushMemoCompositionsForStorage, cleanupItemEvents } from './items.js';
 import { addConnection, updateConnectionArrow, updateConnectionLabel, updateAllConnections, addChildNode } from './connections.js';
 import {
     fsDirectoryHandle,
@@ -309,7 +309,10 @@ export function redo() {
 function restoreState(stateData) {
     state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); if (c.labelEl) c.labelEl.remove(); });
     state.connections.length = 0;
-    state.items.forEach(i => i.el.remove());
+    state.items.forEach(i => {
+        cleanupItemEvents(i);
+        i.el.remove();
+    });
     state.items.length = 0;
     state.selectedItems.clear();
     state.setSelectedItem(null);
@@ -770,9 +773,20 @@ export async function switchCanvas(id) {
 
     switchCanvasInProgress = true;
     pendingCanvasSwitchId = null;
+    let lockedMemoEditors = [];
 
     // Save current canvas with its undo/redo history before switching
     try {
+        // Acquire the switch lock before waiting for IME so concurrent switch
+        // requests queue behind this transition. Once composition settles,
+        // freeze editors before capturing the save payload; otherwise a slow
+        // File System write leaves a window where new input can be lost.
+        await finishMemoCompositions();
+        lockedMemoEditors = state.items
+            .map(item => item.el.querySelector('.memo-body[contenteditable="true"]'))
+            .filter(Boolean);
+        lockedMemoEditors.forEach(editor => editor.setAttribute('contenteditable', 'false'));
+
         if (state.currentCanvasId) {
             await saveCurrentCanvas();
             // History ends at the canvas boundary. Reclaim deferred deletions
@@ -789,7 +803,10 @@ export async function switchCanvas(id) {
             if (c.labelEl) c.labelEl.remove();
         });
         state.connections.length = 0;
-        state.items.forEach(i => i.el.remove());
+        state.items.forEach(i => {
+            cleanupItemEvents(i);
+            i.el.remove();
+        });
         state.items.length = 0;
         state.selectedItems.clear();
         state.setSelectedItem(null);
@@ -824,6 +841,9 @@ export async function switchCanvas(id) {
         renderCanvasList();
         updateTopbarCanvasName();
     } finally {
+        lockedMemoEditors.forEach(editor => {
+            if (editor.isConnected) editor.setAttribute('contenteditable', 'true');
+        });
         switchCanvasInProgress = false;
         if (pendingCanvasSwitchId === state.currentCanvasId) {
             pendingCanvasSwitchId = null;
@@ -3294,16 +3314,20 @@ function saveToLocalStorageSync() {
 
 // Save on page unload to prevent data loss
 window.addEventListener('beforeunload', () => {
-    if (hasPendingChanges && state.currentCanvasId) {
+    const compositionChanged = flushMemoCompositionsForStorage();
+    if ((hasPendingChanges || compositionChanged) && state.currentCanvasId) {
         saveToLocalStorageSync();
     }
 });
 
 // Also save on visibility change (when user switches tabs or minimizes)
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && hasPendingChanges && state.currentCanvasId) {
-        saveToLocalStorageSync();
-        hasPendingChanges = false;
+    if (document.visibilityState === 'hidden') {
+        const compositionChanged = flushMemoCompositionsForStorage();
+        if ((hasPendingChanges || compositionChanged) && state.currentCanvasId) {
+            saveToLocalStorageSync();
+            hasPendingChanges = false;
+        }
     }
 });
 

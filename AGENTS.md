@@ -99,8 +99,11 @@ KnotPad/
 | Handle image/video | `ui.js:handleFile()` |
 | Item rendering | `items.js:createItem()` |
 | Memo paste normalization | `items.js:getMemoHtmlFromClipboardData()`, `sanitizeClipboardHtml()` |
+| Memo clipboard trust boundary | `items.js:getMemoHtmlFromClipboardData()` sanitizes external, custom MIME, and marker HTML uniformly |
 | Memo paragraph spacing on Enter | `items.js:insertParagraphBreakAtSelection()`, `ui.js:applyParagraphSpacing()` |
 | Memo live content and blur commit | `items.js:getLiveMemoHtml()`, `commitMemoContent()` |
+| Memo IME transaction handling | `items.js:setupItemEvents()` defers model/autosave/history updates; `finishMemoCompositions()` gates destructive transitions; `flushMemoCompositionsForStorage()` protects synchronous page-exit storage |
+| Memo editor artifact cleanup | `items.js:stripMemoEditorArtifacts()`; line/paragraph insertion uses `<br>` placeholders instead of zero-width sentinel text |
 | Legacy memo line-break normalization | `items.js:normalizeMemoHtml()`, `convertTopLevelLegacyBreaksToParagraphs()` |
 | Item events | `items.js:setupItemEvents()` |
 | Color management | `items.js:setItemColor()` |
@@ -167,6 +170,7 @@ Undo/redo history is session-only and is not serialized into canvas storage. Can
 | Keyboard shortcuts | `events.js:setupKeyboardEvents()` |
 | Drag & drop | `events.js:setupDragDropEvents()` |
 | Copy/paste | `events.js:setupCopyEvents()`, `setupPasteEvents()` |
+| Paste event ownership | Item editors stop handled paste propagation in `items.js`; `events.js:setupPasteEvents()` ignores already-canceled events before canvas paste routing |
 
 ---
 

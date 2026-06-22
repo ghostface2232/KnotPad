@@ -5,7 +5,8 @@ import * as state from './state.js';
 import { updateTransform, setZoom, throttledMinimap, startPan } from './viewport.js';
 import {
     selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading,
-    getMemoHtmlFromClipboardData, clipboardContainsStructuredMemoContent, selectAllItems
+    getMemoHtmlFromClipboardData, clipboardContainsStructuredMemoContent, selectAllItems,
+    stripMemoEditorArtifacts
 } from './items.js';
 import { getConnectionsForItems, updateConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo, deselectConnection } from './connections.js';
 import {
@@ -512,13 +513,13 @@ export function setupCopyEvents() {
             const sel = window.getSelection();
             if (!sel.rangeCount || sel.isCollapsed) return;
 
-            const plainText = sel.toString();
+            const plainText = stripMemoEditorArtifacts(sel.toString());
             if (!plainText) return;
 
             const fragment = sel.getRangeAt(0).cloneContents();
             const container = document.createElement('div');
             container.appendChild(fragment);
-            const html = container.innerHTML;
+            const html = stripMemoEditorArtifacts(container.innerHTML);
             if (!html) return;
 
             e.preventDefault();
@@ -541,6 +542,11 @@ export function setupPasteEvents() {
     const { signal } = pasteEventsController;
 
     window.addEventListener('paste', e => {
+        // A focused editor (or another component) owns the paste once it has
+        // canceled the browser default. Do not reinterpret that same event as
+        // a canvas paste if its target/focus changes while bubbling.
+        if (e.defaultPrevented) return;
+
         // Allow default paste behavior in input, textarea, and contenteditable elements
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (e.target.matches('[contenteditable="true"]') || e.target.closest('[contenteditable="true"]')) return;

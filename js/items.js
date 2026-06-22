@@ -8,9 +8,61 @@ import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle, loadMedia, l
 import eventBus, { Events } from './events-bus.js';
 
 const canvas = $('canvas');
-const ZERO_WIDTH_SPACE = '\u200B';
 const KNOTPAD_MEMO_CLIPBOARD_MARKER = '<!--KNOTPAD_MEMO-->';
 const MEMO_PARAGRAPH_ATTR = 'data-knotpad-paragraph';
+const memoEditorSessions = new Set();
+const memoCompositionWaiters = new Set();
+
+function notifyMemoCompositionSettled() {
+    if ([...memoEditorSessions].some(session => session.isPending())) return;
+    memoCompositionWaiters.forEach(resolve => resolve());
+    memoCompositionWaiters.clear();
+}
+
+// Destructive document transitions must not remove an editor while its IME
+// still owns the live DOM. Blurring asks the browser to finalize the candidate;
+// callers resume only after compositionend has committed that final DOM.
+export function finishMemoCompositions() {
+    const pendingSessions = [...memoEditorSessions].filter(session => session.isPending());
+    if (!pendingSessions.length) return Promise.resolve();
+
+    const settled = new Promise(resolve => {
+        let fallbackTimer = null;
+        const finish = () => {
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            resolve();
+        };
+        memoCompositionWaiters.add(finish);
+        fallbackTimer = setTimeout(() => {
+            [...memoEditorSessions]
+                .filter(session => session.isPending())
+                .forEach(session => session.forceSettle());
+            notifyMemoCompositionSettled();
+        }, 250);
+    });
+    pendingSessions.forEach(session => {
+        if (session.isComposing()) session.editor.blur();
+    });
+    notifyMemoCompositionSettled();
+    return settled;
+}
+
+// Page-exit/hidden lifecycle events cannot await compositionend. Blur normally
+// finalizes IME synchronously; if a browser does not, preserve the best live DOM
+// available so a mobile tab discard or unload cannot silently lose the candidate.
+export function flushMemoCompositionsForStorage() {
+    const pendingSessions = [...memoEditorSessions].filter(session => session.isPending());
+    pendingSessions.forEach(session => {
+        if (session.isComposing()) session.editor.blur();
+    });
+
+    let changed = false;
+    pendingSessions.forEach(session => {
+        if (!session.isPending()) return;
+        changed = session.flushForStorage() || changed;
+    });
+    return changed;
+}
 
 function updateItemGeometryDependents(item) {
     state.connections.forEach(connection => {
@@ -508,7 +560,7 @@ function memoPlainTextToHtml(text) {
         .replace(/\n/g, '<br>');
 }
 
-function stripMemoEditorArtifacts(text) {
+export function stripMemoEditorArtifacts(text) {
     return (text || '').replace(/\u200B/g, '').replace(/\u00A0/g, ' ');
 }
 
@@ -646,13 +698,7 @@ function insertMemoHtmlAtSelection(editor, html) {
     const sel = window.getSelection();
     const caretRange = document.createRange();
 
-    if (lastNode.nodeType === Node.ELEMENT_NODE && lastNode.nodeName === 'BR' && !getNextMeaningfulSibling(lastNode)) {
-        const placeholder = document.createTextNode(ZERO_WIDTH_SPACE);
-        lastNode.parentNode.insertBefore(placeholder, lastNode.nextSibling);
-        caretRange.setStart(placeholder, 0);
-    } else {
-        caretRange.setStartAfter(lastNode);
-    }
+    caretRange.setStartAfter(lastNode);
 
     caretRange.collapse(true);
     sel.removeAllRanges();
@@ -669,15 +715,18 @@ function insertMemoLineBreakAtSelection(editor, prefix = '') {
 
     const fragment = document.createDocumentFragment();
     const br = document.createElement('br');
-    const caretText = document.createTextNode(prefix + ZERO_WIDTH_SPACE);
-
     fragment.appendChild(br);
-    fragment.appendChild(caretText);
+    const caretText = prefix ? document.createTextNode(prefix) : null;
+    if (caretText) fragment.appendChild(caretText);
     range.insertNode(fragment);
 
     const sel = window.getSelection();
     const caretRange = document.createRange();
-    caretRange.setStart(caretText, prefix.length);
+    if (caretText) {
+        caretRange.setStart(caretText, prefix.length);
+    } else {
+        caretRange.setStartAfter(br);
+    }
     caretRange.collapse(true);
     sel.removeAllRanges();
     sel.addRange(caretRange);
@@ -776,7 +825,7 @@ function insertParagraphBreakAtSelection(editor) {
 
     if (!block) {
         const newBlock = ensureMemoParagraphBlock(document.createElement('div'));
-        newBlock.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+        newBlock.appendChild(document.createElement('br'));
         const referenceNode = range.startContainer === editor
             ? (editor.childNodes[range.startOffset] || null)
             : null;
@@ -801,10 +850,10 @@ function insertParagraphBreakAtSelection(editor) {
     trimEditableBlockBoundaryNodes(newBlock);
 
     if (!block.firstChild) {
-        block.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+        block.appendChild(document.createElement('br'));
     }
     if (!newBlock.firstChild) {
-        newBlock.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+        newBlock.appendChild(document.createElement('br'));
     }
 
     block.parentNode.insertBefore(newBlock, block.nextSibling);
@@ -918,7 +967,7 @@ function placeCaretAtStart(container) {
     if (!container) return false;
 
     if (!container.firstChild) {
-        container.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+        container.appendChild(document.createElement('br'));
     }
 
     const sel = window.getSelection();
@@ -967,7 +1016,7 @@ function insertListItemAfterCurrent(editor, currentListItem) {
     trimListItemBoundaryNodes(newListItem);
 
     if (!newListItem.firstChild) {
-        newListItem.appendChild(document.createTextNode(ZERO_WIDTH_SPACE));
+        newListItem.appendChild(document.createElement('br'));
     }
 
     if (currentListItem.nextSibling) {
@@ -1084,6 +1133,10 @@ function sanitizeClipboardHtml(rawHtml) {
             clean.style.textAlign = node.style.textAlign;
         }
 
+        if (outTag === 'div' && node.getAttribute(MEMO_PARAGRAPH_ATTR) === 'true') {
+            clean.setAttribute(MEMO_PARAGRAPH_ATTR, 'true');
+        }
+
         if (outTag === 'ol' && node.hasAttribute('start')) {
             clean.setAttribute('start', node.getAttribute('start'));
         }
@@ -1142,13 +1195,13 @@ export function getMemoHtmlFromClipboardData(clipboardData, options = {}) {
 
     const internalHtml = clipboardData.getData('application/x-knotpad-memo');
     if (internalHtml) {
-        return normalizeMemoHtml(internalHtml);
+        return sanitizeClipboardHtml(internalHtml);
     }
 
     const rawHtml = clipboardData.getData('text/html');
     const markedInternalHtml = extractInternalMemoClipboardHtml(rawHtml);
     if (markedInternalHtml) {
-        return normalizeMemoHtml(markedInternalHtml);
+        return sanitizeClipboardHtml(markedInternalHtml);
     }
 
     const text = clipboardData.getData('text/plain');
@@ -1625,6 +1678,112 @@ function setupItemEvents(item) {
         let contentBeforeEdit = item.content;
         let hasUnsavedChanges = false;
         let undoSaveTimer = null;
+        let isComposing = false;
+        let pendingCompositionCommit = false;
+        let pendingCompositionBlur = false;
+        let suppressCompositionParagraph = false;
+        let compositionEnterTimer = null;
+        let compositionSettleTimer = null;
+
+        const scheduleMemoUndoSnapshot = () => {
+            if (undoSaveTimer) clearTimeout(undoSaveTimer);
+            undoSaveTimer = setTimeout(() => {
+                if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
+                    eventBus.emit(Events.STATE_SAVE);
+                    contentBeforeEdit = item.content;
+                    hasUnsavedChanges = false;
+                }
+            }, 1000);
+        };
+
+        const applyMemoInput = inputEvent => {
+            // After deletion, convert empty headings to plain divs so that
+            // subsequent lines don't inherit heading formatting when they merge up.
+            if (inputEvent?.inputType?.startsWith('delete')) {
+                const sel = window.getSelection();
+                if (sel.rangeCount) {
+                    let block = sel.anchorNode;
+                    // Walk up to find the direct child block of the memo body
+                    while (block && block !== mb && block.parentNode !== mb) {
+                        block = block.parentNode;
+                    }
+                    if (block && block !== mb && block.nodeType === Node.ELEMENT_NODE &&
+                        /^H[1-3]$/.test(block.tagName) && !block.textContent.trim()) {
+                        const div = document.createElement('div');
+                        div.innerHTML = block.innerHTML || '<br>';
+                        block.parentNode.replaceChild(div, block);
+                        const range = document.createRange();
+                        range.selectNodeContents(div);
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                }
+            }
+
+            item.content = getLiveMemoHtml(mb);
+            eventBus.emit(Events.AUTOSAVE_TRIGGER);
+            hasUnsavedChanges = true;
+            scheduleMemoUndoSnapshot();
+        };
+
+        const finalizeMemoBlur = () => {
+            pendingCompositionBlur = false;
+
+            if (undoSaveTimer) {
+                clearTimeout(undoSaveTimer);
+                undoSaveTimer = null;
+            }
+
+            // Blur is the commit boundary for memo editing. If normalization
+            // changes the stored representation, persist that canonical form
+            // as a real change rather than leaving the live DOM and model apart.
+            const liveContentBeforeCommit = item.content;
+            commitMemoContent(mb, item);
+            if (item.content !== liveContentBeforeCommit) {
+                hasUnsavedChanges = true;
+                eventBus.emit(Events.AUTOSAVE_TRIGGER);
+            }
+
+            if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
+                eventBus.emit(Events.STATE_SAVE);
+                contentBeforeEdit = item.content;
+                hasUnsavedChanges = false;
+            }
+        };
+
+        const isCompositionEvent = event => isComposing || event?.isComposing || event?.keyCode === 229;
+        const memoEditorSession = {
+            editor: mb,
+            isComposing: () => isComposing,
+            isPending: () => isComposing || pendingCompositionCommit,
+            flushForStorage: () => {
+                const canonicalHtml = normalizeMemoHtml(mb.innerHTML);
+                if (item.content === canonicalHtml) return false;
+                item.content = canonicalHtml;
+                return true;
+            },
+            forceSettle: () => {
+                if (compositionSettleTimer) {
+                    clearTimeout(compositionSettleTimer);
+                    compositionSettleTimer = null;
+                }
+                isComposing = false;
+                pendingCompositionCommit = false;
+                if (pendingCompositionBlur) {
+                    finalizeMemoBlur();
+                } else {
+                    applyMemoInput(null);
+                }
+            }
+        };
+        memoEditorSessions.add(memoEditorSession);
+        signal.addEventListener('abort', () => {
+            if (compositionEnterTimer) clearTimeout(compositionEnterTimer);
+            if (compositionSettleTimer) clearTimeout(compositionSettleTimer);
+            memoEditorSessions.delete(memoEditorSession);
+            notifyMemoCompositionSettled();
+        }, { once: true });
 
         // Handle border/padding area click - select node instead of focusing text
         itemMemo.addEventListener('mousedown', e => {
@@ -1713,43 +1872,50 @@ function setupItemEvents(item) {
 
         // Handle input - save content
         mb.addEventListener('input', e => {
-            // After deletion, convert empty headings to plain divs so that
-            // subsequent lines don't inherit heading formatting when they merge up.
-            if (e.inputType && e.inputType.startsWith('delete')) {
-                const sel = window.getSelection();
-                if (sel.rangeCount) {
-                    let block = sel.anchorNode;
-                    // Walk up to find the direct child block of the memo body
-                    while (block && block !== mb && block.parentNode !== mb) {
-                        block = block.parentNode;
-                    }
-                    if (block && block !== mb && block.nodeType === Node.ELEMENT_NODE &&
-                        /^H[1-3]$/.test(block.tagName) && !block.textContent.trim()) {
-                        const div = document.createElement('div');
-                        div.innerHTML = block.innerHTML || '<br>';
-                        block.parentNode.replaceChild(div, block);
-                        const range = document.createRange();
-                        range.selectNodeContents(div);
-                        range.collapse(true);
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                    }
-                }
+            if (isCompositionEvent(e)) {
+                pendingCompositionCommit = true;
+                return;
+            }
+            if (pendingCompositionBlur) {
+                pendingCompositionCommit = true;
+                return;
             }
 
-            item.content = getLiveMemoHtml(mb);
-            eventBus.emit(Events.AUTOSAVE_TRIGGER);
-            hasUnsavedChanges = true;
+            pendingCompositionCommit = false;
+            applyMemoInput(e);
+        }, { signal });
 
-            // Debounced save to undo stack (save after 1 second of no typing)
-            if (undoSaveTimer) clearTimeout(undoSaveTimer);
-            undoSaveTimer = setTimeout(() => {
-                if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
-                    eventBus.emit(Events.STATE_SAVE);
-                    contentBeforeEdit = item.content;
-                    hasUnsavedChanges = false;
+        mb.addEventListener('compositionstart', () => {
+            if (compositionSettleTimer) {
+                clearTimeout(compositionSettleTimer);
+                compositionSettleTimer = null;
+            }
+            isComposing = true;
+            pendingCompositionCommit = false;
+        }, { signal });
+
+        mb.addEventListener('compositionend', () => {
+            isComposing = false;
+            pendingCompositionCommit = true;
+
+            // Some browsers dispatch the final non-composing input in a later
+            // task. Keep a short, bounded grace period before falling back to the
+            // compositionend DOM so a canvas transition cannot race that input.
+            if (compositionSettleTimer) clearTimeout(compositionSettleTimer);
+            compositionSettleTimer = setTimeout(() => {
+                compositionSettleTimer = null;
+                if (pendingCompositionBlur) {
+                    pendingCompositionCommit = false;
+                    finalizeMemoBlur();
+                    notifyMemoCompositionSettled();
+                    return;
                 }
-            }, 1000);
+                if (pendingCompositionCommit) {
+                    pendingCompositionCommit = false;
+                    applyMemoInput(null);
+                }
+                notifyMemoCompositionSettled();
+            }, 50);
         }, { signal });
 
         // Handle blur - save state if changed
@@ -1762,28 +1928,12 @@ function setupItemEvents(item) {
                     toolbar.classList.remove('active');
                 }
             }, 150);
-            // Clear pending debounce timer
-            if (undoSaveTimer) {
-                clearTimeout(undoSaveTimer);
-                undoSaveTimer = null;
+            if (isComposing) {
+                pendingCompositionBlur = true;
+                return;
             }
 
-            // Blur is the commit boundary for memo editing. If normalization
-            // changes the stored representation, persist that canonical form
-            // as a real change rather than leaving the live DOM and model apart.
-            const liveContentBeforeCommit = item.content;
-            commitMemoContent(mb, item);
-            if (item.content !== liveContentBeforeCommit) {
-                hasUnsavedChanges = true;
-                eventBus.emit(Events.AUTOSAVE_TRIGGER);
-            }
-
-            // Save to undo stack if content changed during editing
-            if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
-                eventBus.emit(Events.STATE_SAVE);
-                contentBeforeEdit = item.content;
-                hasUnsavedChanges = false;
-            }
+            finalizeMemoBlur();
         }, { signal });
 
         // Record current state for undo on focus
@@ -1958,6 +2108,7 @@ function setupItemEvents(item) {
         // Fall back to sanitized semantic HTML only when plain text is unavailable.
         mb.addEventListener('paste', e => {
             e.preventDefault();
+            e.stopPropagation();
             const cd = e.clipboardData;
             if (!cd) return;
 
@@ -2001,6 +2152,12 @@ function setupItemEvents(item) {
         // This avoids browser-specific contenteditable list behavior after Shift+Enter.
         mb.addEventListener('beforeinput', e => {
             if (e.inputType !== 'insertParagraph' && e.inputType !== 'insertLineBreak') return;
+            if (isCompositionEvent(e)) return;
+            if (suppressCompositionParagraph) {
+                suppressCompositionParagraph = false;
+                e.preventDefault();
+                return;
+            }
 
             const activeListItem = getListItemAtSelection(mb);
             if (!activeListItem) return;
@@ -2031,7 +2188,13 @@ function setupItemEvents(item) {
         mb.addEventListener('keydown', e => {
             if (e.key !== 'Enter') return;
 
-            if (e.isComposing) {
+            if (isCompositionEvent(e)) {
+                suppressCompositionParagraph = true;
+                if (compositionEnterTimer) clearTimeout(compositionEnterTimer);
+                compositionEnterTimer = setTimeout(() => {
+                    suppressCompositionParagraph = false;
+                    compositionEnterTimer = null;
+                }, 0);
                 return;
             }
 
@@ -2284,6 +2447,7 @@ function setupItemEvents(item) {
         // Block paste of formatted content - only allow plain text
         kb.addEventListener('paste', e => {
             e.preventDefault();
+            e.stopPropagation();
             const text = e.clipboardData.getData('text/plain');
             // Remove any newlines from pasted content
             const cleanText = text.replace(/[\r\n]+/g, ' ').trim();
@@ -2771,7 +2935,7 @@ export { hideMenus, toggleHeading };
 
 // Clean up all event listeners attached to an item
 // This prevents memory leaks when deleting items
-function cleanupItemEvents(item) {
+export function cleanupItemEvents(item) {
     // Abort all element-level listeners registered with the AbortController
     if (item._abortController) {
         item._abortController.abort();

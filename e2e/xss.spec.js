@@ -44,3 +44,45 @@ test('malicious item content does not execute on render', async ({ page }) => {
   const imgSrcs = await page.$$eval('img.item-image', els => els.map(e => e.getAttribute('src') || ''));
   for (const s of imgSrcs) expect(s.toLowerCase()).not.toContain('onerror');
 });
+
+test('forged internal memo clipboard HTML is sanitized before live insertion', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('#canvas');
+
+  const result = await page.evaluate(async () => {
+    window.__clipboardXss = false;
+    const items = await import('/js/items.js');
+    items.createItem({ type: 'memo', x: 100, y: 100, w: 220, h: 120, content: '' });
+
+    const editor = document.querySelector('.memo-body');
+    editor.focus();
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    const transfer = new DataTransfer();
+    transfer.setData(
+      'application/x-knotpad-memo',
+      '<strong>safe</strong><img src="invalid" onerror="window.__clipboardXss=true"><script>window.__clipboardXss=true</script>',
+    );
+    editor.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: transfer,
+    }));
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    return {
+      executed: window.__clipboardXss,
+      html: editor.innerHTML,
+      unsafeNodes: editor.querySelectorAll('img, script, [onerror]').length,
+    };
+  });
+
+  expect(result.executed).toBe(false);
+  expect(result.unsafeNodes).toBe(0);
+  expect(result.html).toContain('<strong>safe</strong>');
+});

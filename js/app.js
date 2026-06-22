@@ -5,7 +5,7 @@ import * as state from './state.js';
 import { initSettingsSaveCallback } from './state.js';
 import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder, scheduleSettingsSave, migrateToFileSystem } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
-import { createItem, addMemo, addKeyword, setFilter, setItemColor, toggleColorGroupMode, positionNewItemInColorGroup } from './items.js';
+import { createItem, addMemo, addKeyword, setFilter, setItemColor, toggleColorGroupMode, positionNewItemInColorGroup, cleanupItemEvents } from './items.js';
 import {
     setupConnDirectionPicker,
     setupConnectionContextMenu,
@@ -322,7 +322,10 @@ function setupImportExportEvents() {
                 if (c.labelEl) c.labelEl.remove();
             });
             state.connections.length = 0;
-            state.items.forEach(i => i.el.remove());
+            state.items.forEach(i => {
+                cleanupItemEvents(i);
+                i.el.remove();
+            });
             state.items.length = 0;
             state.selectedItems.clear();
 
