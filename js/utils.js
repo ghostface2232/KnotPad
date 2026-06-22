@@ -17,6 +17,62 @@ export function stripHtml(html) {
     return div.textContent || '';
 }
 
+// Validate/normalize a URL for safe use as a link href.
+// Only http/https are allowed; bare URLs (no scheme) are upgraded to https://.
+// Returns '' for unsafe schemes (javascript:, data:, vbscript:, ...) or invalid input.
+export function sanitizeUrl(u) {
+    if (!u) return '';
+    let candidate = String(u).trim();
+    if (!/^https?:\/\//i.test(candidate)) {
+        // Any explicit scheme other than http(s) is rejected (not upgraded).
+        if (/^[a-z][a-z0-9+.-]*:/i.test(candidate)) return '';
+        candidate = 'https://' + candidate;
+    }
+    try {
+        const parsed = new URL(candidate, location.href);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '';
+    } catch {
+        return '';
+    }
+}
+
+// Tags that are never legitimate inside memo content and are removed wholesale.
+const UNSAFE_MEMO_TAGS = new Set([
+    'SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH', 'LINK', 'META',
+    'STYLE', 'BASE', 'FORM', 'INPUT', 'BUTTON', 'TEXTAREA', 'AUDIO', 'VIDEO', 'SOURCE'
+]);
+
+// Conservatively sanitize memo HTML on load/import: strip dangerous tags,
+// inline event handlers, and unsafe URL schemes while preserving the existing
+// document structure, attributes, and inline styles so legacy notes render unchanged.
+export function sanitizeMemoHtml(html) {
+    if (!html) return '';
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    tpl.content.querySelectorAll('*').forEach(el => {
+        if (UNSAFE_MEMO_TAGS.has(el.tagName)) { el.remove(); return; }
+        [...el.attributes].forEach(attr => {
+            const name = attr.name.toLowerCase();
+            const val = attr.value || '';
+            // 1) Remove all on* event-handler attributes.
+            if (name.startsWith('on')) { el.removeAttribute(attr.name); return; }
+            // 2) Remove href/src/xlink:href with dangerous schemes (data:image is allowed).
+            if (name === 'href' || name === 'src' || name === 'xlink:href') {
+                const scheme = val.trim().toLowerCase();
+                const isDataImage = /^data:image\//i.test(scheme);
+                if (/^(javascript|vbscript|data):/i.test(scheme) && !isDataImage) {
+                    el.removeAttribute(attr.name);
+                }
+            }
+            // 3) Strip styles carrying script vectors.
+            if (name === 'style' && /(javascript:|expression\()/i.test(val)) {
+                el.removeAttribute(attr.name);
+            }
+        });
+    });
+    return tpl.innerHTML;
+}
+
 // Generate unique ID
 export function generateId() {
     return 'c' + Date.now() + Math.random().toString(36).substr(2, 5);

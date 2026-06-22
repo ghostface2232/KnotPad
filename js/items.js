@@ -1,7 +1,7 @@
 // KnotPad - Items Module (Create, Manage, Delete)
 
 import { COLORS, COLOR_MAP, FONT_SIZES } from './constants.js';
-import { $, esc, findFreePosition } from './utils.js';
+import { $, esc, findFreePosition, sanitizeUrl, sanitizeMemoHtml } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap, updateMinimap } from './viewport.js';
 import { deleteMedia, deleteMediaFromFileSystem, fsDirectoryHandle, loadMedia, loadMediaFromFileSystem } from './storage.js';
@@ -265,7 +265,8 @@ function convertPlainTextToMemoHtml(text, enableAutoFormatting = true) {
 function parseContent(content) {
     if (!content) return '';
     if (/<[a-z][\s\S]*>/i.test(content)) {
-        return normalizeMemoHtml(content);
+        // Sanitize on the load/import boundary (untrusted canvas JSON) before rendering.
+        return normalizeMemoHtml(sanitizeMemoHtml(content));
     }
     return normalizeMemoHtml(convertPlainTextToMemoHtml(content));
 }
@@ -1261,11 +1262,12 @@ export function createItem(cfg, loading = false) {
 
     switch (cfg.type) {
         case 'image':
-            html = `<img class="item-image" src="${mediaSrc}">`;
+            // src is assigned via property after innerHTML to avoid HTML injection (see below)
+            html = `<img class="item-image">`;
             break;
         case 'video':
             html = `<div class="video-container">
-                <video class="item-video" src="${mediaSrc}"></video>
+                <video class="item-video"></video>
                 <div class="video-controls">
                     <button class="video-play-btn" title="Play/Pause">
                         <svg class="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -1296,15 +1298,16 @@ export function createItem(cfg, loading = false) {
         case 'link': {
             const linkContent = cfg.content || {};
             const linkUrl = linkContent.url || '';
+            const safeUrl = sanitizeUrl(linkUrl); // http/https only, '' otherwise
             const linkTitle = linkContent.title || 'Untitled Link';
             const linkDisplay = linkContent.display || linkUrl || 'No URL';
             let hostname = '';
             try {
-                hostname = new URL(linkUrl).hostname;
+                hostname = safeUrl ? new URL(safeUrl).hostname : '';
             } catch {
                 hostname = '';
             }
-            html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${hostname}&sz=64"><div class="link-title">${esc(linkTitle)}</div><a class="link-url" href="${esc(linkUrl)}" target="_blank">${esc(linkDisplay)}</a></div>`;
+            html = `<div class="item-link"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=64"><div class="link-title">${esc(linkTitle)}</div><a class="link-url" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">${esc(linkDisplay)}</a></div>`;
             break;
         }
     }
@@ -1343,6 +1346,18 @@ export function createItem(cfg, loading = false) {
 
     canvas.appendChild(el);
 
+    // Assign media src via property (never via HTML string) to prevent stored XSS
+    // through attacker-controlled content (e.g. `x" onerror="..."`).
+    if (cfg.type === 'image' || cfg.type === 'video') {
+        const mediaEl = el.querySelector('.item-image, .item-video');
+        if (mediaEl && mediaSrc) {
+            const safe = cfg.content?.startsWith('media_')
+                ? mediaSrc // app-generated blob: URL, trusted
+                : (/^(https?:|data:image\/|blob:)/i.test(mediaSrc) ? mediaSrc : '');
+            if (safe) mediaEl.src = safe;
+        }
+    }
+
     // Setup media error handlers for auto-reload on broken blob URLs
     if (cfg.type === 'image' && cfg.content?.startsWith('media_')) {
         const imgEl = el.querySelector('.item-image');
@@ -1355,10 +1370,10 @@ export function createItem(cfg, loading = false) {
         const faviconEl = el.querySelector('.link-favicon');
         if (faviconEl) {
             const linkContent = cfg.content || {};
-            const linkUrl = linkContent.url || '';
+            const safeUrl = sanitizeUrl(linkContent.url || '');
             let hostname = '';
             try {
-                hostname = new URL(linkUrl).hostname;
+                hostname = safeUrl ? new URL(safeUrl).hostname : '';
             } catch {
                 hostname = '';
             }
@@ -2283,7 +2298,8 @@ function setupItemEvents(item) {
                 // Delay opening link to allow double-click detection
                 singleClickTimer = setTimeout(() => {
                     singleClickTimer = null;
-                    window.open(item.content.url, '_blank');
+                    const safe = sanitizeUrl(item.content?.url || '');
+                    if (safe) window.open(safe, '_blank', 'noopener,noreferrer');
                 }, DBLCLICK_DELAY);
             }
         }, { signal });
@@ -2777,7 +2793,6 @@ function pruneSearchResults(removedItems) {
 // Delete selected items
 export function deleteSelectedItems() {
     if (!state.selectedItems.size) return;
-    eventBus.emit(Events.STATE_SAVE);
     const removedItems = Array.from(state.selectedItems);
     removedItems.forEach(item => deleteItem(item, false, true, false));
     if (pruneSearchResults(removedItems)) {
@@ -2785,6 +2800,8 @@ export function deleteSelectedItems() {
     }
     state.selectedItems.clear();
     throttledMinimap();
+    // Snapshot AFTER deletion (matches the app-wide snapshot-after undo model)
+    eventBus.emit(Events.STATE_SAVE);
     eventBus.emit(Events.AUTOSAVE_TRIGGER);
 }
 
@@ -2797,15 +2814,10 @@ export function deleteItem(item, update = true, withFade = true, updateSearch = 
     state.connections.filter(c => c.from === item || c.to === item).forEach(c => eventBus.emit(Events.CONNECTIONS_DELETE, c, false, false));
 
     if ((item.type === 'image' || item.type === 'video') && item.content?.startsWith('media_')) {
-        deleteMedia(item.content);
-        if (fsDirectoryHandle) {
-            deleteMediaFromFileSystem(item.content);
-        }
-        const url = state.blobURLCache.get(item.content);
-        if (url) {
-            URL.revokeObjectURL(url);
-            state.blobURLCache.delete(item.content);
-        }
+        // Deferred GC: do NOT destroy media bytes (or the cached blob URL) now, so
+        // Undo can restore the item instantly. Actual deletion happens in
+        // gcOrphanMedia() once the id is unreferenced by live items + history.
+        state.pendingMediaDeletes.add(item.content);
     }
 
     if (updateSearch && pruneSearchResults([item])) {
@@ -2834,6 +2846,40 @@ export function deleteItem(item, update = true, withFade = true, updateSearch = 
         throttledMinimap();
         eventBus.emit(Events.AUTOSAVE_TRIGGER);
     }
+}
+
+// Collect every media id still referenced by live items or in-memory history.
+// The scan itself acts as reference counting (covers media ids shared via
+// duplicateItem, which deep-copies content including the `media_` id string).
+function collectReferencedMediaIds() {
+    const ids = new Set();
+    const scan = items => items?.forEach(it => {
+        const c = it.content;
+        if (typeof c === 'string' && c.startsWith('media_')) ids.add(c);
+    });
+    scan(state.items);
+    state.undoStack.forEach(s => scan(s.items));
+    state.redoStack.forEach(s => scan(s.items)); // must scan redo too, or redo loses its bytes
+    return ids;
+}
+
+// Sweep deferred media deletes: hard-delete any pending id that is no longer
+// referenced by live items or in-memory undo/redo snapshots. Safe to call only
+// when the in-memory stacks reflect what will be persisted (e.g. after eviction).
+export function gcOrphanMedia() {
+    if (!state.pendingMediaDeletes.size) return;
+    const referenced = collectReferencedMediaIds();
+    state.pendingMediaDeletes.forEach(id => {
+        if (referenced.has(id)) return; // still reachable somewhere → keep
+        deleteMedia(id);
+        if (fsDirectoryHandle) deleteMediaFromFileSystem(id);
+        const url = state.blobURLCache.get(id);
+        if (url) {
+            URL.revokeObjectURL(url);
+            state.blobURLCache.delete(id);
+        }
+        state.pendingMediaDeletes.delete(id);
+    });
 }
 
 // Duplicate an item

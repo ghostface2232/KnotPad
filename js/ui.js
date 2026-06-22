@@ -5,7 +5,7 @@ import { $, esc, generateId, showToast, stripHtml, findFreePosition } from './ut
 import * as state from './state.js';
 import { state as reactiveState, peekUndo } from './state.js';
 import { updateTransform, throttledMinimap, panToItem, setMinimapUpdateFn } from './viewport.js';
-import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus, setupFaviconErrorHandler, loadLinkPreviewForItem, removeLinkPreviewFromItem } from './items.js';
+import { createItem, addMemo, addLink, setFilter, deleteSelectedItems, duplicateItem, deselectAll, hideMenus, setupFaviconErrorHandler, loadLinkPreviewForItem, removeLinkPreviewFromItem, gcOrphanMedia } from './items.js';
 import { addConnection, updateConnectionArrow, updateConnectionLabel, updateAllConnections, addChildNode } from './connections.js';
 import {
     fsDirectoryHandle,
@@ -245,6 +245,9 @@ export function saveState() {
     if (state.undoStack.length > MAX_HISTORY) state.undoStack.shift();
     state.clearRedo();
     updateUndoRedoButtons();
+    // Reclaim media that was deferred-deleted and is now unreferenced. Safe here:
+    // any snapshot just evicted (shift) or redo just cleared won't be persisted.
+    gcOrphanMedia();
 }
 
 export function updateUndoRedoButtons() {
