@@ -50,7 +50,9 @@ export function sanitizeMemoHtml(html) {
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
     tpl.content.querySelectorAll('*').forEach(el => {
-        if (UNSAFE_MEMO_TAGS.has(el.tagName)) { el.remove(); return; }
+        // Normalize case: HTML elements report uppercase tagName, but SVG/MathML
+        // foreign elements report lowercase, which would bypass the tag set.
+        if (UNSAFE_MEMO_TAGS.has(el.tagName.toUpperCase())) { el.remove(); return; }
         [...el.attributes].forEach(attr => {
             const name = attr.name.toLowerCase();
             const val = attr.value || '';
