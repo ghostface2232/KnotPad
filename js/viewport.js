@@ -5,10 +5,13 @@ import * as state from './state.js';
 
 const canvas = $('canvas');
 const zoomDisplay = $('zoomDisplay');
+let lastAppliedScale = null;
 
 // Update canvas transform
 export function updateTransform() {
     canvas.style.transform = `translate(${state.offsetX}px,${state.offsetY}px) scale(${state.scale})`;
+    if (lastAppliedScale === state.scale) return;
+    lastAppliedScale = state.scale;
     zoomDisplay.textContent = Math.round(state.scale * 100) + '%';
 
     // Keep small interactive controls readable when zoomed far out, but avoid
@@ -41,7 +44,7 @@ export function setZoom(z, cx, cy, animate = true) {
         state.setOffsetY(cy - (cy - state.offsetY) * (z / state.scale));
         state.setScale(z);
         updateTransform();
-        throttledMinimap();
+        throttledMinimap('viewport');
         return;
     }
 
@@ -66,7 +69,7 @@ export function setZoom(z, cx, cy, animate = true) {
             state.setZoomAnimationFrame(requestAnimationFrame(animateZoom));
         } else {
             state.setZoomAnimationFrame(null);
-            updateMinimap();
+            updateMinimap('viewport');
         }
     }
     state.setZoomAnimationFrame(requestAnimationFrame(animateZoom));
@@ -116,7 +119,7 @@ export function fitToScreen() {
             requestAnimationFrame(animate);
         } else {
             zoomDisplay.textContent = Math.round(state.scale * 100) + '%';
-            updateMinimap();
+            updateMinimap('viewport');
         }
     }
     requestAnimationFrame(animate);
@@ -142,7 +145,7 @@ export function panToItem(item, animate = true) {
             if (t < 1) {
                 requestAnimationFrame(animatePan);
             } else {
-                updateMinimap();
+                updateMinimap('viewport');
             }
         }
         requestAnimationFrame(animatePan);
@@ -150,15 +153,23 @@ export function panToItem(item, animate = true) {
         state.setOffsetX(targetX);
         state.setOffsetY(targetY);
         updateTransform();
-        updateMinimap();
+        updateMinimap('viewport');
     }
 }
 
 // Throttled minimap update
-export function throttledMinimap() {
+const MINIMAP_MODE_PRIORITY = { viewport: 0, geometry: 1, structure: 2 };
+let pendingMinimapMode = 'viewport';
+
+export function throttledMinimap(mode = 'structure') {
+    if (MINIMAP_MODE_PRIORITY[mode] > MINIMAP_MODE_PRIORITY[pendingMinimapMode]) {
+        pendingMinimapMode = mode;
+    }
     if (state.minimapThrottle) return;
     state.setMinimapThrottle(requestAnimationFrame(() => {
-        updateMinimap();
+        const updateMode = pendingMinimapMode;
+        pendingMinimapMode = 'viewport';
+        updateMinimap(updateMode);
         state.setMinimapThrottle(null);
     }));
 }
@@ -169,8 +180,8 @@ export function setMinimapUpdateFn(fn) {
     minimapUpdateFn = fn;
 }
 
-export function updateMinimap() {
-    minimapUpdateFn();
+export function updateMinimap(mode = 'structure') {
+    minimapUpdateFn(mode);
 }
 
 // Start panning

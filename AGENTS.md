@@ -72,7 +72,7 @@ KnotPad/
 | File | Purpose | Key Exports |
 |------|---------|-------------|
 | `items.js` | Item CRUD, selection, colors | `createItem`, `addMemo`, `addKeyword`, `addLink`, `deleteItem`, `setItemColor` |
-| `connections.js` | Connection management | `addConnection`, `updateConnection`, `deleteConnection`, `startConnection` |
+| `connections.js` | Connection management and incident-edge gesture updates | `addConnection`, `updateConnection`, `updateConnections`, `getConnectionsForItems`, `deleteConnection`, `startConnection` |
 | `ui.js` | UI setup, canvas/sidebar management | `loadCanvases`, `saveCurrentCanvas`, `saveState`, `undo`, `redo` |
 | `events.js` | Input event handlers | `setupMouseEvents`, `setupKeyboardEvents` |
 | `viewport.js` | Canvas transform, zoom | `setZoom`, `fitToScreen`, `panToItem`, `updateTransform` |
@@ -82,7 +82,7 @@ KnotPad/
 
 | File | Purpose | Key Exports |
 |------|---------|-------------|
-| `utils.js` | Helper functions | `$` (DOM selector), `esc`, `sanitizeUrl`, `sanitizeMemoHtml`, `curvePath`, `showToast` |
+| `utils.js` | Helper functions | `$` (DOM selector), `esc`, `sanitizeUrl`, `sanitizeMemoHtml`, `getCurveGeometry`, `curvePath`, `showToast` |
 | `constants.js` | App configuration | `COLORS`, `COLOR_MAP`, `CANVAS_ICONS`, `FONT_SIZES` |
 
 ---
@@ -120,7 +120,8 @@ KnotPad/
 | Complete connection | `connections.js:completeConnection()` |
 | Direction arrows | `connections.js:updateConnectionArrow()` |
 | Connection labels | `connections.js:updateConnectionLabel()` |
-| Curved paths | `utils.js:curvePath()` |
+| Gesture-scoped connection updates | `connections.js:getConnectionsForItems()`, `updateConnections()` |
+| Curved paths and shared geometry | `utils.js:getCurveGeometry()`, `curvePath()` |
 
 ### Canvas & Viewport
 
@@ -130,7 +131,7 @@ KnotPad/
 | Pan | `viewport.js:startPan()`, `events.js` mouse handlers |
 | Fit to screen | `viewport.js:fitToScreen()` |
 | Transform update | `viewport.js:updateTransform()` |
-| Minimap | `viewport.js:updateMinimap()`, `ui.js:setupMinimapClick()` |
+| Minimap | `viewport.js:updateMinimap()`, `ui.js:updateMinimap()` (cached structure/geometry/viewport modes), `ui.js:setupMinimapClick()` |
 
 ### UI Components
 

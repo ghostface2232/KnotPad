@@ -7,7 +7,7 @@ import {
     selectItem, deselectAll, deleteSelectedItems, addMemo, addLink, toggleHeading,
     getMemoHtmlFromClipboardData, clipboardContainsStructuredMemoContent, selectAllItems
 } from './items.js';
-import { updateAllConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo, deselectConnection } from './connections.js';
+import { getConnectionsForItems, updateConnections, cancelConnection, deleteConnection, updateTempLine, completeConnectionWithNewMemo, deselectConnection } from './connections.js';
 import {
     undo, redo, toggleSearch, openSearch, closeSearch, closeLinkModal,
     closeSidebarIfUnpinned, showNewNodePicker, triggerAutoSave, saveState, handleFile,
@@ -34,6 +34,15 @@ export function setupMouseEvents() {
     if (mouseEventsController) mouseEventsController.abort();
     mouseEventsController = new AbortController();
     const { signal } = mouseEventsController;
+    let pointerMoveFrame = null;
+    let pendingPointerEvent = null;
+    let gestureOwner = null;
+    let gestureConnections = [];
+    signal.addEventListener('abort', () => {
+        if (pointerMoveFrame !== null) cancelAnimationFrame(pointerMoveFrame);
+        pointerMoveFrame = null;
+        pendingPointerEvent = null;
+    }, { once: true });
 
     // Wheel - zoom canvas or scroll memo content
     app.addEventListener('wheel', e => {
@@ -143,13 +152,12 @@ export function setupMouseEvents() {
     }, { signal });
 
 
-    // Mouse move
-    window.addEventListener('mousemove', e => {
+    function processPointerMove(e) {
         if (state.isPanning) {
             state.setOffsetX(e.clientX - state.startX);
             state.setOffsetY(e.clientY - state.startY);
             updateTransform();
-            throttledMinimap();
+            throttledMinimap('viewport');
             return;
         }
 
@@ -166,6 +174,10 @@ export function setupMouseEvents() {
         }
 
         if (state.draggedItem) {
+            if (gestureOwner !== state.draggedItem) {
+                gestureOwner = state.draggedItem;
+                gestureConnections = getConnectionsForItems(state.selectedItems);
+            }
             const rect = app.getBoundingClientRect();
             const curX = (e.clientX - rect.left - state.offsetX) / state.scale;
             const curY = (e.clientY - rect.top - state.offsetY) / state.scale;
@@ -187,11 +199,15 @@ export function setupMouseEvents() {
                 item.el.style.left = item.x + 'px';
                 item.el.style.top = item.y + 'px';
             });
-            updateAllConnections();
-            throttledMinimap();
+            updateConnections(gestureConnections);
+            throttledMinimap('geometry');
         }
 
         if (state.resizingItem) {
+            if (gestureOwner !== state.resizingItem) {
+                gestureOwner = state.resizingItem;
+                gestureConnections = getConnectionsForItems([state.resizingItem]);
+            }
             const rect = app.getBoundingClientRect();
             let x = (e.clientX - rect.left - state.offsetX) / state.scale;
             let y = (e.clientY - rect.top - state.offsetY) / state.scale;
@@ -230,8 +246,8 @@ export function setupMouseEvents() {
             state.resizingItem.h = newH;
             state.resizingItem.el.style.width = state.resizingItem.w + 'px';
             state.resizingItem.el.style.height = state.resizingItem.h + 'px';
-            updateAllConnections();
-            throttledMinimap();
+            updateConnections(gestureConnections);
+            throttledMinimap('geometry');
         }
 
         if (state.tempLine) {
@@ -241,10 +257,33 @@ export function setupMouseEvents() {
                 (e.clientY - rect.top - state.offsetY) / state.scale + 10000
             );
         }
+    }
+
+    // Browsers can dispatch pointer movement faster than they can paint. Keep
+    // only the newest sample and perform at most one visual update per frame.
+    window.addEventListener('mousemove', e => {
+        pendingPointerEvent = e;
+        if (pointerMoveFrame !== null) return;
+        pointerMoveFrame = requestAnimationFrame(() => {
+            pointerMoveFrame = null;
+            const latestEvent = pendingPointerEvent;
+            pendingPointerEvent = null;
+            if (latestEvent) processPointerMove(latestEvent);
+        });
     }, { signal });
 
     // Mouse up
     window.addEventListener('mouseup', e => {
+        // Commit the final pointer sample before snapshotting the gesture.
+        if (pointerMoveFrame !== null) {
+            cancelAnimationFrame(pointerMoveFrame);
+            pointerMoveFrame = null;
+        }
+        if (pendingPointerEvent) {
+            const latestEvent = pendingPointerEvent;
+            pendingPointerEvent = null;
+            processPointerMove(latestEvent);
+        }
         if (state.isPanning) {
             state.setIsPanning(false);
             if (!state.isSpacePressed) app.classList.remove('panning');
@@ -288,6 +327,8 @@ export function setupMouseEvents() {
             }
             triggerAutoSave();
         }
+        gestureOwner = null;
+        gestureConnections = [];
     }, { signal });
 }
 

@@ -108,14 +108,20 @@ const BLEND_RANGE = 50; // Blend over 50px range for smooth transition
 
 // Calculate curved path for connections with directional handles
 // Maintains legacy behavior for existing canvases while fixing distortion at close range
-export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
+export function getCurveGeometry(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const distSq = dx * dx + dy * dy;
 
     // Fast path for overlapping points
     if (distSq < 1) {
-        return `M${x1} ${y1} L${x2} ${y2}`;
+        return {
+            p0: { x: x1, y: y1 },
+            p1: { x: x1, y: y1 },
+            p2: { x: x2, y: y2 },
+            p3: { x: x2, y: y2 },
+            isLine: true
+        };
     }
 
     const dist = Math.sqrt(distSq);
@@ -203,7 +209,20 @@ export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
         }
     }
 
-    return `M${x1} ${y1} C${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+    return {
+        p0: { x: x1, y: y1 },
+        p1: { x: cp1x, y: cp1y },
+        p2: { x: cp2x, y: cp2y },
+        p3: { x: x2, y: y2 },
+        isLine: false
+    };
+}
+
+export function curvePath(x1, y1, x2, y2, fromHandle = null, toHandle = null) {
+    const geometry = getCurveGeometry(x1, y1, x2, y2, fromHandle, toHandle);
+    const { p0, p1, p2, p3 } = geometry;
+    if (geometry.isLine) return `M${p0.x} ${p0.y} L${p3.x} ${p3.y}`;
+    return `M${p0.x} ${p0.y} C${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`;
 }
 
 // Find free position for new items (avoid overlap)

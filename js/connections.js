@@ -1,7 +1,7 @@
 // KnotPad - Connections Module
 
 import { COLOR_MAP } from './constants.js';
-import { $, curvePath, getHandlePos } from './utils.js';
+import { $, curvePath, getCurveGeometry, getHandlePos } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap } from './viewport.js';
 import { addMemo, deselectAll, hideMenus } from './items.js';
@@ -207,10 +207,12 @@ export function updateConnectionLabel(c) {
     const text = c.labelEl.querySelector('text');
     text.textContent = c.label;
 
-    // Get midpoint of the connection path
+    // Approximate the path-length midpoint from the curve's control points.
+    // This preserves the previous label placement without SVG layout APIs.
     const fp = getHandlePos(c.from, c.fh);
     const tp = getHandlePos(c.to, c.th);
-    const midPoint = getPathMidpoint(c.el);
+    const { p0, p1, p2, p3 } = getCurveGeometry(fp.x, fp.y, tp.x, tp.y, c.fh, c.th);
+    const midPoint = bezierArcMidpoint(p0, p1, p2, p3);
 
     // Calculate approximate text width (for centering)
     const charWidth = 7;
@@ -251,18 +253,6 @@ export function updateConnectionLabel(c) {
     }
 }
 
-// Get the midpoint of a path element
-function getPathMidpoint(pathEl) {
-    try {
-        const totalLength = pathEl.getTotalLength();
-        const midPoint = pathEl.getPointAtLength(totalLength / 2);
-        return { x: midPoint.x, y: midPoint.y };
-    } catch (e) {
-        // Fallback if path is invalid
-        return { x: 10000, y: 10000 };
-    }
-}
-
 // Calculate point on cubic Bezier curve at parameter t
 function bezierPoint(p0, p1, p2, p3, t) {
     const mt = 1 - t;
@@ -287,120 +277,65 @@ function bezierTangent(p0, p1, p2, p3, t) {
     return Math.atan2(dy, dx);
 }
 
-// Handle direction lookup (cached)
-const ARROW_HANDLE_DIRS = {
-    top: { x: 0, y: -1 },
-    bottom: { x: 0, y: 1 },
-    left: { x: -1, y: 0 },
-    right: { x: 1, y: 0 }
-};
-
 // Update connection arrow based on direction
 // Uses same algorithm as curvePath for consistency
 export function updateConnectionArrow(c) {
-    if (c.arrow) {
-        c.arrow.remove();
-        c.arrow = null;
+    if (c.dir === 'none') {
+        if (c.arrow) {
+            c.arrow.remove();
+            c.arrow = null;
+        }
+        return;
     }
-
-    if (c.dir === 'none') return;
 
     const fp = getHandlePos(c.from, c.fh);
     const tp = getHandlePos(c.to, c.th);
 
-    const dx = tp.x - fp.x;
-    const dy = tp.y - fp.y;
-    const distSq = dx * dx + dy * dy;
+    const geometry = getCurveGeometry(fp.x, fp.y, tp.x, tp.y, c.fh, c.th);
 
     // Handle very close points
-    if (distSq < 1) return;
-
-    const dist = Math.sqrt(distSq);
-    const invDist = 1 / dist;
-    const dirX = dx * invDist;
-    const dirY = dy * invDist;
-
-    const fromDir = ARROW_HANDLE_DIRS[c.fh] || { x: dx >= 0 ? 1 : -1, y: 0 };
-    const toDir = ARROW_HANDLE_DIRS[c.th] || { x: dx >= 0 ? -1 : 1, y: 0 };
-
-    const fromDot = fromDir.x * dirX + fromDir.y * dirY;
-    const toDot = toDir.x * (-dirX) + toDir.y * (-dirY);
-
-    // === Legacy-compatible calculation (matching curvePath) ===
-    const legacyBase = Math.max(50, Math.min(dist * 0.4, 150));
-    const fromAlignFactor = Math.max(0.5, (1 + fromDot) * 0.5);
-    const toAlignFactor = Math.max(0.5, (1 + toDot) * 0.5);
-
-    let fromHandleLen = legacyBase * (0.7 + fromAlignFactor * 0.6);
-    let toHandleLen = legacyBase * (0.7 + toAlignFactor * 0.6);
-
-    // Short-distance correction (smoothly blended)
-    if (dist < 100) {
-        const blendStart = 50;
-        const correctionStrength = dist <= blendStart ? 1 : (100 - dist) / 50;
-        const maxSafeTotal = dist * 0.8;
-        const currentTotal = fromHandleLen + toHandleLen;
-
-        if (currentTotal > maxSafeTotal) {
-            const safeScale = maxSafeTotal / currentTotal;
-            const blendedScale = 1 - correctionStrength * (1 - safeScale);
-            fromHandleLen *= blendedScale;
-            toHandleLen *= blendedScale;
-        }
+    if (geometry.isLine) {
+        if (c.arrow) c.arrow.style.display = 'none';
+        return;
     }
-
-    const p0 = { x: fp.x, y: fp.y };
-    const p3 = { x: tp.x, y: tp.y };
-    let p1 = { x: fp.x + fromDir.x * fromHandleLen, y: fp.y + fromDir.y * fromHandleLen };
-    let p2 = { x: tp.x + toDir.x * toHandleLen, y: tp.y + toDir.y * toHandleLen };
-
-    // S-curve smoothing for opposing directions
-    if (fromDot < 0) {
-        const blendFactor = Math.min(0.35, -fromDot * 0.35);
-        p1.x += dirX * dist * blendFactor;
-        p1.y += dirY * dist * blendFactor;
-
-        if (fromDot < -0.5) {
-            const perpX = -fromDir.y;
-            const perpY = fromDir.x;
-            const perpSign = (perpX * dirX + perpY * dirY) >= 0 ? 1 : -1;
-            p1.x += perpX * perpSign * dist * 0.1;
-            p1.y += perpY * perpSign * dist * 0.1;
-        }
-    }
-
-    if (toDot < 0) {
-        const blendFactor = Math.min(0.35, -toDot * 0.35);
-        p2.x -= dirX * dist * blendFactor;
-        p2.y -= dirY * dist * blendFactor;
-
-        if (toDot < -0.5) {
-            const perpX = -toDir.y;
-            const perpY = toDir.x;
-            const perpSign = (perpX * (-dirX) + perpY * (-dirY)) >= 0 ? 1 : -1;
-            p2.x += perpX * perpSign * dist * 0.1;
-            p2.y += perpY * perpSign * dist * 0.1;
-        }
-    }
+    const { p0, p1, p2, p3 } = geometry;
 
     // Get midpoint on the actual Bezier curve
     const mid = bezierPoint(p0, p1, p2, p3, 0.5);
     const angle = bezierTangent(p0, p1, p2, p3, 0.5);
 
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.classList.add('connection-arrow');
-
-    if (state.selectedConn === c) g.classList.add('selected');
+    let g = c.arrow;
+    if (!g) {
+        g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.classList.add('connection-arrow');
+        connectionsSvg.appendChild(g);
+        c.arrow = g;
+    }
+    g.style.display = '';
+    g.classList.toggle('selected', state.selectedConn === c);
 
     // Apply color from source node
     if (c.from.color && COLOR_MAP[c.from.color]) {
         g.style.fill = COLOR_MAP[c.from.color];
+    } else {
+        g.style.fill = '';
     }
 
     const size = 12; // Increased arrow size for better visibility
 
-    if (c.dir === 'forward' || c.dir === 'both') {
-        const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    const desiredDirections = c.dir === 'both' ? ['forward', 'backward'] : [c.dir];
+    const polygons = new Map(Array.from(g.querySelectorAll('polygon'), polygon => [polygon.dataset.direction, polygon]));
+    polygons.forEach((polygon, direction) => {
+        if (!desiredDirections.includes(direction)) polygon.remove();
+    });
+
+    if (desiredDirections.includes('forward')) {
+        let arr = polygons.get('forward');
+        if (!arr) {
+            arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            arr.dataset.direction = 'forward';
+            g.appendChild(arr);
+        }
         // Arrow pointing in direction of curve
         const offset = c.dir === 'both' ? 14 : 0;
         const ax = mid.x + offset * Math.cos(angle);
@@ -415,11 +350,15 @@ export function updateConnectionArrow(c) {
         const back2X = ax + size * 0.7 * Math.cos(backAngle2);
         const back2Y = ay + size * 0.7 * Math.sin(backAngle2);
         arr.setAttribute('points', `${tipX},${tipY} ${back1X},${back1Y} ${back2X},${back2Y}`);
-        g.appendChild(arr);
     }
 
-    if (c.dir === 'backward' || c.dir === 'both') {
-        const arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    if (desiredDirections.includes('backward')) {
+        let arr = polygons.get('backward');
+        if (!arr) {
+            arr = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            arr.dataset.direction = 'backward';
+            g.appendChild(arr);
+        }
         // Arrow pointing opposite to direction of curve
         const offset = c.dir === 'both' ? -14 : 0;
         const ax = mid.x + offset * Math.cos(angle);
@@ -435,16 +374,56 @@ export function updateConnectionArrow(c) {
         const back2X = ax + size * 0.7 * Math.cos(backAngle2);
         const back2Y = ay + size * 0.7 * Math.sin(backAngle2);
         arr.setAttribute('points', `${tipX},${tipY} ${back1X},${back1Y} ${back2X},${back2Y}`);
-        g.appendChild(arr);
+    }
+}
+
+// Approximate the same half-length point returned by SVG getPointAtLength,
+// using a small fixed polyline entirely in JavaScript. Interpolation within
+// the crossing segment keeps the error sub-pixel for KnotPad's smooth curves.
+export function bezierArcMidpoint(p0, p1, p2, p3) {
+    const segmentCount = 32;
+    const points = [p0];
+    const lengths = [];
+    let totalLength = 0;
+    for (let index = 1; index <= segmentCount; index++) {
+        const point = bezierPoint(p0, p1, p2, p3, index / segmentCount);
+        const previous = points[index - 1];
+        const length = Math.hypot(point.x - previous.x, point.y - previous.y);
+        points.push(point);
+        lengths.push(length);
+        totalLength += length;
     }
 
-    connectionsSvg.appendChild(g);
-    c.arrow = g;
+    const targetLength = totalLength / 2;
+    let traversed = 0;
+    for (let index = 0; index < lengths.length; index++) {
+        const nextLength = traversed + lengths[index];
+        if (nextLength >= targetLength) {
+            const ratio = lengths[index] === 0 ? 0 : (targetLength - traversed) / lengths[index];
+            return {
+                x: points[index].x + (points[index + 1].x - points[index].x) * ratio,
+                y: points[index].y + (points[index + 1].y - points[index].y) * ratio
+            };
+        }
+        traversed = nextLength;
+    }
+    return p3;
 }
 
 // Update all connections
 export function updateAllConnections() {
     state.connections.forEach(updateConnection);
+}
+
+// Resolve the affected edge set once at gesture start, then reuse it for every
+// pointer move. This keeps drag/resize work proportional to incident edges.
+export function getConnectionsForItems(items) {
+    const itemSet = items instanceof Set ? items : new Set(items);
+    return state.connections.filter(c => itemSet.has(c.from) || itemSet.has(c.to));
+}
+
+export function updateConnections(connections) {
+    connections.forEach(updateConnection);
 }
 
 // Select a connection

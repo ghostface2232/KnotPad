@@ -12,6 +12,15 @@ const ZERO_WIDTH_SPACE = '\u200B';
 const KNOTPAD_MEMO_CLIPBOARD_MARKER = '<!--KNOTPAD_MEMO-->';
 const MEMO_PARAGRAPH_ATTR = 'data-knotpad-paragraph';
 
+function updateItemGeometryDependents(item) {
+    state.connections.forEach(connection => {
+        if (connection.from === item || connection.to === item) {
+            eventBus.emit(Events.CONNECTIONS_UPDATE, connection);
+        }
+    });
+    throttledMinimap('geometry');
+}
+
 // ============ Favicon Fallback ============
 // Globe icon SVG as data URI for when favicon fails to load
 const FALLBACK_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cpath d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/%3E%3C/svg%3E";
@@ -104,8 +113,12 @@ export function loadLinkPreviewForItem(item) {
                         itemLink.appendChild(previewImg);
                         // Adjust item height for 3:2 aspect ratio preview (width ~228px inside padding, height ~152px)
                         if (!item.manuallyResized) {
-                            item.h = Math.max(item.h, 280);
-                            el.style.height = item.h + 'px';
+                            const nextHeight = Math.max(item.h, 280);
+                            if (nextHeight !== item.h) {
+                                item.h = nextHeight;
+                                el.style.height = item.h + 'px';
+                                updateItemGeometryDependents(item);
+                            }
                         }
                     };
 
@@ -140,8 +153,11 @@ export function removeLinkPreviewFromItem(item) {
         previewImg.remove();
         // Reset height if not manually resized
         if (!item.manuallyResized) {
-            item.h = 116;
-            el.style.height = item.h + 'px';
+            if (item.h !== 116) {
+                item.h = 116;
+                el.style.height = item.h + 'px';
+                updateItemGeometryDependents(item);
+            }
         }
     }
 }

@@ -203,6 +203,13 @@ export function setupSearchEvents() {
 
 // ============ Undo/Redo ============
 
+const snapshotSerializations = new WeakMap();
+
+function cacheSnapshotSerialization(snapshot, serialized = JSON.stringify(snapshot)) {
+    snapshotSerializations.set(snapshot, serialized);
+    return snapshot;
+}
+
 export function saveState() {
     const stateData = {
         items: state.items.map(i => ({
@@ -212,7 +219,7 @@ export function saveState() {
             y: i.y,
             w: i.w,
             h: i.h,
-            content: JSON.parse(JSON.stringify(i.content)),
+            content: structuredClone(i.content),
             color: i.color,
             fontSize: i.fontSize,
             textAlign: i.textAlign,
@@ -231,19 +238,23 @@ export function saveState() {
         }))
     };
 
-    // Prevent duplicate states - compare with last state
+    // Serialize the new snapshot once. Previous snapshots retain their cached
+    // representation, so dedup does not re-stringify the prior full document.
+    const currentStr = JSON.stringify(stateData);
     const lastState = peekUndo();
     if (lastState) {
-        // Compare serialized versions for equality check
-        const lastStr = JSON.stringify(lastState);
-        const currentStr = JSON.stringify(stateData);
+        let lastStr = snapshotSerializations.get(lastState);
+        if (lastStr === undefined) {
+            lastStr = JSON.stringify(lastState);
+            snapshotSerializations.set(lastState, lastStr);
+        }
         if (lastStr === currentStr) {
             return;
         }
     }
 
     // Store structured object directly (not JSON string)
-    state.pushUndo(stateData);
+    state.pushUndo(cacheSnapshotSerialization(stateData, currentStr));
     if (state.undoStack.length > MAX_HISTORY) state.undoStack.shift();
     state.clearRedo();
     updateUndoRedoButtons();
@@ -708,7 +719,14 @@ async function loadCanvasData(id) {
         // Undo/redo is intentionally session-only. Persisting up to 50 complete
         // document snapshots can inflate one canvas to roughly 50x its content
         // and exhaust localStorage. Legacy persisted stacks are ignored.
-        state.setUndoStack([{ items: data.items, connections: data.connections.map(c => ({ ...c })) }]);
+        // History snapshots must be immutable. Link content objects are edited
+        // in place, so sharing data.items here would mutate the initial undo
+        // state while leaving its cached serialization stale.
+        const initialSnapshot = {
+            items: structuredClone(data.items),
+            connections: structuredClone(data.connections)
+        };
+        state.setUndoStack([cacheSnapshotSerialization(initialSnapshot)]);
         state.setRedoStack([]);
         updateUndoRedoButtons();
     } catch (e) {
@@ -795,7 +813,7 @@ export async function switchCanvas(id) {
 
         // Ensure at least initial state exists if no history was restored
         if (!state.undoStack.length) {
-            state.setUndoStack([{ items: [], connections: [] }]);
+            state.setUndoStack([cacheSnapshotSerialization({ items: [], connections: [] })]);
         }
         updateUndoRedoButtons();
         setFilter('all');
@@ -1504,13 +1522,77 @@ export function setupCanvasIconPicker() {
 
 // ============ Minimap ============
 
-export function updateMinimap() {
-    const visible = state.items.filter(i => !i.el.classList.contains('filtered-out'));
+const minimapCache = {
+    structureDirty: true,
+    visibleItems: [],
+    visibleConnections: [],
+    itemElements: new Map(),
+    connectionElements: new Map(),
+    viewportElement: null,
+    minX: 0,
+    minY: 0,
+    scale: 1
+};
+
+function rebuildMinimapStructure() {
+    const visibleItems = state.items.filter(i => !i.el.classList.contains('filtered-out'));
+    const visibleSet = new Set(visibleItems);
+    const visibleConnections = state.connections.filter(c => visibleSet.has(c.from) && visibleSet.has(c.to));
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
+    const connectionElements = new Map();
+    visibleConnections.forEach(connection => {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('stroke', 'var(--accent-dim)');
+        line.setAttribute('stroke-width', '1');
+        svg.appendChild(line);
+        connectionElements.set(connection, line);
+    });
+
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(svg);
+    const itemElements = new Map();
+    visibleItems.forEach(item => {
+        const element = document.createElement('div');
+        element.className = 'minimap-item';
+        fragment.appendChild(element);
+        itemElements.set(item, element);
+    });
+    const viewportElement = document.createElement('div');
+    viewportElement.className = 'minimap-viewport';
+    fragment.appendChild(viewportElement);
+    minimapContent.replaceChildren(fragment);
+
+    Object.assign(minimapCache, {
+        structureDirty: false,
+        visibleItems,
+        visibleConnections,
+        itemElements,
+        connectionElements,
+        viewportElement
+    });
+}
+
+function updateMinimapViewport() {
+    const viewport = minimapCache.viewportElement;
+    if (!viewport) return;
+    const s = minimapCache.scale;
+    viewport.style.left = `${(-state.offsetX / state.scale - minimapCache.minX) * s}px`;
+    viewport.style.top = `${(-state.offsetY / state.scale - minimapCache.minY) * s}px`;
+    viewport.style.width = `${innerWidth / state.scale * s}px`;
+    viewport.style.height = `${innerHeight / state.scale * s}px`;
+}
+
+function updateMinimapGeometry() {
+    const visible = minimapCache.visibleItems;
     if (!visible.length) {
-        minimapContent.innerHTML = '<div class="minimap-viewport"></div>';
+        minimapCache.minX = 0;
+        minimapCache.minY = 0;
+        minimapCache.scale = 1;
+        if (minimapCache.viewportElement) minimapCache.viewportElement.style.display = 'none';
         return;
     }
-
+    minimapCache.viewportElement.style.display = '';
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     visible.forEach(i => {
         minX = Math.min(minX, i.x);
@@ -1522,27 +1604,45 @@ export function updateMinimap() {
     minX -= 80; minY -= 80; maxX += 80; maxY += 80;
     const s = Math.min(160 / (maxX - minX), 100 / (maxY - minY));
 
-    let html = '<svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">';
-    state.connections.forEach(c => {
-        if (c.from.el.classList.contains('filtered-out') || c.to.el.classList.contains('filtered-out')) return;
+    minimapCache.minX = minX;
+    minimapCache.minY = minY;
+    minimapCache.scale = s;
+
+    minimapCache.visibleConnections.forEach(c => {
+        const line = minimapCache.connectionElements.get(c);
         const fx = (c.from.x + c.from.w / 2 - minX) * s;
         const fy = (c.from.y + c.from.h / 2 - minY) * s;
         const tx = (c.to.x + c.to.w / 2 - minX) * s;
         const ty = (c.to.y + c.to.h / 2 - minY) * s;
-        html += `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="var(--accent-dim)" stroke-width="1"/>`;
+        line.setAttribute('x1', fx);
+        line.setAttribute('y1', fy);
+        line.setAttribute('x2', tx);
+        line.setAttribute('y2', ty);
     });
-    html += '</svg>';
 
     visible.forEach(i => {
+        const element = minimapCache.itemElements.get(i);
         const bg = i.color ? COLOR_MAP[i.color] : 'var(--text-secondary)';
-        html += `<div class="minimap-item" style="left:${(i.x - minX) * s}px;top:${(i.y - minY) * s}px;width:${Math.max(3, i.w * s)}px;height:${Math.max(2, i.h * s)}px;background:${bg}"></div>`;
+        element.style.left = `${(i.x - minX) * s}px`;
+        element.style.top = `${(i.y - minY) * s}px`;
+        element.style.width = `${Math.max(3, i.w * s)}px`;
+        element.style.height = `${Math.max(2, i.h * s)}px`;
+        element.style.background = bg;
     });
+    updateMinimapViewport();
+}
 
-    const vx = (-state.offsetX / state.scale - minX) * s;
-    const vy = (-state.offsetY / state.scale - minY) * s;
-    html += `<div class="minimap-viewport" style="left:${vx}px;top:${vy}px;width:${innerWidth / state.scale * s}px;height:${innerHeight / state.scale * s}px"></div>`;
-
-    minimapContent.innerHTML = html;
+export function updateMinimap(mode = 'structure') {
+    const minimap = $('minimap');
+    if (mode === 'structure') minimapCache.structureDirty = true;
+    if (minimap?.classList.contains('hidden-responsive')) return;
+    let structureRebuilt = false;
+    if (minimapCache.structureDirty) {
+        rebuildMinimapStructure();
+        structureRebuilt = true;
+    }
+    if (structureRebuilt || mode !== 'viewport' || !minimapCache.viewportElement) updateMinimapGeometry();
+    else updateMinimapViewport();
 }
 
 // Register minimap update function
@@ -1608,10 +1708,12 @@ function checkMinimapOverlap() {
                      toolbarRect.bottom + padding >= minimapRect.top &&
                      toolbarRect.top - padding <= minimapRect.bottom;
 
+    const wasHidden = minimap.classList.contains('hidden-responsive');
     if (overlaps) {
         minimap.classList.add('hidden-responsive');
     } else {
         minimap.classList.remove('hidden-responsive');
+        if (wasHidden) updateMinimap(minimapCache.structureDirty ? 'structure' : 'geometry');
     }
 }
 
