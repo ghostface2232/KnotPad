@@ -3,7 +3,7 @@
 import { $ } from './utils.js';
 import * as state from './state.js';
 import { initSettingsSaveCallback } from './state.js';
-import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder, scheduleSettingsSave } from './storage.js';
+import { initMediaDB, requestPersistentStorage, tryRestoreFsConnection, reconnectStorageFolder, scheduleSettingsSave, migrateToFileSystem } from './storage.js';
 import { updateTransform, setZoom, fitToScreen } from './viewport.js';
 import { createItem, addMemo, addKeyword, setFilter, setItemColor, toggleColorGroupMode, positionNewItemInColorGroup } from './items.js';
 import {
@@ -443,6 +443,11 @@ async function init() {
                 e.stopPropagation();
                 const success = await reconnectStorageFolder();
                 if (success) {
+                    // The app loaded browser data while the restored handle was
+                    // permission-gated. Seed the folder with that current data;
+                    // do not replace the live session with potentially stale files.
+                    await saveCurrentCanvas();
+                    await migrateToFileSystem();
                     storageIndicator.removeEventListener('click', reconnectHandler, true);
                 }
             };

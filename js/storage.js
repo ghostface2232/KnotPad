@@ -9,6 +9,10 @@ let mediaDB = null;
 
 // File System directory handle
 export let fsDirectoryHandle = null;
+// A restored handle may exist while read/write permission still requires a
+// user gesture. Keep it separate so callers never mistake it for an active
+// storage backend.
+let pendingFsDirectoryHandle = null;
 
 // ============ IndexedDB Functions ============
 
@@ -54,9 +58,21 @@ export function loadMedia(id) {
 }
 
 export function deleteMedia(id) {
-    if (!mediaDB) return;
-    const tx = mediaDB.transaction(MEDIA_STORE, 'readwrite');
-    tx.objectStore(MEDIA_STORE).delete(id);
+    return new Promise(resolve => {
+        if (!mediaDB) { resolve(false); return; }
+        try {
+            const tx = mediaDB.transaction(MEDIA_STORE, 'readwrite');
+            tx.objectStore(MEDIA_STORE).delete(id);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => {
+                console.error(`Failed to delete media ${id} from IndexedDB:`, tx.error);
+                resolve(false);
+            };
+        } catch (e) {
+            console.error(`Failed to delete media ${id} from IndexedDB:`, e);
+            resolve(false);
+        }
+    });
 }
 
 export function getMediaByIds(ids) {
@@ -188,12 +204,14 @@ export async function tryRestoreFsConnection() {
         if (permission === 'granted') {
             // Permission already granted, restore connection
             fsDirectoryHandle = savedHandle;
+            pendingFsDirectoryHandle = null;
             updateStorageIndicator(true);
             console.log('File system connection restored automatically');
             return true;
         } else {
             // Need to request permission - show indicator that reconnection is possible
-            fsDirectoryHandle = savedHandle;
+            fsDirectoryHandle = null;
+            pendingFsDirectoryHandle = savedHandle;
             updateStorageIndicator(false, true); // Show "reconnect" state
             console.log('File system handle found, permission needed');
             return 'needs-permission';
@@ -210,13 +228,16 @@ export async function tryRestoreFsConnection() {
 
 // Re-request permission for saved handle (user interaction required)
 export async function reconnectStorageFolder() {
-    if (!fsDirectoryHandle) {
+    const handle = pendingFsDirectoryHandle || fsDirectoryHandle;
+    if (!handle) {
         showToast('No saved connection found', 'error');
         return false;
     }
     try {
-        const permission = await fsDirectoryHandle.requestPermission({ mode: 'readwrite' });
+        const permission = await handle.requestPermission({ mode: 'readwrite' });
         if (permission === 'granted') {
+            fsDirectoryHandle = handle;
+            pendingFsDirectoryHandle = null;
             updateStorageIndicator(true);
             showToast('Storage folder reconnected');
             return true;
@@ -244,6 +265,7 @@ export async function selectStorageFolder() {
     }
     try {
         fsDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        pendingFsDirectoryHandle = null;
         // Create subdirectories
         await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
         await fsDirectoryHandle.getDirectoryHandle(MEDIA_DIR, { create: true });
@@ -277,6 +299,7 @@ export async function selectStorageFolder() {
 
 export async function disconnectStorageFolder() {
     fsDirectoryHandle = null;
+    pendingFsDirectoryHandle = null;
     // Remove from both storages
     localStorage.removeItem(FS_STORAGE_KEY);
     await removeFsHandleFromIndexedDB();
@@ -285,12 +308,17 @@ export async function disconnectStorageFolder() {
 }
 
 export async function requestFsPermission() {
-    if (!fsDirectoryHandle) return false;
+    const handle = pendingFsDirectoryHandle || fsDirectoryHandle;
+    if (!handle) return false;
     try {
-        const permission = await fsDirectoryHandle.queryPermission({ mode: 'readwrite' });
-        if (permission === 'granted') return true;
-        const request = await fsDirectoryHandle.requestPermission({ mode: 'readwrite' });
-        return request === 'granted';
+        const permission = await handle.queryPermission({ mode: 'readwrite' });
+        const granted = permission === 'granted'
+            || await handle.requestPermission({ mode: 'readwrite' }) === 'granted';
+        if (granted) {
+            fsDirectoryHandle = handle;
+            pendingFsDirectoryHandle = null;
+        }
+        return granted;
     } catch (e) {
         console.error('Permission error:', e);
         return false;
@@ -325,7 +353,7 @@ export function updateStorageIndicator(connected, needsPermission = false) {
 // ============ File System Canvas Operations ============
 
 export async function saveCanvasesListToFileSystem() {
-    if (!fsDirectoryHandle) return;
+    if (!fsDirectoryHandle) return false;
     try {
         const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
         const fileHandle = await canvasesDir.getFileHandle('_index.json', { create: true });
@@ -336,8 +364,10 @@ export async function saveCanvasesListToFileSystem() {
         };
         await writable.write(JSON.stringify(data, null, 2));
         await writable.close();
+        return true;
     } catch (e) {
         console.error('Failed to save canvases list to file system:', e);
+        return false;
     }
 }
 
@@ -360,15 +390,17 @@ export async function loadCanvasesListFromFileSystem() {
 }
 
 export async function saveCanvasToFileSystem(canvasId, data) {
-    if (!fsDirectoryHandle) return;
+    if (!fsDirectoryHandle) return false;
     try {
         const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR, { create: true });
         const fileHandle = await canvasesDir.getFileHandle(canvasId + '.json', { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(JSON.stringify(data, null, 2));
         await writable.close();
+        return true;
     } catch (e) {
         console.error('Failed to save canvas to file system:', e);
+        return false;
     }
 }
 
@@ -386,12 +418,15 @@ export async function loadCanvasFromFileSystem(canvasId) {
 }
 
 export async function deleteCanvasFromFileSystem(canvasId) {
-    if (!fsDirectoryHandle) return;
+    if (!fsDirectoryHandle) return false;
     try {
         const canvasesDir = await fsDirectoryHandle.getDirectoryHandle(CANVASES_DIR);
         await canvasesDir.removeEntry(canvasId + '.json');
+        return true;
     } catch (e) {
+        if (e.name === 'NotFoundError') return true;
         console.error('Failed to delete canvas from file system:', e);
+        return false;
     }
 }
 
@@ -431,45 +466,57 @@ export async function loadMediaFromFileSystem(mediaId) {
 }
 
 export async function deleteMediaFromFileSystem(mediaId) {
-    if (!fsDirectoryHandle) return;
+    if (!fsDirectoryHandle) return false;
     try {
         const mediaDir = await fsDirectoryHandle.getDirectoryHandle(MEDIA_DIR);
         for (const ext of MEDIA_EXTENSIONS) {
             try {
                 await mediaDir.removeEntry(mediaId + ext);
-                return;
+                return true;
             } catch (e) {
                 continue;
             }
         }
+        // No matching file is already the desired end state.
+        return true;
     } catch (e) {
+        if (e.name === 'NotFoundError') return true;
         console.error('Failed to delete media from file system:', e);
     }
+    return false;
 }
 
 // ============ Migration ============
 
 export async function migrateToFileSystem() {
-    if (!fsDirectoryHandle) return;
+    if (!fsDirectoryHandle) return false;
     const hasPermission = await requestFsPermission();
-    if (!hasPermission) return;
+    if (!hasPermission) return false;
 
     try {
+        let succeeded = true;
         // Migrate all canvases
         for (const canvas of state.canvases) {
             const dataKey = 'knotpad-data-' + canvas.id;
             const saved = localStorage.getItem(dataKey);
             if (saved) {
-                await saveCanvasToFileSystem(canvas.id, JSON.parse(saved));
+                succeeded = await saveCanvasToFileSystem(canvas.id, JSON.parse(saved)) && succeeded;
             }
         }
         // Migrate canvases list
-        await saveCanvasesListToFileSystem();
+        succeeded = await saveCanvasesListToFileSystem() && succeeded;
         // Migrate settings
-        await saveSettingsToFileSystem();
-        showToast('Data migrated to file storage');
+        succeeded = await saveSettingsToFileSystem() && succeeded;
+        if (succeeded) {
+            showToast('Data migrated to file storage');
+        } else {
+            showToast('Some data could not be migrated to file storage', 'error');
+        }
+        return succeeded;
     } catch (e) {
         console.error('Migration error:', e);
+        showToast('Data migration failed', 'error');
+        return false;
     }
 }
 
@@ -481,7 +528,7 @@ const SETTINGS_FILE = '_settings.json';
 let settingsSaveTimer = null;
 
 export async function saveSettingsToFileSystem() {
-    if (!fsDirectoryHandle) return;
+    if (!fsDirectoryHandle) return false;
     try {
         const settings = {};
         // Gather all localStorage settings keys
@@ -511,8 +558,10 @@ export async function saveSettingsToFileSystem() {
         const writable = await fileHandle.createWritable();
         await writable.write(JSON.stringify(settings, null, 2));
         await writable.close();
+        return true;
     } catch (e) {
         console.error('Failed to save settings to file system:', e);
+        return false;
     }
 }
 
@@ -540,4 +589,5 @@ export async function loadSettingsFromFileSystem() {
 // Set fsDirectoryHandle externally
 export function setFsDirectoryHandle(handle) {
     fsDirectoryHandle = handle;
+    pendingFsDirectoryHandle = null;
 }

@@ -155,6 +155,8 @@ KnotPad/
 | Auto-save | `ui.js:triggerAutoSave()` |
 | Undo/redo | `ui.js:saveState()`, `undo()`, `redo()` |
 
+Undo/redo history is session-only and is not serialized into canvas storage. Canvas files and localStorage contain the current document state only, preventing full-document history snapshots from exhausting browser quota.
+
 ### Events & Input
 
 | Feature | Location |

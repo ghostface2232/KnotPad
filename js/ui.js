@@ -17,6 +17,8 @@ import {
     deleteCanvasFromFileSystem,
     loadMedia,
     loadMediaFromFileSystem,
+    deleteMedia,
+    deleteMediaFromFileSystem,
     saveMedia,
     saveMediaToFileSystem,
     selectStorageFolder,
@@ -442,6 +444,10 @@ export async function loadCanvases() {
         if (!state.canvases.length) {
             state.setCanvases([{ id: generateId(), name: 'Untitled', createdAt: Date.now(), itemCount: 0 }]);
         }
+        // One-time compatibility cleanup: old versions embedded full undo/redo
+        // histories in every canvas. Remove them from both backends so existing
+        // users recover quota immediately, not only after opening each canvas.
+        await pruneLegacyPersistedHistories();
         saveCanvasesList();
         const lastId = localStorage.getItem('knotpad-active-canvas');
         const target = state.canvases.find(c => c.id === lastId) || state.canvases[0];
@@ -453,23 +459,59 @@ export async function loadCanvases() {
 }
 
 export function saveCanvasesList() {
-    localStorage.setItem(CANVASES_KEY, JSON.stringify(state.canvases));
-    localStorage.setItem(CANVAS_GROUPS_KEY, JSON.stringify(state.canvasGroups));
+    try {
+        localStorage.setItem(CANVASES_KEY, JSON.stringify(state.canvases));
+        localStorage.setItem(CANVAS_GROUPS_KEY, JSON.stringify(state.canvasGroups));
+    } catch (e) {
+        // File storage is an independent backend. A full browser quota must not
+        // prevent its index from being updated.
+        console.error('Failed to save canvas list to browser storage:', e);
+    }
     if (fsDirectoryHandle) {
         saveCanvasesListToFileSystem();
     }
 }
 
-export async function saveCurrentCanvas() {
-    if (!state.currentCanvasId) return;
-
-    // Cancel any pending auto-save to prevent race condition
-    if (state.autoSaveTimer) {
-        clearTimeout(state.autoSaveTimer);
-        state.setAutoSaveTimer(null);
+function stripPersistedHistory(data) {
+    if (!data || typeof data !== 'object') return false;
+    let changed = false;
+    if (Object.prototype.hasOwnProperty.call(data, 'undoStack')) {
+        delete data.undoStack;
+        changed = true;
     }
+    if (Object.prototype.hasOwnProperty.call(data, 'redoStack')) {
+        delete data.redoStack;
+        changed = true;
+    }
+    return changed;
+}
 
-    const data = {
+async function pruneLegacyPersistedHistories() {
+    await Promise.all(state.canvases.map(async canvas => {
+        const key = 'knotpad-data-' + canvas.id;
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                const data = JSON.parse(saved);
+                if (stripPersistedHistory(data)) {
+                    localStorage.setItem(key, JSON.stringify(data));
+                }
+            }
+        } catch (e) {
+            console.warn(`Failed to compact browser history for canvas ${canvas.id}:`, e);
+        }
+
+        if (fsDirectoryHandle) {
+            const data = await loadCanvasFromFileSystem(canvas.id);
+            if (data && stripPersistedHistory(data)) {
+                await saveCanvasToFileSystem(canvas.id, data);
+            }
+        }
+    }));
+}
+
+function buildCurrentCanvasData() {
+    return {
         items: state.items.map(i => ({
             id: i.id,
             type: i.type,
@@ -498,26 +540,57 @@ export async function saveCurrentCanvas() {
         itemId: state.itemId,
         highestZ: state.highestZ,
         colorGroupModeActive: state.colorGroupModeActive,
-        originalPositions: serializeOriginalPositions(),
-        undoStack: state.undoStack,
-        redoStack: state.redoStack
+        originalPositions: serializeOriginalPositions()
     };
+}
 
+export async function saveCurrentCanvas() {
+    if (!state.currentCanvasId) return;
+
+    // Cancel any pending auto-save to prevent race condition
+    if (state.autoSaveTimer) {
+        clearTimeout(state.autoSaveTimer);
+        state.setAutoSaveTimer(null);
+    }
+
+    // Capture every value before awaiting either backend. Canvas switches and
+    // autosaves may otherwise apply metadata from a different live canvas.
+    const canvasId = state.currentCanvasId;
+    const data = buildCurrentCanvasData();
+    const serializedData = JSON.stringify(data);
+    const itemCount = data.items.length;
+    const updatedAt = Date.now();
+
+    let browserSaved = false;
     try {
-        localStorage.setItem('knotpad-data-' + state.currentCanvasId, JSON.stringify(data));
-        if (fsDirectoryHandle) {
-            await saveCanvasToFileSystem(state.currentCanvasId, data);
-        }
-        const c = state.canvases.find(x => x.id === state.currentCanvasId);
-        if (c) {
-            c.updatedAt = Date.now();
-            c.itemCount = state.items.length;
+        localStorage.setItem('knotpad-data-' + canvasId, serializedData);
+        browserSaved = true;
+    } catch (e) {
+        console.error('Failed to save canvas to browser storage:', e);
+    }
+
+    const fileSaved = fsDirectoryHandle
+        ? await saveCanvasToFileSystem(canvasId, data)
+        : false;
+    const saved = browserSaved || fileSaved;
+
+    if (saved) {
+        const canvasMeta = state.canvases.find(x => x.id === canvasId);
+        if (canvasMeta) {
+            canvasMeta.updatedAt = updatedAt;
+            canvasMeta.itemCount = itemCount;
             saveCanvasesList();
             renderCanvasList();
         }
-    } catch (e) {
+        if (!browserSaved && fileSaved) {
+            showToast('Saved to file storage; browser storage is full', 'warning');
+        } else if (fsDirectoryHandle && !fileSaved) {
+            showToast('Saved to browser storage; file storage failed', 'warning');
+        }
+    } else {
         showToast('Save failed', 'error');
     }
+    return saved;
 }
 
 async function loadCanvasData(id) {
@@ -632,22 +705,38 @@ async function loadCanvasData(id) {
 
         updateMinimap();
 
-        // Restore per-canvas undo/redo stacks if saved, otherwise create initial state
-        if (Array.isArray(data.undoStack) && data.undoStack.length > 0) {
-            state.setUndoStack(data.undoStack);
-        } else {
-            // Create initial state for canvases without saved history
-            state.setUndoStack([{ items: data.items, connections: data.connections.map(c => ({ ...c })) }]);
-        }
-        if (Array.isArray(data.redoStack)) {
-            state.setRedoStack(data.redoStack);
-        } else {
-            state.setRedoStack([]);
-        }
+        // Undo/redo is intentionally session-only. Persisting up to 50 complete
+        // document snapshots can inflate one canvas to roughly 50x its content
+        // and exhaust localStorage. Legacy persisted stacks are ignored.
+        state.setUndoStack([{ items: data.items, connections: data.connections.map(c => ({ ...c })) }]);
+        state.setRedoStack([]);
         updateUndoRedoButtons();
     } catch (e) {
         console.error(e);
     }
+}
+
+async function sweepPendingMediaBeforeCanvasSwitch(leavingCanvasId) {
+    if (!state.pendingMediaDeletes.size) return;
+
+    const otherData = await Promise.all(
+        state.canvases
+            .filter(canvas => canvas.id !== leavingCanvasId)
+            .map(canvas => readStoredCanvasData(canvas.id))
+    );
+    const retainedMediaIds = new Set();
+    otherData.forEach(data => collectMediaIds(data).forEach(mediaId => retainedMediaIds.add(mediaId)));
+
+    await Promise.all([...state.pendingMediaDeletes].map(async mediaId => {
+        if (!retainedMediaIds.has(mediaId)) {
+            await deleteMedia(mediaId);
+            if (fsDirectoryHandle) await deleteMediaFromFileSystem(mediaId);
+            const cachedUrl = state.blobURLCache.get(mediaId);
+            if (cachedUrl) URL.revokeObjectURL(cachedUrl);
+            state.blobURLCache.delete(mediaId);
+        }
+        state.pendingMediaDeletes.delete(mediaId);
+    }));
 }
 
 export async function switchCanvas(id) {
@@ -668,6 +757,9 @@ export async function switchCanvas(id) {
     try {
         if (state.currentCanvasId) {
             await saveCurrentCanvas();
+            // History ends at the canvas boundary. Reclaim deferred deletions
+            // now, while preserving ids referenced by another canvas.
+            await sweepPendingMediaBeforeCanvasSwitch(state.currentCanvasId);
         }
 
         state.blobURLCache.forEach(url => URL.revokeObjectURL(url));
@@ -815,6 +907,46 @@ function moveCanvasToGroup(canvasId, groupId) {
     }
 }
 
+function collectMediaIds(data) {
+    const ids = new Set();
+    const scanItems = items => items?.forEach(item => {
+        if ((item.type === 'image' || item.type === 'video')
+            && typeof item.content === 'string'
+            && item.content.startsWith('media_')) {
+            ids.add(item.content);
+        }
+    });
+    scanItems(data?.items);
+    data?.undoStack?.forEach(snapshot => scanItems(snapshot.items));
+    data?.redoStack?.forEach(snapshot => scanItems(snapshot.items));
+    return ids;
+}
+
+async function readStoredCanvasData(id) {
+    if (id === state.currentCanvasId) return buildCurrentCanvasData();
+    const copies = [];
+    if (fsDirectoryHandle) {
+        const fileData = await loadCanvasFromFileSystem(id);
+        if (fileData) copies.push(fileData);
+    }
+    try {
+        const saved = localStorage.getItem('knotpad-data-' + id);
+        if (saved) copies.push(JSON.parse(saved));
+    } catch (e) {
+        console.warn(`Failed to inspect canvas ${id} for media references:`, e);
+    }
+    if (!copies.length) return null;
+
+    // Destructive cleanup must use the union of both backends. One copy can be
+    // stale after a prior partial save; preferring either copy could delete a
+    // media id that the other still references.
+    return {
+        items: copies.flatMap(data => data.items || []),
+        undoStack: copies.flatMap(data => data.undoStack || []),
+        redoStack: copies.flatMap(data => data.redoStack || [])
+    };
+}
+
 export async function deleteCanvas(id) {
     if (state.canvases.length <= 1) {
         showToast('Cannot delete last canvas', 'error');
@@ -824,10 +956,27 @@ export async function deleteCanvas(id) {
 
     const idx = state.canvases.findIndex(c => c.id === id);
     if (idx > -1) {
+        // Read references before removing either copy of the canvas. Media ids
+        // are normally unique, but imports can legally share them across canvases.
+        const targetData = await readStoredCanvasData(id);
+        const targetMediaIds = collectMediaIds(targetData);
+        if (id === state.currentCanvasId) {
+            state.pendingMediaDeletes.forEach(mediaId => targetMediaIds.add(mediaId));
+        }
+        const otherData = await Promise.all(
+            state.canvases
+                .filter(canvas => canvas.id !== id)
+                .map(canvas => readStoredCanvasData(canvas.id))
+        );
+        const retainedMediaIds = new Set();
+        otherData.forEach(data => collectMediaIds(data).forEach(mediaId => retainedMediaIds.add(mediaId)));
+        const orphanMediaIds = [...targetMediaIds].filter(mediaId => !retainedMediaIds.has(mediaId));
+
         state.canvases.splice(idx, 1);
         localStorage.removeItem('knotpad-data-' + id);
+        let fileCanvasDeleted = true;
         if (fsDirectoryHandle) {
-            await deleteCanvasFromFileSystem(id);
+            fileCanvasDeleted = await deleteCanvasFromFileSystem(id);
         }
         saveCanvasesList();
         if (state.currentCanvasId === id) {
@@ -835,7 +984,25 @@ export async function deleteCanvas(id) {
             await switchCanvas(state.canvases[0].id);
         }
         else renderCanvasList();
-        showToast('Canvas deleted');
+
+        // If the FS canvas file could not be removed, retain FS media so that
+        // the stale file is not made corrupt. IndexedDB cleanup is independent.
+        await Promise.all(orphanMediaIds.map(async mediaId => {
+            await deleteMedia(mediaId);
+            if (fsDirectoryHandle && fileCanvasDeleted) {
+                await deleteMediaFromFileSystem(mediaId);
+            }
+            const cachedUrl = state.blobURLCache.get(mediaId);
+            if (cachedUrl) URL.revokeObjectURL(cachedUrl);
+            state.blobURLCache.delete(mediaId);
+            state.pendingMediaDeletes.delete(mediaId);
+        }));
+
+        if (fsDirectoryHandle && !fileCanvasDeleted) {
+            showToast('Canvas removed, but its file could not be deleted', 'warning');
+        } else {
+            showToast('Canvas deleted');
+        }
     }
 }
 
@@ -1865,6 +2032,7 @@ async function duplicateCanvas(canvasId) {
     const originalDataStr = localStorage.getItem('knotpad-data-' + canvasId);
     if (originalDataStr) {
         const originalData = JSON.parse(originalDataStr);
+        stripPersistedHistory(originalData);
 
         // Find all media items (images/videos with media_ content)
         const mediaItems = (originalData.items || []).filter(
@@ -2962,11 +3130,13 @@ async function importAllCanvases(e) {
 
             // Import canvas data
             if (allData.data[canvas.id]) {
-                localStorage.setItem('knotpad-data-' + canvas.id, JSON.stringify(allData.data[canvas.id]));
+                const canvasData = allData.data[canvas.id];
+                stripPersistedHistory(canvasData);
+                localStorage.setItem('knotpad-data-' + canvas.id, JSON.stringify(canvasData));
 
                 // Also save to file system if connected
                 if (fsDirectoryHandle) {
-                    await saveCanvasToFileSystem(canvas.id, allData.data[canvas.id]);
+                    await saveCanvasToFileSystem(canvas.id, canvasData);
                 }
             }
         }
@@ -3013,39 +3183,7 @@ export function triggerAutoSave() {
 function saveToLocalStorageSync() {
     if (!state.currentCanvasId) return;
     try {
-        const data = {
-            items: state.items.map(i => ({
-                id: i.id,
-                type: i.type,
-                x: i.x,
-                y: i.y,
-                w: i.w,
-                h: i.h,
-                content: i.content,
-                color: i.color,
-                fontSize: i.fontSize,
-                textAlign: i.textAlign,
-                locked: i.locked,
-                manuallyResized: i.manuallyResized,
-                z: parseInt(i.el.style.zIndex)
-            })),
-            connections: state.connections.map(c => ({
-                id: c.id,
-                from: c.from.id,
-                fh: c.fh,
-                to: c.to.id,
-                th: c.th,
-                dir: c.dir,
-                label: c.label || ''
-            })),
-            view: { scale: state.scale, offsetX: state.offsetX, offsetY: state.offsetY },
-            itemId: state.itemId,
-            highestZ: state.highestZ,
-            colorGroupModeActive: state.colorGroupModeActive,
-            originalPositions: serializeOriginalPositions(),
-            undoStack: state.undoStack,
-            redoStack: state.redoStack
-        };
+        const data = buildCurrentCanvasData();
         localStorage.setItem('knotpad-data-' + state.currentCanvasId, JSON.stringify(data));
     } catch (e) {
         console.error('Sync save failed:', e);

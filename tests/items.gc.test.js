@@ -76,10 +76,10 @@ describe('gcOrphanMedia (deferred media GC)', () => {
   });
 });
 
-// Canvas switch must drop pending tracking (keep bytes) rather than GC, because
-// the leaving canvas's undo/redo stacks are persisted to localStorage and may
-// still reference these media (T1-5).
-describe('clearItemsAndConnections preserves cross-canvas history (T1-5)', () => {
+// The low-level state reset has no cross-canvas reference context, so it must
+// drop pending tracking without making destructive storage decisions. The
+// normal switch path performs a reference-aware sweep in ui.js first.
+describe('clearItemsAndConnections leaves storage cleanup to the caller', () => {
   it('drops pending-delete tracking instead of hard-deleting', () => {
     state.pendingMediaDeletes.add('media_a');
     state.pendingMediaDeletes.add('media_b');

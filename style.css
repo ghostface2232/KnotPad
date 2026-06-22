@@ -969,6 +969,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.success { border-color: var(--accent); }
 .toast.error { border-color: var(--danger); }
+.toast.warning { border-color: var(--tag-orange); }
 
 #fileInput { display: none; }
 

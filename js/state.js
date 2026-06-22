@@ -261,9 +261,9 @@ export function resetViewport() {
 export function clearItemsAndConnections() {
     blobURLCache.forEach(url => URL.revokeObjectURL(url));
     blobURLCache.clear();
-    // Drop pending-delete tracking on canvas switch/clear: the leaving canvas's
-    // undo/redo stacks are persisted to localStorage and may still reference these
-    // media, so GC-ing them here would corrupt that canvas's history. Keep the bytes.
+    // This low-level reset has no cross-canvas reference context, so it drops
+    // pending tracking without deleting bytes. Normal canvas switching performs
+    // its reference-aware sweep in ui.js before clearing state.
     pendingMediaDeletes.clear();
     state.connections.forEach(c => { c.el.remove(); if (c.hitArea) c.hitArea.remove(); if (c.arrow) c.arrow.remove(); if (c.labelEl) c.labelEl.remove(); });
     state.connections = [];
