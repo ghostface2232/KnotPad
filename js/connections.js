@@ -149,8 +149,15 @@ export function addConnection(from, fh, to, th, loading = false, savedId = null)
 export function updateConnection(c) {
     const fp = getHandlePos(c.from, c.fh);
     const tp = getHandlePos(c.to, c.th);
-    const pathData = curvePath(fp.x, fp.y, tp.x, tp.y, c.fh, c.th);
+    const geometry = getCurveGeometry(fp.x, fp.y, tp.x, tp.y, c.fh, c.th);
+    const { p0, p1, p2, p3 } = geometry;
+    const pathData = geometry.isLine
+        ? `M${p0.x} ${p0.y} L${p3.x} ${p3.y}`
+        : `M${p0.x} ${p0.y} C${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`;
     c.el.setAttribute('d', pathData);
+    // Keep the geometry that produced the rendered path. Label-only updates
+    // must follow that path even if item state changes before the next render.
+    c.renderedGeometry = geometry;
 
     // Update hit area with same path
     if (c.hitArea) {
@@ -209,9 +216,12 @@ export function updateConnectionLabel(c) {
 
     // Approximate the path-length midpoint from the curve's control points.
     // This preserves the previous label placement without SVG layout APIs.
-    const fp = getHandlePos(c.from, c.fh);
-    const tp = getHandlePos(c.to, c.th);
-    const { p0, p1, p2, p3 } = getCurveGeometry(fp.x, fp.y, tp.x, tp.y, c.fh, c.th);
+    const geometry = c.renderedGeometry || (() => {
+        const fp = getHandlePos(c.from, c.fh);
+        const tp = getHandlePos(c.to, c.th);
+        return getCurveGeometry(fp.x, fp.y, tp.x, tp.y, c.fh, c.th);
+    })();
+    const { p0, p1, p2, p3 } = geometry;
     const midPoint = bezierArcMidpoint(p0, p1, p2, p3);
 
     // Calculate approximate text width (for centering)

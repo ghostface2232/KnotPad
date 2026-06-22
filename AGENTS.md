@@ -72,7 +72,7 @@ KnotPad/
 | File | Purpose | Key Exports |
 |------|---------|-------------|
 | `items.js` | Item CRUD, selection, colors | `createItem`, `addMemo`, `addKeyword`, `addLink`, `deleteItem`, `setItemColor` |
-| `connections.js` | Connection management and incident-edge gesture updates | `addConnection`, `updateConnection`, `updateConnections`, `getConnectionsForItems`, `deleteConnection`, `startConnection` |
+| `connections.js` | Connection management, rendered-path geometry caching, and incident-edge gesture updates | `addConnection`, `updateConnection`, `updateConnections`, `getConnectionsForItems`, `deleteConnection`, `startConnection` |
 | `ui.js` | UI setup, canvas/sidebar management | `loadCanvases`, `saveCurrentCanvas`, `saveState`, `undo`, `redo` |
 | `events.js` | Input event handlers | `setupMouseEvents`, `setupKeyboardEvents` |
 | `viewport.js` | Canvas transform, zoom | `setZoom`, `fitToScreen`, `panToItem`, `updateTransform` |
