@@ -276,9 +276,23 @@ function convertClipboardPlainTextToMemoHtml(text) {
     return memoPlainTextToHtml(text.replace(/\r\n?/g, '\n'));
 }
 
-// Get HTML content from contenteditable element (direct storage, no conversion)
-function getHtmlContent(el) {
-    return normalizeMemoHtml(el.innerHTML);
+// During an active edit the live DOM is the source of truth. Normalizing a
+// cloned tree on every input made item.content differ from what the user saw
+// and added an O(document size) parse/serialize pass to every keystroke.
+function getLiveMemoHtml(el) {
+    return el.innerHTML;
+}
+
+// Canonicalize only at a safe commit boundary (currently blur), when replacing
+// the editor DOM cannot invalidate an active caret or selection. Apply the same
+// HTML to both representations so save/undo/reload all observe one document.
+function commitMemoContent(editor, item) {
+    const canonicalHtml = normalizeMemoHtml(editor.innerHTML);
+    if (editor.innerHTML !== canonicalHtml) {
+        editor.innerHTML = canonicalHtml;
+    }
+    item.content = canonicalHtml;
+    return canonicalHtml;
 }
 
 function isWhitespaceOnlyTextNode(node) {
@@ -1707,7 +1721,7 @@ function setupItemEvents(item) {
                 }
             }
 
-            item.content = getHtmlContent(mb);
+            item.content = getLiveMemoHtml(mb);
             eventBus.emit(Events.AUTOSAVE_TRIGGER);
             hasUnsavedChanges = true;
 
@@ -1737,6 +1751,17 @@ function setupItemEvents(item) {
                 clearTimeout(undoSaveTimer);
                 undoSaveTimer = null;
             }
+
+            // Blur is the commit boundary for memo editing. If normalization
+            // changes the stored representation, persist that canonical form
+            // as a real change rather than leaving the live DOM and model apart.
+            const liveContentBeforeCommit = item.content;
+            commitMemoContent(mb, item);
+            if (item.content !== liveContentBeforeCommit) {
+                hasUnsavedChanges = true;
+                eventBus.emit(Events.AUTOSAVE_TRIGGER);
+            }
+
             // Save to undo stack if content changed during editing
             if (hasUnsavedChanges && item.content !== contentBeforeEdit) {
                 eventBus.emit(Events.STATE_SAVE);
@@ -2165,7 +2190,7 @@ function setupItemEvents(item) {
                         break;
                 }
 
-                item.content = getHtmlContent(mb);
+                item.content = getLiveMemoHtml(mb);
                 eventBus.emit(Events.AUTOSAVE_TRIGGER);
                 hasUnsavedChanges = true;
 

@@ -313,12 +313,27 @@ export function setupKeyboardEvents() {
             openSearch();
             return;
         }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        const isUndoRedoShortcut = e.ctrlKey || e.metaKey;
+        const shortcutKey = e.key.toLowerCase();
+
+        // Text editing owns its own native undo/redo history. Rebuilding the
+        // entire canvas while a contenteditable has focus destroys the caret
+        // and can undo unrelated node operations. Outside an editor, keep the
+        // application-level canvas history shortcuts.
+        if (isUndoRedoShortcut && e.shiftKey && shortcutKey === 'z') {
+            if (isEditableTarget) return;
+            e.preventDefault();
+            redo();
+            return;
+        }
+        if (isUndoRedoShortcut && shortcutKey === 'z') {
+            if (isEditableTarget) return;
             e.preventDefault();
             undo();
             return;
         }
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+        if (isUndoRedoShortcut && shortcutKey === 'y') {
+            if (isEditableTarget) return;
             e.preventDefault();
             redo();
             return;

@@ -100,6 +100,7 @@ KnotPad/
 | Item rendering | `items.js:createItem()` |
 | Memo paste normalization | `items.js:getMemoHtmlFromClipboardData()`, `sanitizeClipboardHtml()` |
 | Memo paragraph spacing on Enter | `items.js:insertParagraphBreakAtSelection()`, `ui.js:applyParagraphSpacing()` |
+| Memo live content and blur commit | `items.js:getLiveMemoHtml()`, `commitMemoContent()` |
 | Legacy memo line-break normalization | `items.js:normalizeMemoHtml()`, `convertTopLevelLegacyBreaksToParagraphs()` |
 | Item events | `items.js:setupItemEvents()` |
 | Color management | `items.js:setItemColor()` |
@@ -280,8 +281,8 @@ eventBus.on(Events.CONNECTIONS_UPDATE, (conn) => { ... });
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl/Cmd + Z` | Undo |
-| `Ctrl/Cmd + Y` or `Ctrl/Cmd + Shift + Z` | Redo |
+| `Ctrl/Cmd + Z` | Undo text edit in an active editor; otherwise undo canvas operation |
+| `Ctrl/Cmd + Y` or `Ctrl/Cmd + Shift + Z` | Redo text edit in an active editor; otherwise redo canvas operation |
 | `Ctrl/Cmd + F` | Search |
 | `Ctrl/Cmd + S` | (Blocked - auto-saves) |
 | `Ctrl/Cmd + B` | Bold (in memo) |
