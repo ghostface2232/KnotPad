@@ -1,10 +1,19 @@
-name: Tests
+name: CI & Deploy
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   unit:
@@ -43,3 +52,47 @@ jobs:
 
       - name: Run E2E tests
         run: npm run test:e2e
+
+  deploy:
+    # Deploy only on push to main; PRs run tests only.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [unit, e2e]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Stage only the deployable static files (exclude tests/tooling/meta).
+      - name: Stage site
+        run: |
+          mkdir _site
+          rsync -a \
+            --exclude='_site' \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='tests' \
+            --exclude='e2e' \
+            --exclude='.github' \
+            --exclude='.agents' \
+            --exclude='test-results' \
+            --exclude='package.json' \
+            --exclude='package-lock.json' \
+            --exclude='vitest.config.js' \
+            --exclude='playwright.config.js' \
+            --exclude='*.md' \
+            --exclude='.gitignore' \
+            ./ _site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
