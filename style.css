@@ -236,7 +236,7 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
 #selectionBox { position: fixed; border: 1.5px solid var(--accent); background: var(--accent-glow); display: none; pointer-events: none; z-index: 9999; border-radius: 4px; }
 
 .canvas-item {
-    position: absolute; background: var(--bg-card); border-radius: var(--radius-md);
+    position: absolute; background: var(--bg-card); border-radius: 12px;
     border: 1px solid var(--border-subtle);
     box-shadow: var(--shadow-md);
     cursor: move; min-width: 140px; min-height: 80px; overflow: visible;
@@ -278,7 +278,7 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
 .canvas-item.new { animation: appear 0.2s ease-out; }
 @keyframes appear { from { opacity: 0; transform: scale(0.96); } }
 
-.item-content { width: 100%; height: 100%; overflow: hidden; border-radius: calc(var(--radius-md) - 1px); position: relative; }
+.item-content { width: 100%; height: 100%; overflow: hidden; border-radius: 11px; position: relative; }
 
 .canvas-item .delete-btn, .canvas-item .color-btn, .canvas-item .font-size-btn {
     position: absolute; top: -10px; width: 24px; height: 24px; border-radius: 50%;
@@ -369,11 +369,11 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
 
 #canvas.connecting .add-child-btn { display: none !important; }
 
-.item-image { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; border-radius: calc(var(--radius-md) - 1px); outline: 1px solid rgba(255, 255, 255, 0.1); outline-offset: -1px; }
+.item-image { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; border-radius: 11px; outline: 1px solid rgba(255, 255, 255, 0.1); outline-offset: -1px; }
 :root.light .item-image { outline-color: rgba(0, 0, 0, 0.1); }
 
 /* Video container and custom controls */
-.video-container { width: 100%; height: 100%; position: relative; background: #000; border-radius: calc(var(--radius-md) - 1px); overflow: hidden; outline: 1px solid rgba(255, 255, 255, 0.1); outline-offset: -1px; }
+.video-container { width: 100%; height: 100%; position: relative; background: #000; border-radius: 11px; overflow: hidden; outline: 1px solid rgba(255, 255, 255, 0.1); outline-offset: -1px; }
 :root.light .video-container { outline-color: rgba(0, 0, 0, 0.1); }
 .item-video { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
 .video-controls {
@@ -427,7 +427,7 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
     position: absolute;
     inset: 0;
     background: var(--bg-secondary);
-    border-radius: calc(var(--radius-md) - 1px);
+    border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -445,7 +445,7 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
     position: absolute;
     inset: 0;
     background: var(--bg-secondary);
-    border-radius: calc(var(--radius-md) - 1px);
+    border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -670,7 +670,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 }
 
 .item-link { padding: 16px; display: flex; flex-direction: column; gap: 10px; height: 100%; cursor: pointer; box-sizing: border-box; }
-.link-favicon { width: 28px; height: 28px; border-radius: 6px; background: var(--bg-hover); flex-shrink: 0; }
+.link-favicon { width: 28px; height: 28px; border-radius: 8px; background: var(--bg-hover); flex-shrink: 0; }
 .link-title { font-size: 14px; font-weight: 500; color: var(--text-primary); line-height: 1.3; word-break: break-word; }
 .link-title.editing {
     outline: none;
@@ -693,7 +693,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     width: 100%;
     aspect-ratio: 3 / 2;
     object-fit: cover;
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--bg-hover);
     flex-shrink: 0;
     margin-top: auto;
@@ -1061,7 +1061,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .sidebar-header-actions { display: flex; gap: 8px; align-items: center; }
 .sidebar-pin-btn {
     width: 28px; height: 28px; background: transparent;
-    border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
     color: var(--text-secondary); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background var(--transition), color var(--transition), border-color var(--transition);
@@ -1070,7 +1070,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .sidebar-pin-btn.pinned { background: var(--accent); border-color: var(--accent); color: white; }
 .sidebar-icon-btn {
     width: 28px; height: 28px; background: transparent;
-    border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
     color: var(--text-secondary); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background var(--transition), color var(--transition), border-color var(--transition);
@@ -1079,7 +1079,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 
 .sidebar-add {
     width: 28px; height: 28px; background: var(--accent);
-    border: none; border-radius: var(--radius-sm);
+    border: none; border-radius: var(--radius-md);
     color: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .sidebar-add:hover { filter: brightness(1.1); }
@@ -1092,7 +1092,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 }
 .canvas-group-header {
     display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px; border-radius: var(--radius-sm);
+    padding: 8px 12px; border-radius: var(--radius-md);
     cursor: pointer; color: var(--text-secondary);
     transition: background 0.15s ease;
 }
@@ -1131,7 +1131,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .canvas-group-header:hover .group-count { opacity: 0; }
 .canvas-group-header .group-action-btn {
     width: 20px; height: 20px; background: transparent; border: none;
-    border-radius: 4px; color: var(--text-secondary); cursor: pointer;
+    border-radius: 6px; color: var(--text-secondary); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
 }
 .canvas-group-header .group-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -1183,7 +1183,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .canvas-list::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
 
 .canvas-item-entry {
-    padding: 10px 12px; border-radius: var(--radius-sm);
+    padding: 10px 12px; border-radius: var(--radius-md);
     cursor: pointer; display: flex; align-items: center; gap: 10px;
     margin-bottom: 4px; position: relative;
     border: 1px solid transparent; /* reserve the active border so switching doesn't shift the row 1px */
@@ -1192,7 +1192,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .canvas-item-entry.active { background: var(--accent-glow); border: 1px solid var(--accent); }
 .canvas-item-entry .canvas-icon {
     width: 32px; height: 32px; background: var(--bg-thumbnail);
-    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
     color: var(--text-secondary); flex-shrink: 0; cursor: pointer;
 }
 .canvas-item-entry .canvas-icon:hover { transform: scale(1.1); }
@@ -1202,12 +1202,30 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .canvas-item-entry.active .canvas-icon.colored { border-color: var(--accent); }
 .canvas-item-entry .canvas-info { flex: 1; min-width: 0; }
 .canvas-item-entry .canvas-name { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
-.canvas-item-entry .canvas-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-.canvas-item-entry .canvas-actions { display: flex; gap: 4px; opacity: 0; }
-.canvas-item-entry:hover .canvas-actions { opacity: 1; }
+.canvas-item-entry .canvas-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; transition: opacity 0.15s ease; }
+/* Actions are absolute so they reserve NO width — name/meta use the full row.
+   On hover the meta fades out and the two buttons cross-fade in over it. */
+.canvas-item-entry .canvas-actions {
+    position: absolute; right: 12px; top: 50%;
+    transform: translateY(-50%) translateX(4px);
+    display: flex; gap: 4px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.canvas-item-entry:hover .canvas-meta,
+.canvas-item-entry:focus-within .canvas-meta { opacity: 0; }
+.canvas-item-entry:hover .canvas-actions,
+.canvas-item-entry:focus-within .canvas-actions {
+    opacity: 1; pointer-events: auto;
+    transform: translateY(-50%) translateX(0);
+}
+/* keep a long name from sliding under the buttons on hover */
+.canvas-item-entry .canvas-info { transition: padding-right 0.15s ease; }
+.canvas-item-entry:hover .canvas-info,
+.canvas-item-entry:focus-within .canvas-info { padding-right: 52px; }
 .canvas-item-entry .canvas-action-btn {
     width: 24px; height: 24px; background: transparent; border: none;
-    border-radius: 4px; color: var(--text-secondary); cursor: pointer;
+    border-radius: 6px; color: var(--text-secondary); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
 }
 .canvas-item-entry .canvas-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -1396,7 +1414,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     padding: 10px 12px;
     background: var(--bg-card);
     border: 1px solid transparent;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     color: var(--text-secondary);
     cursor: pointer;
     font-size: 13px;
