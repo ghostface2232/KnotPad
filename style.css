@@ -1,6 +1,7 @@
-@font-face { font-family: 'SFKR'; src: url('./fonts/SFKR-Regular.otf') format('opentype'); font-weight: 400; }
-@font-face { font-family: 'SFKR'; src: url('./fonts/SFKR-Medium.otf') format('opentype'); font-weight: 500; }
-@font-face { font-family: 'SFKR'; src: url('./fonts/SFKR-Bold.otf') format('opentype'); font-weight: 700; }
+@font-face { font-family: 'SFKR'; src: url('./fonts/SFKR-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'SFKR'; src: url('./fonts/SFKR-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'SFKR'; src: url('./fonts/SFKR-Semibold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'SFKR'; src: url('./fonts/SFKR-Bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,12 +15,16 @@
     --border-active: rgba(255, 255, 255, 0.16);
     --text-primary: #fafafa;
     --text-secondary: rgba(255, 255, 255, 0.64);
+    --text-tertiary: rgba(255, 255, 255, 0.50);
+    --text-muted: rgba(255, 255, 255, 0.40);
     --text-placeholder: rgba(255, 255, 255, 0.32);
+    --border-input: rgba(255, 255, 255, 0.28);
     --accent: #3b82f6;
+    --accent-solid: #2563eb;
     --accent-glow: rgba(59, 130, 246, 0.24);
     --accent-dim: rgba(59, 130, 246, 0.4);
-    --shadow-md: 0 8px 24px rgba(0,0,0,0.4);
-    --shadow-lg: 0 16px 48px rgba(0,0,0,0.48);
+    --shadow-md: 0 1px 2px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.28);
+    --shadow-lg: 0 2px 4px rgba(0,0,0,0.30), 0 8px 20px rgba(0,0,0,0.40), 0 16px 48px rgba(0,0,0,0.40);
     --grid-color: rgba(255, 255, 255, 0.03);
     --scrollbar: rgba(255, 255, 255, 0.16);
     --danger: #ef4444;
@@ -27,6 +32,8 @@
     --radius-md: 8px;
     --radius-lg: 14px;
     --transition: 0.15s ease;
+    --ease-smooth: cubic-bezier(0.2, 0, 0, 1);
+    --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
     --tag-red: #ef4444; --tag-orange: #f97316; --tag-yellow: #eab308;
     --tag-green: #22c55e; --tag-blue: #3b82f6; --tag-purple: #8b5cf6; --tag-pink: #ec4899;
     --conn-default: rgba(255, 255, 255, 0.35);
@@ -40,24 +47,51 @@
     --bg-hover: rgba(0, 0, 0, 0.04);
     --bg-hover-solid: #f5f5f5;
     --border-subtle: rgba(0, 0, 0, 0.08); --border-active: rgba(0, 0, 0, 0.16);
-    --text-primary: #18181b; --text-secondary: rgba(0, 0, 0, 0.56); --text-placeholder: rgba(0, 0, 0, 0.32);
-    --accent: #2563eb; --accent-glow: rgba(37, 99, 235, 0.16); --accent-dim: rgba(37, 99, 235, 0.3);
-    --shadow-md: 0 8px 24px rgba(0,0,0,0.08); --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
+    --text-primary: #18181b; --text-secondary: rgba(0, 0, 0, 0.56);
+    --text-tertiary: rgba(0, 0, 0, 0.45); --text-muted: rgba(0, 0, 0, 0.40);
+    --text-placeholder: rgba(0, 0, 0, 0.32); --border-input: rgba(0, 0, 0, 0.28);
+    --accent: #2563eb; --accent-solid: #2563eb; --accent-glow: rgba(37, 99, 235, 0.16); --accent-dim: rgba(37, 99, 235, 0.3);
+    --shadow-md: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
+    --shadow-lg: 0 2px 4px rgba(0,0,0,0.05), 0 8px 20px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.08);
     --grid-color: rgba(0, 0, 0, 0.04); --scrollbar: rgba(0, 0, 0, 0.16); --danger: #dc2626;
-    --conn-default: rgba(0, 0, 0, 0.3);
+    --conn-default: rgba(0, 0, 0, 0.42);
     --conn-hover: rgba(0, 0, 0, 0.5);
     --bg-thumbnail: #ececee;
+    /* Light-tuned tag colors — dark tokens are near-invisible on light surfaces (yellow/green/orange 1.7-2.6:1) */
+    --tag-red: #dc2626; --tag-orange: #c2410c; --tag-yellow: #a16207;
+    --tag-green: #15803d; --tag-blue: #2563eb; --tag-purple: #7c3aed; --tag-pink: #db2777;
 }
 
 html, body {
     height: 100%; overflow: hidden;
-    font-family: 'SFKR', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'SFKR', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
     background: var(--bg-primary); color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
 }
 input, textarea, button { font-family: inherit; }
 
-#app { width: 100%; height: 100%; position: relative; overflow: hidden; background: var(--bg-primary); outline: none; cursor: default; }
+/* Selection & keyboard focus — brand-consistent, was previously OS default / invisible */
+::selection { background: var(--accent-glow); color: var(--text-primary); }
+:where(button, [tabindex], input, textarea, .context-menu-item, .canvas-item-entry, .settings-tab, .settings-option-btn):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: inherit;
+}
+
+/* Respect reduced-motion — WCAG 2.3.3; also stops the infinite mediaPulse loop */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+#app { width: 100%; height: 100%; position: relative; overflow: hidden; background: var(--bg-primary); outline: none; cursor: default; touch-action: none; }
 #app.panning { cursor: grabbing; }
 #app.space-pan-mode { cursor: grab; }
 #app.space-pan-mode.panning { cursor: grabbing; }
@@ -183,7 +217,7 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
     fill: var(--text-primary);
     font-size: 11px;
     font-weight: 500;
-    font-family: 'SFKR', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'SFKR', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
     dominant-baseline: central;
 }
 .connection-label.selected .connection-label-bg {
@@ -335,10 +369,12 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
 
 #canvas.connecting .add-child-btn { display: none !important; }
 
-.item-image { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; border-radius: calc(var(--radius-md) - 1px); }
+.item-image { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; border-radius: calc(var(--radius-md) - 1px); outline: 1px solid rgba(255, 255, 255, 0.1); outline-offset: -1px; }
+:root.light .item-image { outline-color: rgba(0, 0, 0, 0.1); }
 
 /* Video container and custom controls */
-.video-container { width: 100%; height: 100%; position: relative; background: #000; border-radius: calc(var(--radius-md) - 1px); overflow: hidden; }
+.video-container { width: 100%; height: 100%; position: relative; background: #000; border-radius: calc(var(--radius-md) - 1px); overflow: hidden; outline: 1px solid rgba(255, 255, 255, 0.1); outline-offset: -1px; }
+:root.light .video-container { outline-color: rgba(0, 0, 0, 0.1); }
 .item-video { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
 .video-controls {
     position: absolute; bottom: 0; left: 0; right: 0;
@@ -437,12 +473,12 @@ body.is-box-selecting, body.is-box-selecting * { -webkit-user-select: none; user
 .memo-body > :is(h1, h2, h3, blockquote, div[data-knotpad-paragraph="true"]) + div[data-knotpad-paragraph="true"] { margin-top: calc(1em * var(--memo-paragraph-spacing-percent) / 100); }
 
 /* Markdown toolbar - floating selection-based */
-.memo-toolbar { display: flex; gap: 4px; padding: 6px 10px; position: fixed; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.1s, visibility 0.1s; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 10000; transform: scale(var(--counter-scale-soft, 1)); transform-origin: top left; }
+.memo-toolbar { display: flex; gap: 4px; padding: 6px 10px; position: fixed; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.1s, visibility 0.1s; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; /* concentric: 6px btn + 6px pad */ box-shadow: var(--shadow-lg); z-index: 10000; transform: scale(var(--counter-scale-soft, 1)); transform-origin: top left; }
 .memo-toolbar.active { opacity: 1; visibility: visible; pointer-events: auto; }
-.md-btn { width: 28px; height: 28px; border: none; background: var(--bg-hover); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.md-btn { width: 28px; height: 28px; border: none; background: var(--bg-hover); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease; }
 .md-btn svg { transform: scale(0.8); }
 .md-btn:hover { background: var(--accent-glow); color: var(--accent); }
-.md-btn:active { transform: scale(0.95); }
+.md-btn:active { transform: scale(0.96); }
 .memo-toolbar .toolbar-sep { width: 1px; height: 20px; background: var(--border-subtle); margin: 4px 4px; flex-shrink: 0; }
 
 /* Font size variants */
@@ -661,7 +697,10 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     background: var(--bg-hover);
     flex-shrink: 0;
     margin-top: auto;
+    outline: 1px solid rgba(255, 255, 255, 0.1);
+    outline-offset: -1px;
 }
+:root.light .link-preview-img { outline-color: rgba(0, 0, 0, 0.1); }
 .link-preview-enabled .item-link { gap: 6px; padding: 14px; }
 /* Keep favicon and title at top, preview at bottom */
 .link-preview-enabled .link-favicon { order: 1; }
@@ -684,7 +723,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .toolbar {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 4px; padding: 8px;
-    background: var(--bg-secondary); border-radius: var(--radius-md);
+    background: var(--bg-secondary); border-radius: var(--radius-lg); /* concentric: 6px btn + 8px pad */
     border: 1px solid var(--border-subtle); box-shadow: var(--shadow-lg); z-index: 100;
 }
 .toolbar-btn {
@@ -697,7 +736,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .toolbar-btn.disabled { opacity: 0.35; pointer-events: none; cursor: default; }
 .toolbar-btn.filter-active { box-shadow: inset 0 0 0 2px var(--accent); }
 .toolbar-sep { width: 1px; background: var(--border-subtle); margin: 6px 4px; }
-.zoom-display { display: flex; align-items: center; padding: 0 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); min-width: 52px; justify-content: center; }
+.zoom-display { display: flex; align-items: center; padding: 0 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); min-width: 52px; justify-content: center; font-variant-numeric: tabular-nums; }
 
 .filter-dropdown, .color-dropdown {
     position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
@@ -721,7 +760,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 
 .conn-direction-picker {
     position: fixed; background: var(--bg-secondary);
-    border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-md); /* concentric: 4px btn + 4px pad */
     padding: 4px; display: none; gap: 4px; box-shadow: var(--shadow-lg); z-index: 200;
     align-items: center;
 }
@@ -743,7 +782,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     min-width: 36px;
 }
 .conn-label-btn.has-label {
-    background: var(--accent);
+    background: var(--accent-solid);
     color: white;
 }
 
@@ -786,7 +825,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     font-size: 14px;
     outline: none;
 }
-.conn-label-modal-input:focus { border-color: var(--accent); }
+.conn-label-modal-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
 .conn-label-modal-input::placeholder { color: var(--text-placeholder); }
 .conn-label-modal-actions {
     display: flex;
@@ -808,14 +847,14 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 }
 .conn-label-modal-btn.cancel:hover { color: var(--text-primary); }
 .conn-label-modal-btn.confirm {
-    background: var(--accent);
+    background: var(--accent-solid);
     color: white;
 }
 .conn-label-modal-btn.confirm:hover { filter: brightness(1.1); }
 
 .context-menu {
     position: fixed; background: var(--bg-secondary);
-    border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle); border-radius: 10px; /* concentric: 6px item + 4px pad */
     padding: 4px; box-shadow: var(--shadow-lg); z-index: 10000; min-width: 160px; display: none;
 }
 .context-menu.active { display: block; }
@@ -890,13 +929,13 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     border-radius: var(--radius-sm); color: var(--text-primary);
     font-size: 14px; margin-bottom: 12px;
 }
-.modal-input:focus { outline: none; border-color: var(--accent); }
+.modal-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
 .modal-input::placeholder { color: var(--text-placeholder); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 .modal-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: var(--radius-sm); border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
 .modal-btn-cancel { background: transparent; color: var(--text-secondary); }
 .modal-btn-cancel:hover { color: var(--text-primary); }
-.modal-btn-submit { background: var(--accent); color: white; }
+.modal-btn-submit { background: var(--accent-solid); color: white; }
 .modal-btn-submit:hover { filter: brightness(1.1); }
 
 .link-modal-error {
@@ -931,7 +970,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 }
 .search-bar input::placeholder { color: var(--text-placeholder); }
 .search-nav { display: flex; gap: 4px; align-items: center; }
-.search-nav span { font-size: 12px; color: var(--text-secondary); min-width: 50px; text-align: center; }
+.search-nav span { font-size: 12px; color: var(--text-secondary); min-width: 50px; text-align: center; font-variant-numeric: tabular-nums; }
 .search-nav button {
     width: 28px; height: 28px; border: none; background: var(--bg-card);
     color: var(--text-secondary); border-radius: 50%; cursor: pointer;
@@ -945,7 +984,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     position: fixed; bottom: 16px; right: 16px;
     width: 160px; height: 100px;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm); overflow: hidden; z-index: 50;
+    border-radius: var(--radius-lg); overflow: hidden; z-index: 50; /* match floating-panel radius language */
     cursor: pointer;
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
@@ -964,7 +1003,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
     padding: 12px 20px; border-radius: var(--radius-sm);
     font-size: 13px; box-shadow: var(--shadow-md); z-index: 10000;
-    opacity: 0; transition: all 0.3s ease; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: none;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.success { border-color: var(--accent); }
@@ -977,9 +1016,12 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     position: fixed; top: 0; left: 0; width: var(--sidebar-width, 280px); height: 100%;
     background: var(--bg-secondary); border-right: 1px solid var(--border-subtle);
     z-index: 200; display: flex; flex-direction: column;
-    transform: translateX(calc(-1 * var(--sidebar-width, 280px))); transition: transform var(--transition);
+    transform: translateX(calc(-1 * var(--sidebar-width, 280px)));
+    /* Exit (class removed): shorter, softer glide out */
+    transition: transform 0.18s cubic-bezier(0.4, 0, 1, 1);
 }
-.sidebar.open { transform: translateX(0); }
+/* Enter (class added): longer spring-decelerate slide in */
+.sidebar.open { transform: translateX(0); transition: transform 0.34s var(--ease-spring); }
 .sidebar.resizing { transition: none; }
 .sidebar-resize-handle {
     position: absolute; top: 0; right: -4px; width: 8px; height: 100%;
@@ -999,13 +1041,20 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     position: fixed; top: 16px; left: 16px;
     width: 48px; height: 48px;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md); color: var(--text-secondary);
+    border-radius: var(--radius-lg); color: var(--text-secondary);
     cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 201;
     box-shadow: var(--shadow-md);
-    transition: background var(--transition), color var(--transition), border-color var(--transition);
+    /* left mirrors the sidebar's EXIT motion (used when it closes) */
+    transition: left 0.18s cubic-bezier(0.4, 0, 1, 1), transform var(--transition),
+                background var(--transition), color var(--transition), border-color var(--transition);
 }
 .sidebar-toggle:hover { background: var(--bg-hover-solid); color: var(--text-primary); border-color: var(--border-active); }
-.sidebar.open ~ .sidebar-toggle { left: calc(var(--sidebar-width, 280px) + 16px); }
+/* left mirrors the sidebar's ENTER motion (spring) so the button rides in with the panel */
+.sidebar.open ~ .sidebar-toggle {
+    left: calc(var(--sidebar-width, 280px) + 16px);
+    transition: left 0.34s var(--ease-spring), transform var(--transition),
+                background var(--transition), color var(--transition), border-color var(--transition);
+}
 
 .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
 .sidebar-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
@@ -1045,7 +1094,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 12px; border-radius: var(--radius-sm);
     cursor: pointer; color: var(--text-secondary);
-    transition: all 0.15s ease;
+    transition: background 0.15s ease;
 }
 .canvas-group-header:hover { background: var(--bg-hover); }
 .canvas-group-header .group-chevron {
@@ -1069,6 +1118,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     font-size: 11px; color: var(--text-muted);
     background: var(--bg-card); padding: 2px 6px; border-radius: 10px;
     transition: opacity 0.15s;
+    font-variant-numeric: tabular-nums;
 }
 .canvas-group-header .group-actions {
     position: absolute; right: 0; top: 50%; transform: translateY(-50%);
@@ -1136,6 +1186,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     padding: 10px 12px; border-radius: var(--radius-sm);
     cursor: pointer; display: flex; align-items: center; gap: 10px;
     margin-bottom: 4px; position: relative;
+    border: 1px solid transparent; /* reserve the active border so switching doesn't shift the row 1px */
 }
 .canvas-item-entry:hover { background: var(--bg-hover); }
 .canvas-item-entry.active { background: var(--accent-glow); border: 1px solid var(--accent); }
@@ -1172,7 +1223,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 .canvas-customize-picker {
     position: absolute; left: 12px;
     background: var(--bg-secondary); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md); padding: 12px;
+    border-radius: 16px; padding: 12px; /* concentric-ish: 6px swatch + 12px pad */
     display: none; flex-direction: column; gap: 12px; width: 220px;
     box-shadow: var(--shadow-lg); z-index: 300;
 }
@@ -1203,7 +1254,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 
 .canvas-color-opt {
     width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
-    border: 2px solid transparent; transition: all 0.15s ease;
+    border: 2px solid transparent; transition: transform 0.15s ease, border-color 0.15s ease;
 }
 .canvas-color-opt:hover { transform: scale(1.15); }
 .canvas-color-opt.selected { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-secondary); }
@@ -1224,8 +1275,8 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 }
 .topbar-group {
     display: flex; align-items: center; gap: 4px;
-    padding: 6px 8px;
-    background: var(--bg-secondary); border-radius: var(--radius-md);
+    padding: 8px;
+    background: var(--bg-secondary); border-radius: var(--radius-lg); /* concentric: 6px btn + 8px pad, matches bottom toolbar */
     border: 1px solid var(--border-subtle); box-shadow: var(--shadow-md);
 }
 .topbar-canvas-name {
@@ -1349,7 +1400,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     color: var(--text-secondary);
     cursor: pointer;
     font-size: 13px;
-    transition: all var(--transition);
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
 .sidebar-settings-btn:hover {
     background: var(--bg-hover-solid);
@@ -1419,7 +1470,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     font-size: 13px;
     font-weight: 500;
     white-space: nowrap;
-    transition: all var(--transition);
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
     position: relative;
     margin-bottom: -1px;
 }
@@ -1441,8 +1492,11 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     overflow-y: auto;
     padding: 24px;
 }
+/* Wide track + transparent-bordered thumb: the visible 4px thumb floats ~4px off the
+   content, independent of padding (WebKit carves the scrollbar out of the content box). */
 .settings-content::-webkit-scrollbar { width: 4px; }
 .settings-content::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+.settings-content::-webkit-scrollbar-thumb:hover { background: var(--conn-hover); }
 .settings-panel {
     display: none;
     height: 100%;
@@ -1489,7 +1543,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     color: var(--text-secondary);
     cursor: pointer;
     font-size: 13px;
-    transition: all var(--transition);
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
 .settings-option-btn:hover {
     background: var(--bg-hover);
@@ -1534,7 +1588,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     bottom: 0;
     background: var(--bg-hover);
     border: 1px solid var(--border-subtle);
-    transition: all var(--transition);
+    transition: background var(--transition), border-color var(--transition);
     border-radius: 12px;
 }
 .settings-toggle-slider:before {
@@ -1545,9 +1599,11 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     left: 2px;
     bottom: 2px;
     background: var(--text-secondary);
-    transition: all var(--transition);
+    transition: transform 0.28s var(--ease-spring), background var(--transition), width 0.15s ease;
     border-radius: 50%;
 }
+/* Momentary knob squash on press for a tactile toggle */
+.settings-toggle:active .settings-toggle-slider:before { width: 22px; }
 .settings-toggle input:checked + .settings-toggle-slider {
     background: var(--accent);
     border-color: var(--accent);
@@ -1556,6 +1612,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     transform: translateX(20px);
     background: white;
 }
+.settings-toggle input:checked:active + .settings-toggle-slider:before { transform: translateX(16px); }
 .shortcuts-section {
     flex: 1;
     overflow-y: auto;
@@ -1705,7 +1762,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     border: 2px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     cursor: pointer;
-    transition: all var(--transition);
+    transition: border-color var(--transition), background var(--transition);
     text-align: center;
 }
 .storage-card:hover {
@@ -1734,7 +1791,7 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
     color: var(--text-secondary);
-    transition: all var(--transition);
+    transition: background var(--transition), color var(--transition);
 }
 .storage-card:hover .storage-card-icon {
     color: var(--text-primary);
@@ -2085,4 +2142,152 @@ body.color-mode-fill .connection-label.selected .connection-label-bg {
 }
 .font-size-preview .preview-text.size-xlarge {
     font-size: 22px;
+}
+
+/* ============================================================
+   Motion & micro-interactions (make-interfaces-feel-better pass)
+   ============================================================ */
+
+@keyframes kp-pop-in {
+    from { opacity: 0; transform: translateY(6px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes kp-pop-out {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+@keyframes kp-overlay-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes kp-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes kp-swatch-in {
+    from { opacity: 0; transform: scale(0.4); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* --- Popover / menu / picker entrance (was hard display:none→block "pop") --- */
+.context-menu.active,
+.context-submenu.active,
+.color-picker.active,
+.filter-dropdown.active,
+.color-dropdown.active,
+.conn-direction-picker.active,
+.canvas-customize-picker.active {
+    animation: kp-pop-in 0.14s var(--ease-smooth);
+    transform-origin: top center;
+}
+
+/* --- Color / filter popovers: gentle staggered swatch reveal --- */
+.color-picker.active .color-opt,
+.filter-dropdown.active .filter-opt,
+.color-dropdown.active .color-opt {
+    animation: kp-swatch-in 0.2s var(--ease-smooth) backwards;
+}
+.color-picker.active .color-opt:nth-child(1),
+.filter-dropdown.active .filter-opt:nth-child(1),
+.color-dropdown.active .color-opt:nth-child(1) { animation-delay: 0.00s; }
+.color-picker.active .color-opt:nth-child(2),
+.filter-dropdown.active .filter-opt:nth-child(2),
+.color-dropdown.active .color-opt:nth-child(2) { animation-delay: 0.02s; }
+.color-picker.active .color-opt:nth-child(3),
+.filter-dropdown.active .filter-opt:nth-child(3),
+.color-dropdown.active .color-opt:nth-child(3) { animation-delay: 0.04s; }
+.color-picker.active .color-opt:nth-child(4),
+.filter-dropdown.active .filter-opt:nth-child(4),
+.color-dropdown.active .color-opt:nth-child(4) { animation-delay: 0.06s; }
+.color-picker.active .color-opt:nth-child(5),
+.filter-dropdown.active .filter-opt:nth-child(5),
+.color-dropdown.active .color-opt:nth-child(5) { animation-delay: 0.08s; }
+.color-picker.active .color-opt:nth-child(6),
+.filter-dropdown.active .filter-opt:nth-child(6),
+.color-dropdown.active .color-opt:nth-child(6) { animation-delay: 0.10s; }
+.color-picker.active .color-opt:nth-child(n+7),
+.filter-dropdown.active .filter-opt:nth-child(n+7),
+.color-dropdown.active .color-opt:nth-child(n+7) { animation-delay: 0.12s; }
+
+/* --- Modal enter / exit --- */
+.modal.active { animation: kp-overlay-in 0.16s ease; }
+.modal.active .modal-box { animation: kp-pop-in 0.22s var(--ease-smooth); }
+.modal.closing { animation: kp-overlay-in 0.14s ease reverse forwards; }
+.modal.closing .modal-box { animation: kp-pop-out 0.14s var(--ease-smooth) forwards; }
+
+/* --- Settings tab-panel cross-fade on switch --- */
+.settings-panel.active { animation: kp-fade-in 0.2s var(--ease-smooth); }
+
+/* --- Tactile press feedback: scale(0.96). Excludes canvas-anchored
+       controls that use transform for zoom counter-scaling. --- */
+/* NB: .sidebar-toggle is intentionally excluded here — it defines its own
+   transition (incl. `left`) so the button rides the sidebar's exit motion. */
+.toolbar-btn, .topbar-btn, .sidebar-icon-btn, .sidebar-pin-btn, .sidebar-add,
+.sidebar-settings-btn, .modal-btn, .settings-tab,
+.settings-option-btn, .settings-close-btn, .conn-direction-picker button,
+.conn-label-modal-btn, .conn-label-btn, .search-nav button, .search-close,
+.canvas-action-btn, .group-action-btn, .video-play-btn, .video-mute-btn,
+.video-fullscreen-btn, .md-btn {
+    transition: background var(--transition), color var(--transition),
+                border-color var(--transition), box-shadow var(--transition),
+                filter var(--transition), transform var(--transition);
+}
+.toolbar-btn:active, .topbar-btn:active, .sidebar-icon-btn:active,
+.sidebar-pin-btn:active, .sidebar-add:active, .sidebar-toggle:active,
+.sidebar-settings-btn:active, .modal-btn:active, .settings-tab:active,
+.settings-option-btn:active, .settings-close-btn:active,
+.conn-direction-picker button:active, .conn-label-modal-btn:active,
+.conn-label-btn:active, .search-nav button:active, .search-close:active,
+.canvas-action-btn:active, .group-action-btn:active, .video-play-btn:active,
+.video-mute-btn:active, .video-fullscreen-btn:active, .md-btn:active {
+    transform: scale(0.96);
+}
+
+/* --- Theme toggle: cross-fade moon/sun (scale + blur), not a hard swap --- */
+#themeToggle { position: relative; }
+#themeToggle .moon, #themeToggle .sun {
+    position: absolute; top: 50%; left: 50%;
+    transition: opacity 0.3s var(--ease-smooth),
+                transform 0.3s var(--ease-smooth),
+                filter 0.3s var(--ease-smooth);
+}
+#themeToggle .moon { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+#themeToggle .sun  { opacity: 0; transform: translate(-50%, -50%) scale(0.25); filter: blur(4px); }
+#themeToggle.is-light .moon { opacity: 0; transform: translate(-50%, -50%) scale(0.25); filter: blur(4px); }
+#themeToggle.is-light .sun  { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+
+/* --- Sidebar: split & staggered content cascade on ENTER (exit just slides) --- */
+.sidebar.open .sidebar-header { animation: kp-fade-in 0.3s var(--ease-smooth) 0.06s backwards; }
+.sidebar.open .canvas-list    { animation: kp-fade-in 0.32s var(--ease-smooth) 0.12s backwards; }
+.sidebar.open .sidebar-footer { animation: kp-fade-in 0.3s var(--ease-smooth) 0.18s backwards; }
+
+/* --- Extend tap targets on the smallest sidebar controls toward 40px.
+       Vertical only where rows are tightly packed, so hit areas never overlap. --- */
+.group-action-btn { position: relative; }
+.group-action-btn::after { content: ""; position: absolute; inset: -9px 0; }
+.canvas-action-btn { position: relative; }
+.canvas-action-btn::after { content: ""; position: absolute; inset: -8px -2px; }
+
+/* --- Settings scroll containers: float the visible 4px thumb off the content.
+       WebKit carves the scrollbar from the content box, so the fix is a wider track
+       with a transparent-bordered thumb (padding-box), NOT container padding. --- */
+.storage-scroll-wrapper::-webkit-scrollbar,
+.nodestyle-scroll-wrapper::-webkit-scrollbar,
+.shortcuts-scroll-wrapper::-webkit-scrollbar,
+.shortcuts-list::-webkit-scrollbar { width: 10px; }
+.storage-scroll-wrapper::-webkit-scrollbar-thumb,
+.nodestyle-scroll-wrapper::-webkit-scrollbar-thumb,
+.shortcuts-scroll-wrapper::-webkit-scrollbar-thumb,
+.shortcuts-list::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: 8px;
+    border: 3px solid transparent; /* visible 4px thumb (app standard), floats 3px off the cards */
+    background-clip: padding-box;
+}
+.storage-scroll-wrapper::-webkit-scrollbar-thumb:hover,
+.nodestyle-scroll-wrapper::-webkit-scrollbar-thumb:hover,
+.shortcuts-scroll-wrapper::-webkit-scrollbar-thumb:hover,
+.shortcuts-list::-webkit-scrollbar-thumb:hover {
+    background: var(--conn-hover);
+    background-clip: padding-box;
 }

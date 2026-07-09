@@ -88,8 +88,8 @@ export function toggleTheme() {
 
 function updateThemeIcon() {
     const isLight = document.documentElement.classList.contains('light');
-    $('themeToggle').querySelector('.moon').style.display = isLight ? 'none' : 'block';
-    $('themeToggle').querySelector('.sun').style.display = isLight ? 'block' : 'none';
+    // Cross-fade the two glyphs (see #themeToggle rules in style.css) instead of a hard display swap.
+    $('themeToggle').classList.toggle('is-light', isLight);
 }
 
 // ============ Search ============
@@ -1067,8 +1067,11 @@ function getCanvasIconHTML(c) {
 
 function getCanvasIconStyle(c, isActive) {
     if (c.color && COLOR_MAP[c.color]) {
-        // For colored canvas, use color as background with adjusted opacity
-        return `background: ${COLOR_MAP[c.color]}${isActive ? '' : '33'}; ${isActive ? 'color: white;' : `color: ${COLOR_MAP[c.color]};`}`;
+        // For colored canvas, use theme-aware tag token; inactive is a faint tint of the same hue
+        const v = `var(--tag-${c.color})`;
+        return isActive
+            ? `background: ${v}; color: #fff;`
+            : `background: color-mix(in srgb, ${v} 20%, transparent); color: ${v};`;
     }
     return '';
 }
@@ -1642,7 +1645,7 @@ function updateMinimapGeometry() {
 
     visible.forEach(i => {
         const element = minimapCache.itemElements.get(i);
-        const bg = i.color ? COLOR_MAP[i.color] : 'var(--text-secondary)';
+        const bg = i.color ? `var(--tag-${i.color})` : 'var(--text-secondary)';
         element.style.left = `${(i.x - minX) * s}px`;
         element.style.top = `${(i.y - minY) * s}px`;
         element.style.width = `${Math.max(3, i.w * s)}px`;
@@ -2586,15 +2589,20 @@ export function openLinkModal(itemToEdit = null) {
         $('linkUrl').value = '';
     }
 
+    linkModal.classList.remove('closing');
     linkModal.classList.add('active');
     setTimeout(() => $('linkUrl').focus(), 100);
 }
 
 export function closeLinkModal() {
-    linkModal.classList.remove('active');
-    $('linkTitle').value = '';
-    $('linkUrl').value = '';
-    hideLinkModalError();
+    if (linkModal.classList.contains('closing')) return;
+    linkModal.classList.add('closing');
+    setTimeout(() => {
+        linkModal.classList.remove('active', 'closing');
+        $('linkTitle').value = '';
+        $('linkUrl').value = '';
+        hideLinkModalError();
+    }, 140);
 }
 
 function isValidUrl(string) {
@@ -2712,6 +2720,7 @@ export function openSettingsModal() {
     if (settingsModal) {
         updateStorageModalState();
         updateSettingsUI();
+        settingsModal.classList.remove('closing');
         settingsModal.classList.add('active');
         // Update shortcuts scroll gradient
         setTimeout(updateShortcutsScrollGradient, 0);
@@ -2719,7 +2728,9 @@ export function openSettingsModal() {
 }
 
 export function closeSettingsModal() {
-    if (settingsModal) settingsModal.classList.remove('active');
+    if (!settingsModal || settingsModal.classList.contains('closing')) return;
+    settingsModal.classList.add('closing');
+    setTimeout(() => settingsModal.classList.remove('active', 'closing'), 140);
 }
 
 function updateStorageModalState() {

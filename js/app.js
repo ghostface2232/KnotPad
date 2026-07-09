@@ -108,7 +108,7 @@ function setupToolbarEvents() {
         saveState();
     });
 
-    $('addLinkBtn').addEventListener('click', openLinkModal);
+    $('addLinkBtn').addEventListener('click', () => openLinkModal());
 
     $('addFileBtn').addEventListener('click', () => $('fileInput').click());
 
