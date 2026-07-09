@@ -1,6 +1,6 @@
 // KnotPad - Items Module (Create, Manage, Delete)
 
-import { COLORS, COLOR_MAP, FONT_SIZES } from './constants.js';
+import { COLORS, FONT_SIZES } from './constants.js';
 import { $, esc, findFreePosition, sanitizeUrl, sanitizeMemoHtml } from './utils.js';
 import * as state from './state.js';
 import { throttledMinimap, updateMinimap } from './viewport.js';
@@ -1396,7 +1396,7 @@ export function createItem(cfg, loading = false) {
     }
 
     if (cfg.color) {
-        el.style.setProperty('--tag-color', COLOR_MAP[cfg.color]);
+        el.style.setProperty('--tag-color', `var(--tag-${cfg.color})`);
         el.classList.add('has-color');
         el.dataset.color = cfg.color;
     }
@@ -1425,7 +1425,7 @@ export function createItem(cfg, loading = false) {
         el.classList.add('keyword-node');
     }
 
-    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>${fontSizeBtn}<button class="color-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="2" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r="2" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:${COLOR_MAP[c]}" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>${memoToolbar}`;
+    el.innerHTML = `<div class="color-dot"></div><div class="item-content">${html}</div><button class="delete-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></button>${fontSizeBtn}<button class="color-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="2" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r="2" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg></button><div class="color-picker"><div class="color-opt none" data-color="" title="None"></div>${COLORS.map(c => `<div class="color-opt" data-color="${c}" style="background:var(--tag-${c})" title="${c}"></div>`).join('')}</div><div class="resize-handle"></div><div class="connection-handle top" data-h="top"></div><div class="connection-handle bottom" data-h="bottom"></div><div class="connection-handle left" data-h="left"></div><div class="connection-handle right" data-h="right"></div><button class="add-child-btn top" data-d="top">+</button><button class="add-child-btn bottom" data-d="bottom">+</button><button class="add-child-btn left" data-d="left">+</button><button class="add-child-btn right" data-d="right">+</button>${memoToolbar}`;
 
     canvas.appendChild(el);
 
@@ -2821,7 +2821,7 @@ export function setItemColor(targetItem, color) {
     targets.forEach(item => {
         item.color = color || null;
         if (color) {
-            item.el.style.setProperty('--tag-color', COLOR_MAP[color]);
+            item.el.style.setProperty('--tag-color', `var(--tag-${color})`);
             item.el.classList.add('has-color');
             item.el.dataset.color = color;
         } else {

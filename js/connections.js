@@ -29,7 +29,7 @@ export function startConnection(item, handle) {
     tempLine.classList.add('connection-line', 'temp');
 
     if (item.color && COLOR_MAP[item.color]) {
-        tempLine.style.stroke = COLOR_MAP[item.color];
+        tempLine.style.stroke = `var(--tag-${item.color})`;
     }
 
     connectionsSvg.appendChild(tempLine);
@@ -166,7 +166,7 @@ export function updateConnection(c) {
 
     // Apply color from source node
     if (c.from.color && COLOR_MAP[c.from.color]) {
-        c.el.style.stroke = COLOR_MAP[c.from.color];
+        c.el.style.stroke = `var(--tag-${c.from.color})`;
     } else {
         c.el.style.stroke = '';
     }
@@ -248,7 +248,7 @@ export function updateConnectionLabel(c) {
     // Expose source-node color via CSS variables/attrs so display modes can
     // restyle the label without fighting inline SVG styles.
     if (c.from.color && COLOR_MAP[c.from.color]) {
-        c.labelEl.style.setProperty('--connection-label-accent', COLOR_MAP[c.from.color]);
+        c.labelEl.style.setProperty('--connection-label-accent', `var(--tag-${c.from.color})`);
         c.labelEl.dataset.color = c.from.color;
     } else {
         c.labelEl.style.removeProperty('--connection-label-accent');
@@ -326,7 +326,7 @@ export function updateConnectionArrow(c) {
 
     // Apply color from source node
     if (c.from.color && COLOR_MAP[c.from.color]) {
-        g.style.fill = COLOR_MAP[c.from.color];
+        g.style.fill = `var(--tag-${c.from.color})`;
     } else {
         g.style.fill = '';
     }

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v15.13.3';
+const CACHE_VERSION = 'v15.14.0';
 const CACHE_NAME = 'knotpad-' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   './',
@@ -7,9 +7,10 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './fonts/SFKR-Regular.otf',
-  './fonts/SFKR-Medium.otf',
-  './fonts/SFKR-Bold.otf',
+  './fonts/SFKR-Regular.woff2',
+  './fonts/SFKR-Medium.woff2',
+  './fonts/SFKR-Semibold.woff2',
+  './fonts/SFKR-Bold.woff2',
   './js/app.js',
   './js/connections.js',
   './js/constants.js',
